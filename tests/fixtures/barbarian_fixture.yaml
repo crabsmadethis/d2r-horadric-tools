@@ -1,0 +1,45 @@
+schema_version: 1
+name: TestBarb
+class: barbarian
+level: 60
+
+stats:
+  strength: 150
+  dexterity: 80
+  vitality: 150
+  energy: 20
+
+skills:
+  Whirlwind: 20
+  Blade Mastery: 10
+  Shout: 5
+  Battle Orders: 5
+  Battle Command: 1
+
+equipment:
+  # Grief runeword (Eth + Tir + Lo + Mal + Ral) in Phase Blade
+  - slot: weapon
+    runeword: Grief
+    base: "7cr"
+
+  # Grief runeword second weapon for dual wield on switch
+  - slot: switch_weapon
+    runeword: Grief
+    base: "7cr"
+
+  # Arreat's Face (Slayer Guard) - UID 279
+  - slot: helm
+    unique: "Arreat's Face"
+
+  # Enigma in Archon Plate
+  - slot: body
+    runeword: Enigma
+    base: utp
+
+inventory:
+  charms:
+    - magic_small_charm:
+        count: 2
+        properties:
+          life: 20
+          fire_res: 11

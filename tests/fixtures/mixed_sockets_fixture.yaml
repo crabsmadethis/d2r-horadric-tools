@@ -1,0 +1,45 @@
+schema_version: 1
+name: TestSockets
+class: paladin
+level: 70
+
+stats:
+  strength: 100
+  dexterity: 80
+  vitality: 200
+  energy: 25
+
+skills:
+  Zeal: 20
+  Fanaticism: 10
+  Holy Shield: 5
+  Smite: 1
+  Sacrifice: 1
+
+equipment:
+  # Spirit runeword sword (Tal + Thul + Ort + Amn) in Rune Sword
+  - slot: weapon
+    runeword: Spirit
+    base: "9ls"
+
+  # Rhyme runeword shield (Shael + Eth) in Kite Shield
+  - slot: shield
+    runeword: Rhyme
+    base: kit
+
+  # Lore runeword helm (Ort + Sol) in Great Helm
+  - slot: helm
+    runeword: Lore
+    base: ghm
+
+  # Stealth runeword body (Tal + Eth) in Leather Armor
+  - slot: body
+    runeword: Stealth
+    base: lea
+
+inventory:
+  charms:
+    - magic_small_charm:
+        count: 2
+        properties:
+          life: 20

@@ -1,0 +1,39 @@
+schema_version: 1
+name: TestDruid
+class: druid
+level: 70
+
+stats:
+  strength: 130
+  dexterity: 60
+  vitality: 200
+  energy: 30
+
+skills:
+  Tornado: 20
+  Hurricane: 15
+  Cyclone Armor: 5
+  Oak Sage: 5
+  Summon Grizzly: 1
+
+equipment:
+  # Heart of the Oak runeword (Ko + Vex + Pul + Thul) in Elder Staff
+  - slot: weapon
+    runeword: Heart of the Oak
+    base: "6cs"
+
+  # Jalal's Mane (Totemic Mask) - UID 287
+  - slot: helm
+    unique: "Jalal's Mane"
+
+  # Enigma (Jah + Ith + Ber) in Archon Plate
+  - slot: body
+    runeword: Enigma
+    base: utp
+
+inventory:
+  charms:
+    - magic_small_charm:
+        count: 1
+        properties:
+          life: 20

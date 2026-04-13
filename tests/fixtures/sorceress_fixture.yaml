@@ -1,0 +1,56 @@
+schema_version: 1
+name: TestSorc
+class: sorceress
+level: 80
+
+stats:
+  strength: 156
+  dexterity: 60
+  vitality: 200
+  energy: 35
+
+skills:
+  Lightning: 20
+  Chain Lightning: 20
+  Lightning Mastery: 10
+  Teleport: 1
+  Warmth: 1
+  Static Field: 1
+
+equipment:
+  # Spirit sword (runeword) in Rune Sword (9ls)
+  - slot: weapon
+    runeword: Spirit
+    base: "9ls"
+
+  # Spirit shield (runeword) in Monarch (uit)
+  - slot: shield
+    runeword: Spirit
+    base: uit
+
+  # Griffon's Eye diadem - UID 336
+  - slot: helm
+    unique: "Griffon's Eye"
+
+  # Skin of the Vipermagi - UID 210
+  - slot: body
+    unique: Skin of the Vipermagi
+
+  # Arachnid Mesh - UID 373
+  - slot: belt
+    unique: Arachnid Mesh
+
+inventory:
+  charms:
+    - unique: Annihilus
+      properties:
+        all_skills: 1
+        strength: 20
+        dexterity: 20
+        vitality: 20
+        energy: 20
+        fire_res: 20
+        cold_res: 20
+        light_res: 20
+        poison_res: 20
+        add_exp: 10

@@ -1,0 +1,39 @@
+schema_version: 1
+name: TestAmazon
+class: amazon
+level: 45
+
+stats:
+  strength: 60
+  dexterity: 100
+  vitality: 150
+  energy: 25
+
+skills:
+  Lightning Fury: 20
+  Charged Strike: 10
+  Power Strike: 1
+  Jab: 1
+  Critical Strike: 1
+
+equipment:
+  # Titan's Revenge (Ceremonial Javelin) - UID 281
+  - slot: weapon
+    unique: "Titan's Revenge"
+
+  # Lore helm runeword (Ort + Sol) in Bone Helm
+  - slot: helm
+    runeword: Lore
+    base: bhm
+
+  # Stealth body armor (Tal + Eth) in Leather Armor
+  - slot: body
+    runeword: Stealth
+    base: lea
+
+inventory:
+  charms:
+    - magic_small_charm:
+        count: 2
+        properties:
+          life: 20

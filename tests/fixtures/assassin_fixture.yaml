@@ -1,0 +1,44 @@
+schema_version: 1
+name: TestAssassin
+class: assassin
+level: 50
+
+stats:
+  strength: 80
+  dexterity: 80
+  vitality: 150
+  energy: 25
+
+skills:
+  Lightning Sentry: 20
+  Death Sentry: 10
+  Fade: 5
+  Claw Mastery: 5
+  Shadow Master: 1
+
+equipment:
+  # Jadetalon (Wrist Sword, code 7wb) - UID 308
+  - slot: weapon
+    unique: Jadetalon
+
+  # Pattern runeword (Tal + Ort + Thul) in Greater Claws
+  - slot: switch_weapon
+    runeword: Pattern
+    base: "9lw"
+
+  # Lore helm runeword in Bone Helm
+  - slot: helm
+    runeword: Lore
+    base: bhm
+
+  # Stealth body in Leather Armor
+  - slot: body
+    runeword: Stealth
+    base: lea
+
+inventory:
+  charms:
+    - magic_small_charm:
+        count: 2
+        properties:
+          life: 20

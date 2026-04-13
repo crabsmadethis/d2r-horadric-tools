@@ -1,0 +1,41 @@
+schema_version: 1
+name: TestMerc
+class: barbarian
+level: 80
+
+stats:
+  strength: 150
+  dexterity: 80
+  vitality: 200
+  energy: 20
+
+skills:
+  Whirlwind: 20
+  Blade Mastery: 10
+  Battle Orders: 10
+  Shout: 5
+  Battle Command: 1
+
+equipment:
+  # Arreat's Face - UID 279
+  - slot: helm
+    unique: "Arreat's Face"
+
+  # Enigma in Archon Plate
+  - slot: body
+    runeword: Enigma
+    base: utp
+
+  # The Grandfather (Colossus Blade) - UID 261
+  - slot: weapon
+    unique: The Grandfather
+
+inventory:
+  charms:
+    - magic_small_charm:
+        count: 2
+        properties:
+          life: 20
+
+merc:
+  template: infinity_might

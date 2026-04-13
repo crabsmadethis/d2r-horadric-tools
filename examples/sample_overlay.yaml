@@ -1,0 +1,32 @@
+# Sample overlay: buff early-game unique items
+#
+# Overlays modify D2R data tables (TSV files) declaratively.
+# Place in an overlays/ directory and run 'd2r-mod build'.
+#
+# Format:
+#   target: path to game table (relative to Data directory)
+#   changes: list of row modifications
+#     - row: identifies the row by column value (usually 'index')
+#       set: column -> new value pairs
+#       comment: optional description of the change
+
+target: data/global/excel/UniqueItems.txt
+changes:
+  # Add Enhanced Damage and Strength to The Gnasher (unique Hand Axe)
+  - row: {index: "The Gnasher"}
+    set:
+      prop4: "dmg%"
+      min4: "50"
+      max4: "50"
+      prop5: "str"
+      min5: "20"
+      max5: "20"
+    comment: "The Gnasher: add +50% ED, +20 Strength"
+
+  # Add +1 All Skills to Nagelring (unique ring)
+  - row: {index: "Nagelring"}
+    set:
+      prop5: "allskills"
+      min5: "1"
+      max5: "1"
+    comment: "Nagelring: add +1 All Skills"

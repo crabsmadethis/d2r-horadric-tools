@@ -1,0 +1,34 @@
+schema_version: 1
+name: TestStash
+class: sorceress
+level: 50
+
+stats:
+  strength: 50
+  dexterity: 35
+  vitality: 150
+  energy: 35
+
+skills:
+  Teleport: 1
+  Warmth: 1
+  Fire Ball: 10
+
+equipment:
+  # Lore helm in Skull Cap
+  - slot: helm
+    runeword: Lore
+    base: skp
+
+  # Stealth body in Leather Armor
+  - slot: body
+    runeword: Stealth
+    base: lea
+
+inventory:
+  charms:
+    # Fill inventory with small charms (10 cols x 4 rows = 40 slots)
+    - magic_small_charm:
+        count: 35
+        properties:
+          life: 20

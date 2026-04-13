@@ -1,0 +1,72 @@
+schema_version: 1
+name: TestPaladin
+class: paladin
+level: 99
+
+stats:
+  strength: 156
+  dexterity: 125
+  vitality: 300
+  energy: 25
+
+skills:
+  Blessed Hammer: 20
+  Concentration: 20
+  Vigor: 20
+  Blessed Aim: 20
+  Holy Shield: 10
+  Smite: 1
+  Charge: 1
+
+equipment:
+  # Harlequin Crest (Shako) - UID 248
+  - slot: helm
+    unique: Harlequin Crest
+
+  # Herald of Zakarum (Gilded Shield) - UID 285
+  - slot: shield
+    unique: Herald of Zakarum
+
+  # Enigma body (Jah + Ith + Ber) in Archon Plate
+  - slot: body
+    runeword: Enigma
+    base: utp
+
+  # Mara's Kaleidoscope - UID 272
+  - slot: neck
+    unique: "Mara's Kaleidoscope"
+
+  # The Stone of Jordan - UID 122
+  - slot: ring_right
+    unique: The Stone of Jordan
+
+inventory:
+  charms:
+    - unique: Annihilus
+      properties:
+        all_skills: 1
+        strength: 20
+        dexterity: 20
+        vitality: 20
+        energy: 20
+        fire_res: 20
+        cold_res: 20
+        light_res: 20
+        poison_res: 20
+        add_exp: 10
+
+    - unique: Hellfire Torch
+      properties:
+        class_skills: [3, paladin]
+        fire_res: 20
+        cold_res: 20
+        light_res: 20
+        poison_res: 20
+        strength: 10
+        dexterity: 10
+        vitality: 10
+        energy: 10
+        light_radius: 8
+
+merc:
+  template: infinity_might

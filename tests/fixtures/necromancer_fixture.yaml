@@ -1,0 +1,38 @@
+schema_version: 1
+name: TestNecro
+class: necromancer
+level: 30
+
+stats:
+  strength: 35
+  dexterity: 25
+  vitality: 100
+  energy: 40
+
+skills:
+  Raise Skeleton: 20
+  Skeleton Mastery: 5
+  Corpse Explosion: 1
+  Amplify Damage: 1
+  Clay Golem: 1
+
+equipment:
+  # Arm of King Leoric (Tomb Wand) - UID 141
+  - slot: weapon
+    unique: Arm of King Leoric
+
+  # Homunculus (Heirophant Trophy) - UID 280
+  - slot: shield
+    unique: Homunculus
+
+  # Lore helm runeword in Skull Cap
+  - slot: helm
+    runeword: Lore
+    base: skp
+
+inventory:
+  charms:
+    - magic_small_charm:
+        count: 1
+        properties:
+          life: 15

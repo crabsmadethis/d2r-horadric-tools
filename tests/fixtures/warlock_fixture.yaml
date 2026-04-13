@@ -1,0 +1,47 @@
+schema_version: 1
+name: TestWarlock
+class: warlock
+level: 85
+
+stats:
+  strength: 156
+  dexterity: 60
+  vitality: 250
+  energy: 50
+
+skills:
+  Eldritch Blast: 20
+  Hex Bane: 10
+  Levitate: 1
+  Blood Oath: 5
+  Summon Goatman: 1
+
+equipment:
+  # Dreadfang (Legend Sword, 2H) - UID 412 (warlock can use 2H + shield)
+  - slot: weapon
+    unique: Dreadfang
+
+  # Stormshield (Monarch) - UID 253
+  - slot: shield
+    unique: Stormshield
+
+  # Harlequin Crest (Shako) - UID 248
+  - slot: helm
+    unique: Harlequin Crest
+
+  # Enigma in Archon Plate
+  - slot: body
+    runeword: Enigma
+    base: utp
+
+  # Raven Frost ring - UID 275
+  - slot: ring_right
+    unique: Raven Frost
+
+inventory:
+  charms:
+    - magic_small_charm:
+        count: 2
+        properties:
+          life: 20
+          light_res: 11
