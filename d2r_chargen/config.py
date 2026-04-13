@@ -237,7 +237,10 @@ CHARM_DIMS = {
 
 def validate_aliases():
     """Validate all property aliases point to valid STAT_BY_NAME keys. Call at startup."""
-    from d2r_chargen.data.item_stat_cost import STAT_BY_NAME
+    try:
+        from d2r_chargen.data.item_stat_cost import STAT_BY_NAME
+    except ImportError:
+        return  # Data not extracted yet — skip validation
     errors = []
     for alias, canonical in PROPERTY_ALIASES.items():
         if canonical not in STAT_BY_NAME:

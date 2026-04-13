@@ -11,10 +11,9 @@ Usage:
 """
 import sys, os, argparse
 
-from d2r_chargen.character import deploy_character, load_character_yaml, validate_char_def
-from d2r_chargen.config import CHARS_DIR
 
 def cmd_build(args):
+    from d2r_chargen.character import deploy_character
     deploy_character(args.name, phase=args.phase, force=args.force)
     if getattr(args, 'verify', False):
         import subprocess
@@ -25,6 +24,7 @@ def cmd_build(args):
             sys.exit(result.returncode)
 
 def cmd_list(args):
+    from d2r_chargen.config import CHARS_DIR
     if not os.path.isdir(CHARS_DIR):
         print(f"No characters directory at {CHARS_DIR}")
         return
@@ -33,6 +33,8 @@ def cmd_list(args):
             print(f"  {f[:-5]}")
 
 def cmd_validate(args):
+    from d2r_chargen.config import CHARS_DIR
+    from d2r_chargen.character import load_character_yaml, validate_char_def
     path = os.path.join(CHARS_DIR, f"{args.name}.yaml")
     char_def = load_character_yaml(path)
     validate_char_def(char_def)
@@ -133,6 +135,7 @@ def cmd_import(args):
     result = import_character(d2s_path)
     yaml_str = dict_to_yaml(result)
 
+    from d2r_chargen.config import CHARS_DIR
     output = os.path.join(CHARS_DIR, f"{args.name}.yaml")
     if os.path.exists(output) and not args.force:
         print(f"  {output} already exists. Use --force to overwrite.")
@@ -148,6 +151,9 @@ def cmd_diff(args):
     print(format_diff(result))
 
 def main():
+    from d2r_chargen.data import check_data_available
+    check_data_available()
+
     parser = argparse.ArgumentParser(description='D2R Character Generation')
     sub = parser.add_subparsers(dest='command')
 

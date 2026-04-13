@@ -6,7 +6,7 @@ import pytest
 
 
 def test_missing_data_gives_clear_error(monkeypatch):
-    """If generated data modules are absent, importing d2r_chargen gives actionable message."""
+    """If generated data modules are absent, CLI gives actionable message."""
     _real_find_spec = importlib.util.find_spec
 
     blocked = {
@@ -28,10 +28,14 @@ def test_missing_data_gives_clear_error(monkeypatch):
 
     monkeypatch.setattr("importlib.util.find_spec", _mock_find_spec)
 
-    # Clear cached modules so the guard re-runs
-    for mod in list(sys.modules):
-        if mod.startswith("d2r_chargen"):
-            del sys.modules[mod]
-
+    from d2r_chargen.data import check_data_available
     with pytest.raises(SystemExit, match="1"):
-        importlib.import_module("d2r_chargen")
+        check_data_available()
+
+
+@pytest.mark.integration
+def test_data_available_passes_when_present():
+    """Guard passes silently when all data modules exist."""
+    from d2r_chargen.data import check_data_available
+    # Should not raise — data files exist in private repo
+    check_data_available()
