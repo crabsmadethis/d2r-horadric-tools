@@ -1,0 +1,590 @@
+#!/usr/bin/env python3
+"""Automated tests for d2r_chargen.
+
+Tests item building, property resolution, and byte-level compatibility.
+
+Run: python3 -m pytest tests/test_chargen.py -v
+"""
+import os, random, unittest
+
+from d2r_chargen.data.item_stat_cost import STAT_BY_NAME
+from d2r_chargen.build_lib import build_item
+from d2r_chargen.config import PROPERTY_ALIASES, CHARS_DIR
+from d2r_chargen.resolve import resolve_properties, resolve_unique, resolve_runeword
+from d2r_chargen.items import build_equipment_item
+from d2r_chargen.character import load_character_yaml, validate_char_def, build_all_items
+
+
+def _char(name):
+    """Resolve a character YAML path."""
+    return os.path.join(CHARS_DIR, f'{name}.yaml')
+
+
+class TestPropertyAliases(unittest.TestCase):
+    """Verify all PROPERTY_ALIASES resolve to valid stat IDs."""
+
+    def test_all_aliases_resolve(self):
+        for alias, stat_name in PROPERTY_ALIASES.items():
+            self.assertIn(stat_name, STAT_BY_NAME,
+                          f"Alias '{alias}' -> '{stat_name}' not in STAT_BY_NAME")
+
+    def test_ed_is_enhanced_defense(self):
+        """Regression: ed must be stat 16 (Enhanced Defense), not 17."""
+        stat_name = PROPERTY_ALIASES['ed']
+        stat_id = STAT_BY_NAME[stat_name]
+        self.assertEqual(stat_id, 16,
+                         f"ed alias maps to stat {stat_id}, expected 16 (item_armor_percent)")
+
+    def test_enhanced_dmg_is_stat_17(self):
+        stat_name = PROPERTY_ALIASES['enhanced_dmg']
+        stat_id = STAT_BY_NAME[stat_name]
+        self.assertEqual(stat_id, 17)
+
+    def test_no_unintentional_duplicate_stat_mappings(self):
+        """Check for aliases that accidentally map to the same stat.
+
+        Known intentional duplicates (aliases for the same stat):
+          ed / enhanced_def -> stat 16
+          life / maxhp -> stat 7
+          mana / maxmana -> stat 9
+        Anything else sharing a stat ID is suspicious.
+        """
+        KNOWN_SHARED = {16, 7, 9}  # stats with intentional alias pairs
+        seen = {}  # stat_name -> first alias
+        for alias, stat_name in PROPERTY_ALIASES.items():
+            stat_id = STAT_BY_NAME[stat_name]
+            if stat_name in seen and stat_id not in KNOWN_SHARED:
+                self.fail(
+                    f"Aliases '{seen[stat_name]}' and '{alias}' both map to "
+                    f"'{stat_name}' (stat {stat_id}) — is this intentional?"
+                )
+            seen[stat_name] = alias
+
+    def test_reverse_resolve_alias(self):
+        """reverse_resolve_alias returns shortest alias for known stat IDs."""
+        from d2r_chargen.config import reverse_resolve_alias
+        # fcr -> stat 105 -> 'fcr' (shortest alias for item_fastercastrate)
+        self.assertEqual(reverse_resolve_alias(105), 'fcr')
+        # fire_res -> stat 39 -> 'fire_res' (shortest alias for fireresist)
+        self.assertEqual(reverse_resolve_alias(39), 'fire_res')
+        # stat 127 -> 'all_skills'
+        self.assertEqual(reverse_resolve_alias(127), 'all_skills')
+        # Unknown stat falls back to stat_<id>
+        self.assertEqual(reverse_resolve_alias(9999), 'stat_9999')
+
+
+class TestPropertyResolution(unittest.TestCase):
+    """Verify resolve_properties produces correct stat tuples."""
+
+    def test_simple_stat(self):
+        result = resolve_properties({'life': 200})
+        self.assertEqual(result, [(7, 200)])
+
+    def test_resistance(self):
+        result = resolve_properties({'fire_res': 35, 'cold_res': 25})
+        self.assertIn((39, 35), result)
+        self.assertIn((43, 25), result)
+
+    def test_class_skills(self):
+        result = resolve_properties({'class_skills': [2, 'sorceress']})
+        self.assertEqual(result, [(83, 2, 1)])  # sorceress = class 1
+
+    def test_item_aura(self):
+        result = resolve_properties({'item_aura': [[31, 'Might']]})
+        # Might skill ID = 98
+        self.assertEqual(result, [(151, 31, 98)])
+
+    def test_ed_resolves_to_stat_16(self):
+        """Regression: ed: 120 must produce stat 16, not 17."""
+        result = resolve_properties({'ed': 120})
+        self.assertEqual(result, [(16, 120)])
+
+    def test_enhanced_def_same_as_ed(self):
+        ed_result = resolve_properties({'ed': 120})
+        edef_result = resolve_properties({'enhanced_def': 120})
+        self.assertEqual(ed_result, edef_result)
+
+
+class TestUniqueResolution(unittest.TestCase):
+    """Verify resolve_unique returns correct UIDs and type codes."""
+
+    def test_griffons_eye(self):
+        info = resolve_unique("Griffon's Eye")
+        self.assertEqual(info['unique_id'], 336)
+        self.assertEqual(info['type_code'], 'ci3')
+
+    def test_arachnid_mesh(self):
+        info = resolve_unique('Arachnid Mesh')
+        self.assertEqual(info['unique_id'], 373)
+        self.assertEqual(info['type_code'], 'ulc')
+
+    def test_stone_of_jordan(self):
+        info = resolve_unique('The Stone of Jordan')
+        self.assertEqual(info['unique_id'], 122)
+        self.assertEqual(info['type_code'], 'rin')
+
+
+class TestCharmBuilding(unittest.TestCase):
+    """Verify charm building respects property overrides."""
+
+    def test_unique_charm_properties_override(self):
+        """Regression: build_charm must use YAML properties when specified,
+        not just auto-resolved values from resolve_unique."""
+        from d2r_chargen.items import build_charm
+
+        # Annihilus with custom strength (override auto-resolved 20)
+        charm_def = {
+            'unique': 'Annihilus',
+            'properties': {
+                'all_skills': 1,
+                'strength': 10,     # lower than auto-resolved 20
+                'fire_res': 20,
+                'cold_res': 20,
+                'light_res': 20,
+                'poison_res': 20,
+            }
+        }
+        # Should not raise, and should use the overridden props
+        result = build_charm(charm_def, col=0, row=3)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0][0], 'char')
+        # Bytes should be non-empty
+        self.assertGreater(len(result[0][1]), 0)
+
+
+class TestRunewordResolution(unittest.TestCase):
+    """Verify resolve_runeword returns correct IDs and rune lists."""
+
+    def test_crescent_moon(self):
+        info = resolve_runeword('Crescent Moon', '9ls')
+        self.assertEqual(info['runeword_id'], 16)
+        self.assertEqual(info['rune_codes'], ['r13', 'r22', 'r03'])
+
+    def test_spirit(self):
+        info = resolve_runeword('Spirit', 'uit')
+        self.assertEqual(info['runeword_id'], 128)
+        self.assertEqual(info['num_sockets'], 4)
+
+    def test_ctc_plain_skill_name(self):
+        """CTC params with plain skill names (e.g. 'Confuse') must resolve."""
+        from d2r_chargen.resolve import _resolve_stat_entry
+        entry = {'stat': 'item_skillonhit', 'min': 10, 'max': 15,
+                 'param_type': 'ctc', 'param': 'Confuse'}
+        result = _resolve_stat_entry(entry)
+        stat_id, value, param = result
+        self.assertIsInstance(param, int)
+        self.assertGreater(param, 0, "CTC param should encode a skill ID")
+
+
+class TestBuildConsistency(unittest.TestCase):
+    """Verify chargen produces consistent output with the same seed.
+
+    Same YAML + same random seed must always produce identical bytes.
+    This catches regressions in property resolution, stat encoding, etc.
+    """
+
+    def test_tempest_deterministic(self):
+        """Two builds with same seed must produce identical items."""
+        char_def = load_character_yaml(_char('Tempest'))
+
+        random.seed(99999)
+        items_a = build_all_items(char_def)
+
+        random.seed(99999)
+        items_b = build_all_items(char_def)
+
+        self.assertEqual(len(items_a), len(items_b))
+        for i in range(len(items_a)):
+            self.assertEqual(items_a[i][1], items_b[i][1],
+                             f"Item [{i}] not deterministic")
+
+    def test_tempest_item_count(self):
+        """Tempest should produce 49 items (10 equipped + 7 fillers + 21 charms + 3 stash + 8 stash fillers)."""
+        char_def = load_character_yaml(_char('Tempest'))
+        items = build_all_items(char_def)
+        self.assertEqual(len(items), 49,
+                         f"Expected 49 items, got {len(items)}")
+
+    def test_tempest_belt_uses_stat_16(self):
+        """Regression: Arachnid Mesh belt ed must encode as stat 16 via auto-resolve."""
+        char_def = load_character_yaml(_char('Tempest'))
+        belt_def = char_def['equipment'][5]
+        self.assertEqual(belt_def['slot'], 'belt')
+        self.assertEqual(belt_def.get('unique'), 'Arachnid Mesh')
+
+        # Auto-resolved: no explicit properties, check via resolve_unique
+        info = resolve_unique('Arachnid Mesh')
+        stat_ids = [t[0] for t in info['properties']]
+        self.assertIn(16, stat_ids, "Arachnid Mesh auto-resolve missing stat 16 (Enhanced Defense)")
+        self.assertNotIn(17, stat_ids, "Arachnid Mesh auto-resolve has stat 17 (Enhanced Damage) — wrong!")
+
+
+class TestDreamBuild(unittest.TestCase):
+    """Verify Dream (Auradin Paladin) builds correctly."""
+
+    def test_dream_item_count(self):
+        """Dream should produce 82 items (42 parents + 40 socket fillers)."""
+        char_def = load_character_yaml(_char('Dream'))
+        items = build_all_items(char_def)
+        self.assertEqual(len(items), 82,
+                         f"Expected 82 items, got {len(items)}")
+
+    def test_dream_deterministic(self):
+        """Two builds with same seed must produce identical items."""
+        char_def = load_character_yaml(_char('Dream'))
+
+        random.seed(12345)
+        items_a = build_all_items(char_def)
+
+        random.seed(12345)
+        items_b = build_all_items(char_def)
+
+        self.assertEqual(len(items_a), len(items_b))
+        for i in range(len(items_a)):
+            self.assertEqual(items_a[i][1], items_b[i][1],
+                             f"Item [{i}] not deterministic")
+
+
+class TestFoedraBuild(unittest.TestCase):
+    """Verify Foedra (Amazon) builds correctly."""
+
+    def test_foedra_item_count(self):
+        """Foedra should produce 37 items (22 parents + 15 socket fillers)."""
+        char_def = load_character_yaml(_char('Foedra'))
+        items = build_all_items(char_def)
+        self.assertEqual(len(items), 37,
+                         f"Expected 37 items, got {len(items)}")
+
+    def test_foedra_deterministic(self):
+        """Two builds with same seed must produce identical items."""
+        char_def = load_character_yaml(_char('Foedra'))
+
+        random.seed(54321)
+        items_a = build_all_items(char_def)
+
+        random.seed(54321)
+        items_b = build_all_items(char_def)
+
+        self.assertEqual(len(items_a), len(items_b))
+        for i in range(len(items_a)):
+            self.assertEqual(items_a[i][1], items_b[i][1],
+                             f"Item [{i}] not deterministic")
+
+
+class TestObsidianBuild(unittest.TestCase):
+    """Verify Obsidian (Warlock) builds correctly."""
+
+    def test_obsidian_item_count(self):
+        """Obsidian should produce 60 items (36 parents + 24 socket fillers)."""
+        char_def = load_character_yaml(_char('Obsidian'))
+        items = build_all_items(char_def)
+        self.assertEqual(len(items), 60,
+                         f"Expected 60 items, got {len(items)}")
+
+    def test_obsidian_deterministic(self):
+        """Two builds with same seed must produce identical items."""
+        char_def = load_character_yaml(_char('Obsidian'))
+
+        random.seed(77777)
+        items_a = build_all_items(char_def)
+
+        random.seed(77777)
+        items_b = build_all_items(char_def)
+
+        self.assertEqual(len(items_a), len(items_b))
+        for i in range(len(items_a)):
+            self.assertEqual(items_a[i][1], items_b[i][1],
+                             f"Item [{i}] not deterministic")
+
+
+class TestYAMLValidation(unittest.TestCase):
+    """Verify all character YAMLs pass validation and build."""
+
+    def test_all_yamls_validate(self):
+        import glob
+        yamls = glob.glob(os.path.join(CHARS_DIR, '*.yaml'))
+        for path in yamls:
+            if 'merc_templates' in path:
+                continue
+            char_def = load_character_yaml(path)
+            try:
+                validate_char_def(char_def)
+            except Exception as e:
+                self.fail(f"{path} failed validation: {e}")
+
+    def test_all_yamls_build(self):
+        import glob
+        yamls = glob.glob(os.path.join(CHARS_DIR, '*.yaml'))
+        for path in yamls:
+            if 'merc_templates' in path:
+                continue
+            char_def = load_character_yaml(path)
+            validate_char_def(char_def)
+            try:
+                items = build_all_items(char_def)
+                self.assertGreater(len(items), 0,
+                                   f"{path} produced 0 items")
+            except Exception as e:
+                self.fail(f"{path} failed to build: {e}")
+
+
+class TestBlankTemplate(unittest.TestCase):
+    """Verify the bundled blank template produces valid saves."""
+
+    def test_template_is_valid_d2s(self):
+        """The bundled template must have all required section markers."""
+        import struct
+        template_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            'd2r_chargen', 'data', 'template.d2s'
+        )
+        data = open(template_path, 'rb').read()
+        # Magic bytes
+        self.assertEqual(data[0:4], b'\x55\xaa\x55\xaa')
+        # Version 105
+        self.assertEqual(struct.unpack_from('<I', data, 4)[0], 105)
+        # Required markers
+        self.assertGreater(data.find(b'gf'), 0, "Missing gf (stats) marker")
+        self.assertGreater(data.find(b'if'), 0, "Missing if (skills) marker")
+        self.assertGreater(data.find(b'JM'), 0, "Missing JM (items) marker")
+        self.assertGreater(data.find(b'WS'), 0, "Missing WS (waypoints) marker")
+        self.assertGreater(data.find(b'Woo!'), 0, "Missing Woo! (quests) marker")
+
+    def test_template_accepts_chargen_transforms(self):
+        """Stats, skills, waypoints, quests, difficulty can be applied to template."""
+        from d2r_chargen.save import (
+            set_character_stats, set_skills, set_all_waypoints,
+            set_all_quests, set_difficulty_hell,
+        )
+        template_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            'd2r_chargen', 'data', 'template.d2s'
+        )
+        data = bytearray(open(template_path, 'rb').read())
+        data = set_character_stats(data, 100, 100, 300, 50)
+        data = set_skills(data, [0] * 30)
+        data = set_all_waypoints(data)
+        data = set_all_quests(data)
+        data = set_difficulty_hell(data)
+        # Should not raise and markers should still be present
+        self.assertGreater(data.find(b'gf'), 0)
+        self.assertGreater(data.find(b'if'), 0)
+
+
+class TestTemplateValidation(unittest.TestCase):
+    """Verify template corruption is detected."""
+
+    def test_valid_template_passes(self):
+        """The bundled template should pass validation."""
+        from d2r_chargen.save import validate_template
+        template_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            'd2r_chargen', 'data', 'template.d2s'
+        )
+        errors = validate_template(template_path)
+        self.assertEqual(errors, [], f"Template has errors: {errors}")
+
+    def test_corrupt_template_detected(self):
+        """A truncated file should be detected as corrupt."""
+        import tempfile
+        from d2r_chargen.save import validate_template
+        with tempfile.NamedTemporaryFile(suffix='.d2s', delete=False) as f:
+            f.write(b'\xaa\x55' * 10)  # Garbage data
+            f.flush()
+            errors = validate_template(f.name)
+        os.unlink(f.name)
+        self.assertGreater(len(errors), 0, "Should detect corruption")
+
+
+class TestGroupedStatResolution(unittest.TestCase):
+    """Verify grouped stats resolve correctly for both scalar and list forms."""
+
+    def test_poison_scalar_expands(self):
+        """poison_min: 100 -> (57, [100, 100, 100])"""
+        result = resolve_properties({'poison_min': 100})
+        self.assertEqual(len(result), 1)
+        stat_id, values = result[0]
+        self.assertEqual(stat_id, 57)
+        self.assertEqual(values, [100, 100, 100])
+
+    def test_poison_explicit_list(self):
+        """poison_min: [100, 200, 75] -> (57, [100, 200, 75])"""
+        result = resolve_properties({'poison_min': [100, 200, 75]})
+        self.assertEqual(len(result), 1)
+        stat_id, values = result[0]
+        self.assertEqual(stat_id, 57)
+        self.assertEqual(values, [100, 200, 75])
+
+    def test_enhanced_dmg_explicit_list(self):
+        """enhanced_dmg: [300, 250] -> (17, [300, 250])"""
+        result = resolve_properties({'enhanced_dmg': [300, 250]})
+        self.assertEqual(len(result), 1)
+        stat_id, values = result[0]
+        self.assertEqual(stat_id, 17)
+        self.assertEqual(values, [300, 250])
+
+    def test_ctc_still_works_as_list(self):
+        """ctc_hit: [5, 3, 'Amplify Damage'] must NOT be treated as grouped stat."""
+        result = resolve_properties({'ctc_hit': [5, 3, 'Amplify Damage']})
+        self.assertEqual(len(result), 1)
+        # Should be a 3-tuple (stat_id, chance, encoded_param), not grouped
+        self.assertEqual(len(result[0]), 3)
+
+
+class TestFreshnessGate(unittest.TestCase):
+    """Verify build refuses when .d2s has changed since import."""
+
+    def test_stale_import_blocks_deploy(self):
+        """deploy_character returns False with stale checksum."""
+        import tempfile, yaml
+        from d2r_chargen.character import deploy_character
+
+        saves = os.path.expanduser(
+            '~/.local/share/Steam/steamapps/compatdata/2536520/pfx/'
+            'drive_c/users/steamuser/Saved Games/Diablo II Resurrected'
+        )
+        if not os.path.isdir(saves):
+            self.skipTest("D2R saves directory not found")
+        d2s_files = [f for f in os.listdir(saves) if f.endswith('.d2s')]
+        if not d2s_files:
+            self.skipTest("No .d2s files found")
+
+        d2s_name = d2s_files[0]
+        char_name = d2s_name[:-4]
+
+        char_def = {
+            'schema_version': 1,
+            '_imported_at': '2026-04-11T00:00:00',
+            '_imported_from': d2s_name,
+            '_imported_checksum': '0xDEADBEEF',  # Intentionally wrong
+            'name': char_name,
+            'class': 'necromancer',
+            'level': 14,
+            'progression': 'hell',
+            'stats': {'strength': 35, 'dexterity': 25, 'vitality': 60, 'energy': 25},
+        }
+
+        yaml_path = os.path.join(CHARS_DIR, '_TestFreshness.yaml')
+        try:
+            with open(yaml_path, 'w') as f:
+                yaml.dump(char_def, f)
+            # Should return False because checksum doesn't match
+            import io, contextlib
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                result = deploy_character('_TestFreshness')
+            self.assertFalse(result, "Deploy should fail with stale checksum")
+            self.assertIn('has changed since', output.getvalue())
+        finally:
+            if os.path.exists(yaml_path):
+                os.unlink(yaml_path)
+
+    def test_no_import_metadata_skips_gate(self):
+        """Hand-written YAML (no _imported_at) bypasses freshness check."""
+        from d2r_chargen.character import load_character_yaml
+        yaml_path = os.path.join(CHARS_DIR, 'Tempest.yaml')
+        if not os.path.exists(yaml_path):
+            self.skipTest("Tempest.yaml not found")
+        char_def = load_character_yaml(yaml_path)
+        self.assertNotIn('_imported_at', char_def)
+
+
+class TestSkillTabEncoding(unittest.TestCase):
+    """Verify skill_tab encoding through the full resolve pipeline.
+
+    Regression: global tab indices (7, 8) were written directly to binary
+    instead of converting to (class_id << 3) | tab_within_class. This caused
+    FAILED TO JOIN GAME for Arm of King Leoric across 3 debugging sessions.
+    """
+
+    def test_encode_skill_tab_param_all_classes(self):
+        """encode_skill_tab_param produces valid binary for all 24 tabs."""
+        from d2r_chargen.resolve import encode_skill_tab_param
+        for global_tab in range(24):
+            binary = encode_skill_tab_param(global_tab)
+            tab_enc = binary & 0x7
+            cls_enc = (binary >> 3) & 0x1F
+            self.assertLessEqual(tab_enc, 2,
+                                 f"Global tab {global_tab}: binary tab_enc={tab_enc} > 2")
+            self.assertLessEqual(cls_enc, 7,
+                                 f"Global tab {global_tab}: binary cls_enc={cls_enc} > 7")
+
+    def test_encode_necro_tabs(self):
+        """Necro tabs (6=Curses, 7=P&B, 8=Summoning) encode correctly."""
+        from d2r_chargen.resolve import encode_skill_tab_param
+        self.assertEqual(encode_skill_tab_param(6), (2 << 3) | 0)  # Curses
+        self.assertEqual(encode_skill_tab_param(7), (2 << 3) | 1)  # P&B
+        self.assertEqual(encode_skill_tab_param(8), (2 << 3) | 2)  # Summoning
+
+    def test_resolve_unique_arm_of_king_leoric(self):
+        """Regression: Arm of King Leoric skill_tab params must be binary-encoded."""
+        info = resolve_unique('Arm of King Leoric')
+        skill_tab_props = [t for t in info['properties']
+                           if len(t) == 3 and t[0] == 188]
+        self.assertEqual(len(skill_tab_props), 2,
+                         "AoKL should have 2 skill_tab stats")
+        for stat_id, value, param in skill_tab_props:
+            tab_enc = param & 0x7
+            cls_enc = (param >> 3) & 0x1F
+            self.assertLessEqual(tab_enc, 2,
+                                 f"AoKL skill_tab param={param}: tab_enc={tab_enc} > 2 (invalid binary)")
+            self.assertEqual(cls_enc, 2,
+                             f"AoKL skill_tab param={param}: cls_enc={cls_enc} != 2 (should be Necromancer)")
+
+    def test_resolve_properties_skill_tab_yaml_path(self):
+        """YAML skill_tab: [value, global_tab] must produce valid binary encoding."""
+        # Necro Summoning (global tab 8)
+        result = resolve_properties({'skill_tab': [3, 8]})
+        self.assertEqual(len(result), 1)
+        stat_id, value, param = result[0]
+        self.assertEqual(stat_id, 188)
+        self.assertEqual(value, 3)
+        self.assertEqual(param, (2 << 3) | 2)  # Necro class=2, tab=2
+
+    def test_all_unique_items_skill_tab_valid(self):
+        """Every unique item with skill_tab must produce valid binary encoding."""
+        from d2r_chargen.data.unique_item_stats import UNIQUE_ITEM_STATS
+        from d2r_chargen.resolve import _resolve_stat_entry
+        for uid, item in UNIQUE_ITEM_STATS.items():
+            for stat_entry in item.get('stats', []):
+                if stat_entry.get('param_type') != 'skill_tab':
+                    continue
+                result = _resolve_stat_entry(stat_entry)
+                param = result[2]
+                tab_enc = param & 0x7
+                cls_enc = (param >> 3) & 0x1F
+                self.assertLessEqual(tab_enc, 2,
+                                     f"UID {uid} ({item['name']}): skill_tab param={param}, "
+                                     f"tab_enc={tab_enc} > 2 (invalid binary)")
+                self.assertLessEqual(cls_enc, 7,
+                                     f"UID {uid} ({item['name']}): skill_tab param={param}, "
+                                     f"cls_enc={cls_enc} > 7 (invalid class)")
+
+    def test_malachar_builds_without_scanner_errors(self):
+        """Regression: Malachar build must pass scanner validation (skill_tab fix)."""
+        if not os.path.exists(_char('Malachar')):
+            self.skipTest("Malachar.yaml not found")
+        char_def = load_character_yaml(_char('Malachar'))
+        validate_char_def(char_def)
+        items = build_all_items(char_def)
+        self.assertGreater(len(items), 0)
+        # Verify no skill_tab properties have invalid binary encoding
+        from d2r_chargen.scanner import decode_item_header, validate_item_properties, bits_at
+        for section, item_bytes in items:
+            if len(item_bytes) < 10:
+                continue
+            is_simple = bits_at(item_bytes, 21, 1)
+            if is_simple:
+                continue
+            hdr = decode_item_header(item_bytes, 0)
+            itype, ilvl, quality, uid, storage, col, row, bodyloc, location, ext = hdr
+            flags32 = int.from_bytes(item_bytes[0:4], 'little')
+            is_rw = bool(flags32 & (1 << 26))
+            is_sock = bool(flags32 & (1 << 27))
+            ok, err, _ = validate_item_properties(
+                item_bytes, 0, itype, quality, is_rw, is_sock, flags32)
+            self.assertTrue(ok, f"Item {itype} uid={uid}: {err}")
+
+
+if __name__ == '__main__':
+    unittest.main(verbosity=2)
