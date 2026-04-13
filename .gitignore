@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+
+# Generated game data (run 'd2r-mod extract' to produce these)
+d2r_chargen/data/item_bases.py
+d2r_chargen/data/item_dimensions.py
+d2r_chargen/data/item_stat_cost.py
+d2r_chargen/data/runewords.py
+d2r_chargen/data/runeword_stats.py
+d2r_chargen/data/set_items.py
+d2r_chargen/data/skills.py
+d2r_chargen/data/unique_items.py
+d2r_chargen/data/unique_item_stats.py
+
+# Working directories
+vanilla/
+build/
+
+# Test/IDE
+.pytest_cache/
+.venv/
+*.log
