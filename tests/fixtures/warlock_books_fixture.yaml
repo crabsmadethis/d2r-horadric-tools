@@ -1,0 +1,113 @@
+schema_version: 1
+name: TestWlkBooks
+class: warlock
+level: 85
+
+stats:
+  strength: 156
+  dexterity: 60
+  vitality: 250
+  energy: 50
+
+skills:
+  # Summoning tree
+  Summon Goatman: 1
+  Demonic Mastery: 10
+  Summon Tainted: 1
+  Summon Defiler: 1
+  Bind Demon: 1
+  # Blood tree
+  Death Mark: 5
+  Blood Oath: 10
+  Engorge: 5
+  Blood Boil: 5
+  Consume: 1
+  # Hex tree
+  Eldritch Blast: 20
+  Hex Bane: 10
+  Hex Siphon: 5
+  Psychic Ward: 1
+  Hex Purge: 1
+  Sigil Lethargy: 1
+  Sigil Rancor: 1
+  Sigil Death: 1
+  # Combat tree
+  Levitate: 1
+  Echoing Strike: 1
+  Blade Warp: 1
+  Cleave: 1
+  Mirrored Blades: 1
+  # Destruction tree
+  Ring of Fire: 1
+  Miasma Bolt: 1
+  Enhanced Entropy: 1
+  Flame Wave: 1
+  Miasma Chains: 1
+  Apocalypse: 1
+  Abyss: 1
+
+equipment:
+  # Ars Al'Diablolos (Blasphemous Grimoire, waf) - UID 408
+  # Warlock books go in shield/offhand slot
+  - slot: shield
+    unique: "Ars Al'Diablolos"
+
+  # Dreadfang (Legend Sword, 72h) - UID 412
+  # Warlocks can use 2H weapon + shield simultaneously
+  - slot: weapon
+    unique: Dreadfang
+
+  # Unique Warlock Helm (Death Mask, xsk) - UID 419
+  - slot: helm
+    unique: Unique Warlock Helm
+
+  # Entropy Locket (Amulet) - UID 417
+  - slot: neck
+    unique: Entropy Locket
+
+  # Sling (Ring) - UID 415
+  - slot: ring_right
+    unique: Sling
+
+  # Opalvein (Ring) - UID 416
+  - slot: ring_left
+    unique: Opalvein
+
+  # Switch: Ars Tor'Baalos (Blasphemous Compendium, wae) - UID 409
+  - slot: switch_shield
+    unique: "Ars Tor'Baalos"
+
+  # Switch weapon: Bloodpact Shard (Mithral Point, 7di) - UID 414
+  - slot: switch_weapon
+    unique: Bloodpact Shard
+
+  # Enigma body in Archon Plate
+  - slot: body
+    runeword: Enigma
+    base: utp
+
+  # Wraithstep (Mirrored Boots, utb) - UID 413
+  - slot: feet
+    unique: Wraithstep
+
+  # Gheed's Wager (Troll Belt, utc) - UID 418
+  - slot: belt
+    unique: "Gheed's Wager"
+
+inventory:
+  charms:
+    - magic_small_charm:
+        count: 2
+        properties:
+          life: 20
+          fire_res: 11
+
+merc:
+  equipment:
+    # Ars Dul'Mephistos (Occult Tome, wac) - UID 410 — in stash for merc
+    - slot: shield
+      unique: "Ars Dul'Mephistos"
+
+    # Measured Wrath (Burnt Text, wa6) - UID 411 — in stash for merc
+    - slot: shield
+      unique: Measured Wrath

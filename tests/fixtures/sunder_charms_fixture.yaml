@@ -1,0 +1,70 @@
+schema_version: 1
+name: TestSunder
+class: sorceress
+level: 75
+
+stats:
+  strength: 100
+  dexterity: 60
+  vitality: 200
+  energy: 35
+
+skills:
+  Lightning: 20
+  Chain Lightning: 15
+  Lightning Mastery: 10
+  Teleport: 1
+  Warmth: 1
+  Static Field: 1
+
+equipment:
+  # Griffon's Eye (Diadem, ci3) - UID 336
+  - slot: helm
+    unique: "Griffon's Eye"
+
+  # Enigma body in Archon Plate
+  - slot: body
+    runeword: Enigma
+    base: utp
+
+  # Spirit sword (Rune Sword, 9ls)
+  - slot: weapon
+    runeword: Spirit
+    base: "9ls"
+
+inventory:
+  charms:
+    # 5 sunder charms (grand charms, cm3)
+    # Properties specified explicitly (per Tempest.yaml pattern)
+    # Note: Can't fit all 6 in one inventory due to fixed position collisions
+    # (Crack of the Heavens and Black Cleft both map to column 8)
+
+    # Cold Rupture - UID 401
+    - unique: Cold Rupture
+      properties:
+        item_pierce_cold_immunity: 1
+        cold_res: -75
+
+    # Flame Rift - UID 402
+    - unique: Flame Rift
+      properties:
+        item_pierce_fire_immunity: 1
+        fire_res: -75
+
+    # Crack of the Heavens - UID 403 (fixed position at col 8)
+    - unique: Crack of the Heavens
+      properties:
+        item_pierce_light_immunity: 1
+        light_res: -75
+
+    # Rotting Fissure - UID 404
+    - unique: Rotting Fissure
+      properties:
+        item_pierce_poison_immunity: 1
+        poison_res: -75
+
+    # Bone Break - UID 405
+    - unique: Bone Break
+      properties:
+        item_pierce_damage_immunity: 1
+        dr_pct: -15

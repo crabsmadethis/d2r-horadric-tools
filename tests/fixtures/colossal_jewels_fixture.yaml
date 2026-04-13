@@ -1,0 +1,127 @@
+schema_version: 1
+name: TestCJewels
+class: paladin
+level: 99
+
+stats:
+  strength: 185
+  dexterity: 136
+  vitality: 300
+  energy: 25
+
+skills:
+  Blessed Hammer: 20
+  Concentration: 20
+  Vigor: 20
+  Blessed Aim: 20
+  Holy Shield: 10
+  Smite: 1
+  Charge: 1
+
+equipment:
+  # Crusader's Vengeance (Phase Blade, 7cr) - UID 442
+  # Override properties: auto-resolved lightmindam overflows sB=6 at max roll
+  # Grouped stats use list format: [mindam, maxdam] or [mindam, maxdam, duration]
+  - slot: weapon
+    unique: "Crusader's Vengeance"
+    properties:
+      ignore_target_ac: 1
+      skill_tab: [3, 9]
+      enhanced_dmg: 200
+      firemindam: [50, 100]
+      lightmindam: [1, 150]
+      coldmindam: [25, 75, 4]
+      ias: 20
+      fire_res: 15
+      light_res: 15
+      cold_res: 15
+      poison_res: 15
+
+  # Herald of Zakarum (Gilded Shield) - UID 285
+  - slot: shield
+    unique: Herald of Zakarum
+
+  # Harlequin Crest (Shako) - UID 248
+  - slot: helm
+    unique: Harlequin Crest
+
+  # Enigma body in Archon Plate
+  - slot: body
+    runeword: Enigma
+    base: utp
+
+inventory:
+  charms:
+    # All 6 Colossal Jewels (unique, cjw, 1x1) — placed in inventory
+    # Auto-resolved stats from unique_item_stats.py
+
+    # Defender's Bile - UID 420
+    # Grouped stat: poisonmindam np=3 -> [mindam, maxdam, length]
+    - unique: "Defender's Bile"
+      properties:
+        poisonmindam: [975, 975, 25]
+        add_exp: 5
+        mf: 35
+        gold_find: 50
+
+    # Guardian's Thunder - UID 421
+    # Grouped stat: lightmindam np=2 -> [mindam, maxdam]
+    - unique: "Guardian's Thunder"
+      properties:
+        lightmindam: [1, 75]
+        add_exp: 5
+        mf: 35
+        gold_find: 50
+
+    # Protector's Frost - UID 422
+    # Grouped stat: coldmindam np=3 -> [mindam, maxdam, length]
+    - unique: "Protector's Frost"
+      properties:
+        coldmindam: [10, 30, 125]
+        add_exp: 5
+        mf: 35
+        gold_find: 50
+
+    # Defender's Fire - UID 423
+    # Grouped stat: firemindam np=2 -> [mindam, maxdam]
+    - unique: "Defender's Fire"
+      properties:
+        firemindam: [20, 60]
+        add_exp: 5
+        mf: 35
+        gold_find: 50
+
+    # Protector's Stone - UID 424
+    - unique: "Protector's Stone"
+      properties:
+        enhanced_dmg: 50
+        min_dmg: 30
+        add_exp: 5
+        mf: 35
+        gold_find: 50
+
+    # Guardian's Light - UID 425
+    - unique: "Guardian's Light"
+      properties:
+        add_exp: 5
+        mf: 35
+        gold_find: 50
+
+    # Black Cleft (sunder charm) - UID 406
+    # Placed here to exercise the 6th sunder charm
+    # (can't coexist with Crack of the Heavens in same inventory due to
+    #  both having fixed position at col 8 in _UNIQUE_CHARM_POSITIONS)
+    - unique: Black Cleft
+      properties:
+        item_pierce_magic_immunity: 1
+        magicresist: -50
+
+merc:
+  equipment:
+    # Deathgrip Scepter (Unearthed Wand, 7gw) - UID 441 — in stash
+    - slot: weapon
+      unique: Deathgrip Scepter
+
+    # Flamekeeper's Antlers (Dream Spirit druid pelt, drf) - UID 438 — in stash
+    - slot: helm
+      unique: "Flamekeeper's Antlers"

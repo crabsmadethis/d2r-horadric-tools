@@ -1,0 +1,87 @@
+schema_version: 1
+name: TestExpSets
+class: warlock
+level: 50
+
+stats:
+  strength: 80
+  dexterity: 50
+  vitality: 150
+  energy: 35
+
+skills:
+  Eldritch Blast: 15
+  Hex Bane: 5
+  Levitate: 1
+  Blood Oath: 1
+  Summon Goatman: 1
+
+equipment:
+  # --- McAuley's Folly (set, IDs 123-126, qlvl 20) ---
+
+  # McAuley's Paragon (Cap, cap) - set ID 123
+  - slot: helm
+    set: "McAuley's Paragon"
+    properties:
+      ed: 40
+      fire_res: 10
+      cold_res: 10
+
+  # McAuley's Riprap (Heavy Boots, vbt) - set ID 124
+  - slot: feet
+    set: "McAuley's Riprap"
+    properties:
+      frw: 20
+      defense: 15
+      maxstamina: 10
+
+  # McAuley's Taboo (Heavy Gloves, vgl) - set ID 125
+  - slot: hands
+    set: "McAuley's Taboo"
+    properties:
+      ias: 10
+      mana_leech: 3
+      life: 15
+
+  # McAuley's Superstition (Bone Wand, bwn) - set ID 126
+  - slot: weapon
+    set: "McAuley's Superstition"
+    properties:
+      fcr: 10
+      mana: 25
+      energy: 10
+
+  # --- Bane's Garments (set, IDs 132-134, qlvl 7) ---
+
+  # Bane's Oathmaker (Kriss dagger, kri) - set ID 132
+  - slot: switch_weapon
+    set: "Bane's Oathmaker"
+    properties:
+      enhanced_dmg: 50
+      poison_min: 25
+      poison_max: 25
+      poison_len: 75
+
+  # Bane's Wraithskin (Hard Leather Armor, hla) - set ID 133
+  - slot: body
+    set: "Bane's Wraithskin"
+    properties:
+      ed: 40
+      fire_res: 15
+      light_res: 15
+
+  # Bane's Authority (Light Belt, vbl) - set ID 134
+  - slot: belt
+    set: "Bane's Authority"
+    properties:
+      defense: 10
+      fire_res: 10
+      cold_res: 10
+
+inventory:
+  charms:
+    - magic_small_charm:
+        count: 2
+        properties:
+          life: 20
+          light_res: 11

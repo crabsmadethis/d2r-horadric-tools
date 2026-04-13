@@ -312,16 +312,16 @@ def validate_item_properties(data, pos, itype, quality, is_runeword, is_socketed
 
         # (a2) NON_CLASS_SKILL param validation (stat 97) — skill ID must be valid
         if stat_id == 97 and sP > 0:
-            if param_val > 400:
-                return False, f"stat 97 (item_nonclassskill): skill_id={param_val} > 400 (invalid)", br
+            if param_val > 450:
+                return False, f"stat 97 (item_nonclassskill): skill_id={param_val} > 450 (invalid)", br
             decoded_level = raw_val - sA
             if decoded_level < 1 or decoded_level > 60:
                 prop_warnings.append(f"stat 97 (item_nonclassskill): skill {param_val} level={decoded_level} outside 1-60")
 
         # (a3) ITEM_AURA param validation (stat 151) — aura skill ID must be valid
         if stat_id == 151 and sP > 0:
-            if param_val > 400:
-                return False, f"stat 151 (item_aura): aura_id={param_val} > 400 (invalid)", br
+            if param_val > 450:
+                return False, f"stat 151 (item_aura): aura_id={param_val} > 450 (invalid)", br
             decoded_level = raw_val - sA
             if decoded_level < 1 or decoded_level > 45:
                 prop_warnings.append(f"stat 151 (item_aura): aura {param_val} level={decoded_level} outside 1-45")

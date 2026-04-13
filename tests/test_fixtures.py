@@ -1,12 +1,16 @@
-"""Test fixture characters: YAML validation and item building across all classes.
+"""Test fixture characters: YAML validation, item building, and full .d2s scan.
 
 Parametrized across all fixture YAML files in tests/fixtures/ to verify:
 1. YAML loads and validates (schema, required fields, stat minimums)
 2. Item building produces valid binary output without errors
 3. All equipment items produce non-empty bytes
+4. Full .d2s build + scanner produces zero hard errors
 """
 import os
 import glob
+import shutil
+import struct
+import tempfile
 import pytest
 
 FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
@@ -117,6 +121,91 @@ def test_fixture_item_count_matches_definition(yaml_path):
         f"(equip={equip_count}, charms={charm_count}, merc={merc_count}), "
         f"got {len(items)}"
     )
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    "yaml_path",
+    _fixture_yamls(),
+    ids=lambda p: os.path.basename(p).replace("_fixture.yaml", ""),
+)
+def test_fixture_scans_clean(yaml_path):
+    """Full .d2s build + scanner produces zero hard errors."""
+    from d2r_chargen.character import load_character_yaml, build_all_items
+    from d2r_chargen.save import (
+        set_character_stats, set_skills,
+        rebuild_items, calc_checksum,
+    )
+    from d2r_chargen.resolve import resolve_skills
+    from d2r_chargen.scanner import scan_character_data
+    import d2r_chargen
+
+    char_def = load_character_yaml(yaml_path)
+    all_items = build_all_items(char_def)
+
+    # Use bundled template .d2s
+    template_path = os.path.join(
+        os.path.dirname(os.path.abspath(d2r_chargen.__file__)),
+        "data", "template.d2s",
+    )
+
+    with tempfile.NamedTemporaryFile(suffix=".d2s", delete=False) as tmp:
+        tmp_path = tmp.name
+
+    try:
+        shutil.copy2(template_path, tmp_path)
+
+        # Set stats + skills
+        data = bytearray(open(tmp_path, "rb").read())
+        skill_array = resolve_skills(
+            char_def["class"], char_def.get("skills", {})
+        )
+        stats = char_def["stats"]
+        data = set_character_stats(
+            data,
+            stats["strength"], stats["dexterity"],
+            stats["vitality"], stats["energy"],
+            level=char_def.get("level", 99),
+            char_class=char_def["class"],
+            skill_points_spent=sum(skill_array),
+        )
+        data = set_skills(data, skill_array)
+
+        # Fix size + checksum
+        struct.pack_into("<I", data, 8, len(data))
+        data[12:16] = b"\x00\x00\x00\x00"
+        cs = calc_checksum(data)
+        struct.pack_into("<I", data, 12, cs)
+        with open(tmp_path, "wb") as f:
+            f.write(data)
+
+        # Inject all items
+        item_bytes_list = [item_bytes for _, item_bytes in all_items]
+        result_data = rebuild_items(tmp_path, item_bytes_list, [])
+        with open(tmp_path, "wb") as f:
+            f.write(result_data)
+
+        # Scanner validation
+        scan = scan_character_data(tmp_path)
+        fixture_name = os.path.basename(yaml_path)
+
+        assert scan["checksum_ok"], (
+            f"{fixture_name}: checksum failed"
+        )
+        assert scan["size_ok"], (
+            f"{fixture_name}: stored size != actual size"
+        )
+        assert len(scan["errors"]) == 0, (
+            f"{fixture_name}: scanner errors:\n"
+            + "\n".join(f"  - {e}" for e in scan["errors"])
+        )
+        # Item count sanity check (not exact — fillers are embedded in parents)
+        assert scan["item_count"] > 0, (
+            f"{fixture_name}: scanner found 0 items"
+        )
+    finally:
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
 
 
 @pytest.mark.integration

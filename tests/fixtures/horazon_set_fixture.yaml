@@ -1,0 +1,129 @@
+schema_version: 1
+name: TestHorazon
+class: warlock
+level: 60
+
+stats:
+  strength: 110
+  dexterity: 50
+  vitality: 200
+  energy: 40
+
+skills:
+  Eldritch Blast: 20
+  Hex Bane: 10
+  Levitate: 1
+  Blood Oath: 5
+  Summon Goatman: 1
+
+equipment:
+  # --- Horazon's Splendor (set, IDs 135-139, qlvl 40) ---
+
+  # Horazon's Countenance (Demonhead helm, usk) - set ID 135
+  - slot: helm
+    set: "Horazon's Countenance"
+    properties:
+      all_skills: 1
+      fcr: 20
+      ed: 100
+      fire_res: 25
+      light_res: 25
+
+  # Horazon's Dominion (Russet Armor body, xpl) - set ID 136
+  - slot: body
+    set: "Horazon's Dominion"
+    properties:
+      ed: 120
+      fire_res: 20
+      cold_res: 20
+      light_res: 20
+      poison_res: 20
+      fhr: 20
+
+  # Horazon's Hold (Demonhide Gloves, xlg) - set ID 137
+  - slot: hands
+    set: "Horazon's Hold"
+    properties:
+      ias: 20
+      strength: 15
+      dexterity: 15
+      mana_leech: 5
+
+  # Horazon's Legacy (Mirrored Boots, utb) - set ID 138
+  - slot: feet
+    set: "Horazon's Legacy"
+    properties:
+      frw: 30
+      fhr: 20
+      fire_res: 15
+      cold_res: 15
+      defense: 40
+
+  # Horazon's Secrets (Occult Codex warlock book, wad) - set ID 139
+  # Warlock book in shield/offhand slot
+  - slot: shield
+    set: "Horazon's Secrets"
+    properties:
+      class_skills: [2, warlock]
+      fcr: 15
+      mana: 50
+      energy: 20
+
+  # Dreadfang (Legend Sword, 72h) - UID 412
+  # Warlocks can dual-wield 2H + offhand
+  - slot: weapon
+    unique: Dreadfang
+
+  # Entropy Locket (amu) - UID 417
+  - slot: neck
+    unique: Entropy Locket
+
+merc:
+  equipment:
+    # --- Warlord's Glory (set, IDs 127-131, qlvl 100) --- in stash
+
+    # Warlord's Conquest (Gauntlets, hgl) - set ID 127
+    - slot: hands
+      set: "Warlord's Conquest"
+      base: hgl
+      properties:
+        ias: 20
+        strength: 20
+        crush_blow: 10
+
+    # Warlord's Lust (Great Helm, ghm) - set ID 128
+    - slot: helm
+      set: "Warlord's Lust"
+      base: ghm
+      properties:
+        ed: 80
+        all_skills: 1
+        life: 40
+
+    # Warlord's Mantle (Full Plate Mail body, ful) - set ID 129
+    - slot: body
+      set: "Warlord's Mantle"
+      base: ful
+      properties:
+        ed: 100
+        fire_res: 30
+        cold_res: 30
+        light_res: 30
+
+    # Warlord's Crushers (Greaves feet, hbt) - set ID 130
+    - slot: feet
+      set: "Warlord's Crushers"
+      base: hbt
+      properties:
+        frw: 20
+        defense: 25
+        fhr: 10
+
+    # Warlord's Authority (Plated Belt, hbl) - set ID 131
+    - slot: belt
+      set: "Warlord's Authority"
+      base: hbl
+      properties:
+        defense: 20
+        fire_res: 15
+        light_res: 15

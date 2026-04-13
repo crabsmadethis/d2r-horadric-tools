@@ -1,0 +1,94 @@
+schema_version: 1
+name: TestExpUniq
+class: barbarian
+level: 85
+
+stats:
+  strength: 185
+  dexterity: 136
+  vitality: 200
+  energy: 20
+
+skills:
+  Whirlwind: 20
+  Blade Mastery: 10
+  Battle Orders: 10
+  Shout: 5
+  Battle Command: 1
+
+equipment:
+  # Dreadfang (Legend Sword, 72h) - UID 412
+  - slot: weapon
+    unique: Dreadfang
+
+  # Hawkeye's Sight (Diadem, ci3) - UID 440
+  - slot: helm
+    unique: "Hawkeye's Sight"
+
+  # Entropy Locket (Amulet, amu) - UID 417
+  - slot: neck
+    unique: Entropy Locket
+
+  # Sling (Ring, rin) - UID 415
+  - slot: ring_right
+    unique: Sling
+
+  # Opalvein (Ring, rin) - UID 416
+  - slot: ring_left
+    unique: Opalvein
+
+  # Wraithstep (Mirrored Boots, utb) - UID 413
+  - slot: feet
+    unique: Wraithstep
+
+  # Thunderhurler's Grip (Ogre Gauntlets, uhg) - UID 439
+  - slot: hands
+    unique: "Thunderhurler's Grip"
+
+  # Gheed's Wager (Troll Belt, utc) - UID 418
+  - slot: belt
+    unique: "Gheed's Wager"
+
+  # Enigma body in Archon Plate
+  - slot: body
+    runeword: Enigma
+    base: utp
+
+  # Switch: Crusader's Vengeance (Phase Blade, 7cr) - UID 442
+  # Override properties: auto-resolved lightmindam overflows sB=6 at max roll
+  - slot: switch_weapon
+    unique: "Crusader's Vengeance"
+    properties:
+      ignore_target_ac: 1
+      skill_tab: [3, 9]
+      enhanced_dmg: 200
+      firemindam: [50, 100]
+      lightmindam: [1, 150]
+      coldmindam: [25, 75, 4]
+      ias: 20
+      fire_res: 15
+      light_res: 15
+      cold_res: 15
+      poison_res: 15
+
+  # Switch shield: Stormshield (Monarch, uit) - UID 253
+  - slot: switch_shield
+    unique: Stormshield
+
+inventory:
+  charms:
+    - magic_small_charm:
+        count: 2
+        properties:
+          life: 20
+          fire_res: 11
+
+merc:
+  equipment:
+    # Bloodpact Shard (Mithral Point, 7di) - UID 414 — in stash
+    - slot: weapon
+      unique: Bloodpact Shard
+
+    # Deathgrip Scepter (Unearthed Wand, 7gw) - UID 441 — in stash
+    - slot: weapon
+      unique: Deathgrip Scepter

@@ -1,0 +1,105 @@
+schema_version: 1
+name: TestExpRW
+class: assassin
+level: 80
+
+stats:
+  strength: 115
+  dexterity: 115
+  vitality: 150
+  energy: 25
+
+skills:
+  Lightning Sentry: 20
+  Death Sentry: 10
+  Fade: 5
+  Claw Mastery: 10
+  Shadow Master: 1
+
+equipment:
+  # Mosaic (Mal+Gul+Amn) in Suwayyah (Hand to Hand, 7ar, 3 sockets)
+  # Runeword ID 171
+  - slot: weapon
+    runeword: Mosaic
+    base: "7ar"
+
+  # Metamorphosis (Io+Cham+Fal) in Bone Visage (Helm, uh9, 3 sockets)
+  # Runeword ID 172
+  - slot: helm
+    runeword: Metamorphosis
+    base: uh9
+
+  # Enigma body in Archon Plate
+  - slot: body
+    runeword: Enigma
+    base: utp
+
+  # Ritual (Amn+Shael+Ohm) in Legend Spike (Dagger, 7bl, 3 sockets)
+  # Runeword ID 180
+  - slot: switch_weapon
+    runeword: Ritual
+    base: "7bl"
+
+inventory:
+  charms:
+    - magic_small_charm:
+        count: 2
+        properties:
+          life: 20
+          light_res: 11
+
+merc:
+  equipment:
+    # Ground (Shael+Io+Ort) in Grand Crown (Helm, xrn, 3 sockets)
+    # Runeword ID 173 — in stash
+    - slot: helm
+      runeword: Ground
+      base: xrn
+
+    # Temper (Shael+Io+Ral) in Winged Helm (Helm, xhm, 3 sockets)
+    # Runeword ID 174 — in stash
+    - slot: helm
+      runeword: Temper
+      base: xhm
+
+    # Hearth (Shael+Io+Thul) in Crown (Helm, crn, 3 sockets)
+    # Runeword ID 175 — in stash
+    - slot: helm
+      runeword: Hearth
+      base: crn
+
+    # Cure (Shael+Io+Tal) in Mask (Helm, msk, 3 sockets)
+    # Runeword ID 176 — in stash
+    - slot: helm
+      runeword: Cure
+      base: msk
+
+    # Bulwark (Shael+Io+Sol) in Great Helm (Helm, ghm, 3 sockets)
+    # Runeword ID 177 — in stash
+    - slot: helm
+      runeword: Bulwark
+      base: ghm
+
+    # Coven (Ist+Ral+Io) in Death Mask (Helm, xsk, 3 sockets)
+    # Runeword ID 178 — in stash
+    - slot: helm
+      runeword: Coven
+      base: xsk
+
+    # Void (Thul+Zod+Ist) in Fanged Knife (Dagger, 7kr, 3 sockets)
+    # Runeword ID 155 — in stash
+    - slot: weapon
+      runeword: Void
+      base: "7kr"
+
+    # Hustle (weapon) (Shael+Ko+Eld) in Phase Blade (Sword, 7cr, 6 sockets - only uses 3)
+    # Runeword ID 170 — in stash
+    - slot: weapon
+      runeword: "Hustle (weapon)"
+      base: "7cr"
+
+    # Hustle (armor) (Shael+Ko+Eld) in Archon Plate (Body Armor, utp, 4 sockets - only uses 3)
+    # Runeword ID 169 — in stash
+    - slot: body
+      runeword: "Hustle (armor)"
+      base: utp
