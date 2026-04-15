@@ -10,9 +10,7 @@ import zlib
 sys.setrecursionlimit(5000)
 
 
-DEFAULT_GAME_DIR = (
-    "/run/media/deck/SK256/steamapps/common/Diablo II Resurrected"
-)
+from d2r_mod.build import DEFAULT_GAME_DIR
 
 # TVFS uses LOWERCASE_MANIFEST; restore original D2R casing for pipeline compat
 _FILENAME_CASING = {

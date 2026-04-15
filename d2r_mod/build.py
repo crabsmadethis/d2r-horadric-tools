@@ -11,9 +11,44 @@ from d2r_mod.scripts import run_script
 from d2r_mod.version import check_stale
 
 
-DEFAULT_GAME_DIR = (
-    "/run/media/deck/SK256/steamapps/common/Diablo II Resurrected"
-)
+def _detect_game_dir() -> str | None:
+    """Auto-detect D2R installation directory. Override with D2R_GAME_DIR env var."""
+    if 'D2R_GAME_DIR' in os.environ:
+        p = os.environ['D2R_GAME_DIR']
+        return p if os.path.isdir(p) else None
+
+    # Common Steam library locations (Linux)
+    suffix = "steamapps/common/Diablo II Resurrected"
+
+    # Check direct Steam library
+    direct = os.path.join(os.path.expanduser("~/.local/share/Steam"), suffix)
+    if os.path.isdir(direct):
+        return direct
+
+    # Check mounted media (SD cards, USB drives)
+    media = "/run/media"
+    if os.path.isdir(media):
+        for user in os.listdir(media):
+            user_dir = os.path.join(media, user)
+            if not os.path.isdir(user_dir):
+                continue
+            for vol in os.listdir(user_dir):
+                candidate = os.path.join(user_dir, vol, suffix)
+                if os.path.isdir(candidate):
+                    return candidate
+
+    # Windows
+    for drive in ["C", "D", "E", "F"]:
+        candidate = os.path.join(f"{drive}:", "Program Files (x86)",
+                                 "Steam", "steamapps", "common",
+                                 "Diablo II Resurrected")
+        if os.path.isdir(candidate):
+            return candidate
+
+    return None
+
+
+DEFAULT_GAME_DIR = _detect_game_dir()
 
 
 def _find_txt_files(vanilla_dir: str) -> dict[str, str]:

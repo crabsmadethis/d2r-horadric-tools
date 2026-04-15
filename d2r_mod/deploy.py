@@ -205,9 +205,7 @@ def _strip_patch_config(game_dir: str) -> None:
     print("Stripped patch-config from CASC build config (offline TACT fix)")
 
 
-DEFAULT_GAME_DIR = (
-    "/run/media/deck/SK256/steamapps/common/Diablo II Resurrected"
-)
+from d2r_mod.build import DEFAULT_GAME_DIR
 
 
 def _mod_root(game_dir: str) -> str:
