@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """D2R Save File Manipulation Functions.
 
-Extracted from build_characters.py — single source of truth for save-file
-binary operations: rebuild items, set stats, waypoints, quests, skills,
-difficulty, and create new characters from templates.
+Single source of truth for save-file binary operations: rebuild items,
+set stats, waypoints, quests, skills, difficulty, and create new characters
+from templates.
 """
 import os, struct, shutil
 

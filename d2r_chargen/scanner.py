@@ -821,8 +821,8 @@ def scan_characters(target, all_files, ghost_chars):
                 print(f"  ITEM SIZES: uniq avg={avg:.0f}B (n={len(uniq_sizes)})  {status}")
                 if avg<25:
                     print(f"  \u26a0 Unique items avg {avg:.0f}B \u2014 likely missing stat properties (expect 30-45B)")
-                    print(f"    Items built with build_safe.py or build_item(unique_id=X) without properties?")
-                    print(f"    Use build_characters.py with encode_property() for full stat encoding.")
+                    print(f"    Items built with build_item(unique_id=X) without properties?")
+                    print(f"    Use build_lib.encode_property() for full stat encoding.")
             if rw_sizes:
                 avg_rw=sum(rw_sizes)/len(rw_sizes)
                 if avg_rw<25:
