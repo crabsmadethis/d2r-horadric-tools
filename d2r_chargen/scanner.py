@@ -2,12 +2,9 @@
 """
 d2r_scanner.py -- D2R save file diagnostic scanner.
 
-Extracted from d2rdoctor.md skill file. Can be:
+Can be:
   1. Run standalone: python3 d2r_scanner.py [character_name|all]
   2. Imported: from d2r_chargen.scanner import run_scanner, scan_character_data
-  3. Called from d2rdoctor.md skill (thin wrapper)
-
-Produces identical output to the original inline d2rdoctor.md scanner.
 """
 
 import struct, sys, os, time, json
@@ -1092,7 +1089,7 @@ def scan_characters(target, all_files, ghost_chars):
 # ============================================================
 def delta_and_summary(files, ghost_chars, save_total, bak_total, bak_files):
     """Delta tracking and save directory summary."""
-    snapshot_path = os.path.join(SAVES, '.d2rdoctor_snapshot.json')
+    snapshot_path = os.path.join(SAVES, '.d2r_scanner_snapshot.json')
     current_snapshot = {}
     for fname_s in files:
         path_s = os.path.join(SAVES, fname_s)
@@ -1256,7 +1253,7 @@ def scan_character_data(filepath):
 # Main Entry Point
 # ============================================================
 def run_scanner(target='all'):
-    """Run the full scanner (identical output to original d2rdoctor.md).
+    """Run the full scanner.
 
     Args:
         target: Character name filter (lowercase), or 'all'

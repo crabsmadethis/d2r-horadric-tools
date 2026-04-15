@@ -177,7 +177,7 @@ def main():
                        help='Only validate YAML structure, skip binary build+scan')
     p_val.set_defaults(func=cmd_validate)
 
-    p_scan = sub.add_parser('scan', help='Run d2rdoctor scanner')
+    p_scan = sub.add_parser('scan', help='Run diagnostic scanner on save file')
     p_scan.add_argument('name')
     p_scan.set_defaults(func=cmd_scan)
 

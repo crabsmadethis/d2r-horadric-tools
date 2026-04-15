@@ -37,5 +37,5 @@ def test_missing_data_gives_clear_error(monkeypatch):
 def test_data_available_passes_when_present():
     """Guard passes silently when all data modules exist."""
     from d2r_chargen.data import check_data_available
-    # Should not raise — data files exist in private repo
+    # Should not raise — data files exist after extraction
     check_data_available()

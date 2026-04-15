@@ -770,7 +770,7 @@ def deploy_character(char_name, phase=4, force=False):
                 os.unlink(temp_path)
         print(f"  Phase {p}: deployed {len(phase_items)} items, checksum OK")
 
-        # Run d2rdoctor scanner after each phase (Rule 4)
+        # Run scanner after each phase (Rule 4)
         try:
             from d2r_chargen.scanner import scan_character_data
             result = scan_character_data(char_path)
