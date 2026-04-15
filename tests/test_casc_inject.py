@@ -30,7 +30,7 @@ from d2r_mod.casc_write import (
     inject_files,
 )
 
-CASC_DATA_DIR = os.path.join(DEFAULT_GAME_DIR, "data", "data")
+CASC_DATA_DIR = os.path.join(DEFAULT_GAME_DIR, "data", "data") if DEFAULT_GAME_DIR else ""
 
 
 def _casc_available():

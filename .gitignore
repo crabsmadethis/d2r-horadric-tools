@@ -24,3 +24,7 @@ build/
 .pytest_cache/
 .venv/
 *.log
+
+# Save files
+*.d2s
+!d2r_chargen/data/template.d2s

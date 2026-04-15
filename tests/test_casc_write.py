@@ -166,7 +166,7 @@ class TestMakeArchiveEntry:
 class TestArchiveEntryMatchesReal:
     """Compare our entry format against real entries in the D2R CASC."""
 
-    CASC_DATA_DIR = os.path.join(DEFAULT_GAME_DIR, "data", "data")
+    CASC_DATA_DIR = os.path.join(DEFAULT_GAME_DIR, "data", "data") if DEFAULT_GAME_DIR else ""
 
     @pytest.fixture(autouse=True)
     def _check_casc_available(self):

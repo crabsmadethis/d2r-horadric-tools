@@ -5,6 +5,7 @@ import struct
 import glob
 import pytest
 
+from d2r_mod.build import DEFAULT_GAME_DIR
 from d2r_mod.jenkins import (
     hashlittle,
     hashlittle2,
@@ -136,7 +137,7 @@ class TestHashlittle2:
 
 # === CASC .idx integration tests ===
 
-IDX_DIR = "/run/media/deck/SK256/steamapps/common/Diablo II Resurrected/data/data"
+IDX_DIR = os.path.join(DEFAULT_GAME_DIR, "data", "data") if DEFAULT_GAME_DIR else ""
 
 
 def _idx_available():
