@@ -21,35 +21,38 @@ import random
 # Imports from data files
 # ---------------------------------------------------------------------------
 
-# Authoritative item base database (659 entries)
-# Source: d2r_chargen/data/item_bases.py
-from d2r_chargen.data.item_bases import ITEM_BASES as ITEM_BASES_FULL
-
-# Unique items database (406 entries, UIDs 0-406)
-# Source: d2r_chargen/data/unique_items.py
-from d2r_chargen.data.unique_items import UNIQUE_ITEMS
-
-# Set items database (127 entries)
-# Source: d2r_chargen/data/set_items.py
-from d2r_chargen.data.set_items import SET_ITEMS
-
-# Runewords database (177 entries)
-# Source: d2r_chargen/data/runewords.py
-from d2r_chargen.data.runewords import RUNEWORDS
-
-# Stat encoding parameters (361 stat definitions)
-# Source: d2r_chargen/data/item_stat_cost.py
-from d2r_chargen.data.item_stat_cost import ITEM_STAT_COST, STAT_BY_NAME
-
-# Item grid dimensions (659 entries)
-# Source: d2r_chargen/data/item_dimensions.py
-from d2r_chargen.data.item_dimensions import ITEM_DIMENSIONS
-
-# Huffman encoding table for item type code encoding
-# Maps character -> (value, num_bits) for LSB-first encoding
+# Huffman encoding table (static, always available)
 from d2r_chargen.data.huffman import HUFFMAN
 
 from d2r_chargen.config import RW_BASE_CATEGORIES
+
+# Generated data modules — require 'd2r-mod extract' to exist
+try:
+    from d2r_chargen.data.item_bases import ITEM_BASES as ITEM_BASES_FULL
+    from d2r_chargen.data.unique_items import UNIQUE_ITEMS
+    from d2r_chargen.data.set_items import SET_ITEMS
+    from d2r_chargen.data.runewords import RUNEWORDS
+    from d2r_chargen.data.item_stat_cost import ITEM_STAT_COST, STAT_BY_NAME
+    from d2r_chargen.data.item_dimensions import ITEM_DIMENSIONS
+    _HAS_DATA = True
+except ImportError:
+    ITEM_BASES_FULL = None
+    UNIQUE_ITEMS = None
+    SET_ITEMS = None
+    RUNEWORDS = None
+    ITEM_STAT_COST = None
+    STAT_BY_NAME = None
+    ITEM_DIMENSIONS = None
+    _HAS_DATA = False
+
+
+def _require_data():
+    """Raise RuntimeError if generated game data is not available."""
+    if not _HAS_DATA:
+        raise RuntimeError(
+            "Game data not available. Run 'd2r-mod extract' first."
+        )
+
 
 # ---------------------------------------------------------------------------
 # Canonical Constants
@@ -170,6 +173,7 @@ def encode_property(w, stat_id, value, param=0):
     Raises:
         ValueError: If stat_id unknown, sB=0, or value overflows sB bits
     """
+    _require_data()
     info = ITEM_STAT_COST.get(stat_id)
     if info is None:
         raise ValueError(f"Unknown stat_id {stat_id} — not in ITEM_STAT_COST")
@@ -288,6 +292,7 @@ def encode_properties_terminated(w, props, is_runeword=False):
     For injected runewords, we write all props in the first list and
     leave the second list empty (just a terminator).
     """
+    _require_data()
     i = 0
     while i < len(props):
         stat_id, value = props[i][0], props[i][1]
@@ -484,6 +489,7 @@ def build_item(type_code, col, row, storage,
         ValueError: On validation failures (UID mismatch, overflow, etc.)
         AssertionError: On structural issues (bad type_code length)
     """
+    _require_data()
     # --- Validation ---
     if item_id is None:
         item_id = random.randint(1, 0xFFFFFFFF)
@@ -721,6 +727,7 @@ def encode_socketed_rune(rune_code, socket_idx=0):
         rune_code: Rune type code (e.g., 'r18' for Ko rune)
         socket_idx: Socket slot index (0-based). First rune=0, second=1, etc.
     """
+    _require_data()
     w = BitWriter()
     # Flags: identified (bit 4) + simple (bit 21) + always-1 (bit 23)
     flags = (1 << 4) | (1 << 21) | (1 << 23)
@@ -815,33 +822,34 @@ def write_d2s(path, data):
 # H. Stat ID Shortcuts (convenience aliases)
 # Reference: item_stat_cost.py (verified IDs)
 # ---------------------------------------------------------------------------
-S = STAT_BY_NAME
+if _HAS_DATA:
+    S = STAT_BY_NAME
 
-# Common stat IDs for item building
-STRENGTH     = S['strength']              # 0  (sB=8,  sA=32)
-ENERGY       = S['energy']                # 1  (sB=7,  sA=32)
-DEXTERITY    = S['dexterity']             # 2  (sB=7,  sA=32)
-VITALITY     = S['vitality']              # 3  (sB=7,  sA=32)
-MAXHP        = S['maxhp']                 # 7  (sB=9,  sA=32)
-MAXMANA      = S['maxmana']               # 9  (sB=8,  sA=32)
-ED           = S['item_armor_percent']     # 16 (sB=9,  sA=0)
-FLAT_DEF     = S['armorclass']             # 31 (sB=11, sA=10)
-FIRE_RES     = S['fireresist']             # 39 (sB=9,  sA=200)
-LIGHT_RES    = S['lightresist']            # 41 (sB=9,  sA=200)
-COLD_RES     = S['coldresist']             # 43 (sB=9,  sA=200)
-POISON_RES   = S['poisonresist']           # 45 (sB=9,  sA=200)
-FCR          = S['item_fastercastrate']    # 105 (sB=9, sA=0)
-FHR          = S['item_fastergethitrate']  # 99  (sB=7, sA=20)
-FRW          = S['item_fastermovevelocity'] # 96  (sB=7, sA=20)
-IAS          = S['item_fasterattackrate']  # 93  (sB=7, sA=0)
-MF           = S['item_magicbonus']        # 80  (sB=7, sA=100)
-ALL_SKILLS   = S['item_allskills']         # 127 (sB=3, sA=0)
-MAGIC_ABSORB     = S['item_absorbmagic']       # 147 (sB=7, sA=0)
-ABSORB_COLD_PCT  = S['item_absorbcold_percent'] # 148 (sB=7, sA=0) — NOT the same as MAGIC_ABSORB
-REPLENISH        = S['hpregen']                # 74  (sB=6, sA=30)
-SKILL_TAB        = S['item_addskill_tab']      # 188 (sB=3, sA=0, sP=16)
-NON_CLASS_SKILL  = S['item_nonclassskill']     # 97  (sB=6, sA=0, sP=9) — oskills (Teleport, BO, etc.)
-ITEM_AURA        = S['item_aura']              # 151 (sB=5, sA=0, sP=9) — aura when equipped
+    # Common stat IDs for item building
+    STRENGTH     = S['strength']              # 0  (sB=8,  sA=32)
+    ENERGY       = S['energy']                # 1  (sB=7,  sA=32)
+    DEXTERITY    = S['dexterity']             # 2  (sB=7,  sA=32)
+    VITALITY     = S['vitality']              # 3  (sB=7,  sA=32)
+    MAXHP        = S['maxhp']                 # 7  (sB=9,  sA=32)
+    MAXMANA      = S['maxmana']               # 9  (sB=8,  sA=32)
+    ED           = S['item_armor_percent']     # 16 (sB=9,  sA=0)
+    FLAT_DEF     = S['armorclass']             # 31 (sB=11, sA=10)
+    FIRE_RES     = S['fireresist']             # 39 (sB=9,  sA=200)
+    LIGHT_RES    = S['lightresist']            # 41 (sB=9,  sA=200)
+    COLD_RES     = S['coldresist']             # 43 (sB=9,  sA=200)
+    POISON_RES   = S['poisonresist']           # 45 (sB=9,  sA=200)
+    FCR          = S['item_fastercastrate']    # 105 (sB=9, sA=0)
+    FHR          = S['item_fastergethitrate']  # 99  (sB=7, sA=20)
+    FRW          = S['item_fastermovevelocity'] # 96  (sB=7, sA=20)
+    IAS          = S['item_fasterattackrate']  # 93  (sB=7, sA=0)
+    MF           = S['item_magicbonus']        # 80  (sB=7, sA=100)
+    ALL_SKILLS   = S['item_allskills']         # 127 (sB=3, sA=0)
+    MAGIC_ABSORB     = S['item_absorbmagic']       # 147 (sB=7, sA=0)
+    ABSORB_COLD_PCT  = S['item_absorbcold_percent'] # 148 (sB=7, sA=0) — NOT the same as MAGIC_ABSORB
+    REPLENISH        = S['hpregen']                # 74  (sB=6, sA=30)
+    SKILL_TAB        = S['item_addskill_tab']      # 188 (sB=3, sA=0, sP=16)
+    NON_CLASS_SKILL  = S['item_nonclassskill']     # 97  (sB=6, sA=0, sP=9) — oskills (Teleport, BO, etc.)
+    ITEM_AURA        = S['item_aura']              # 151 (sB=5, sA=0, sP=9) — aura when equipped
 
 
 # ===========================================================================
