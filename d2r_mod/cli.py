@@ -9,7 +9,7 @@ from d2r_mod.build import build_mod, DEFAULT_GAME_DIR
 
 
 def _project_root() -> str:
-    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return os.getcwd()
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:

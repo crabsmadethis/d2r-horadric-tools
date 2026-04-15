@@ -34,10 +34,7 @@ def _detect_chars_dir():
     """Character YAML directory. Override with D2R_CHARS env var."""
     if 'D2R_CHARS' in os.environ:
         return os.environ['D2R_CHARS']
-
-    # Default: chars/ directory next to the package
-    pkg_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    return os.path.join(pkg_dir, 'chars')
+    return os.path.join(os.getcwd(), 'chars')
 
 
 SAVES = _detect_saves_dir()
