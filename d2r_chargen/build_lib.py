@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-d2r_build_lib.py — Single authoritative item encoder for D2R save file editing.
+build_lib.py — Single authoritative item encoder for D2R save file editing.
 
 Consolidated item encoder for D2R save file editing.
 Replaces three competing build_item() implementations with a single
@@ -849,7 +849,7 @@ ITEM_AURA        = S['item_aura']              # 151 (sB=5, sA=0, sP=9) — aura
 # ===========================================================================
 if __name__ == '__main__':
     print("=" * 60)
-    print("d2r_build_lib.py — Smoke Tests")
+    print("build_lib.py — Smoke Tests")
     print("=" * 60)
 
     errors = 0
