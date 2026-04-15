@@ -9,6 +9,8 @@ import shutil
 import subprocess
 from datetime import datetime, timezone
 
+from d2r_mod.build import DEFAULT_GAME_DIR
+
 
 MOD_NAME = "rebalance"
 
@@ -203,9 +205,6 @@ def _strip_patch_config(game_dir: str) -> None:
     with open(config_path, "w", encoding="utf-8") as f:
         f.write(cleaned)
     print("Stripped patch-config from CASC build config (offline TACT fix)")
-
-
-from d2r_mod.build import DEFAULT_GAME_DIR
 
 
 def _mod_root(game_dir: str) -> str:
