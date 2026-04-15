@@ -22,6 +22,8 @@
 | `steamdeck.home.local` | Private hostname | Same |
 | `d2r-editor` | Private repo name | Acceptable in commit diffs (we changed them), flag if in surviving code |
 | `d2rdoctor` | Private tool name | Same |
+| `item_injector` | Private tool name (appears in build_lib.py comments without repo prefix) | Acceptable — historical reference, no repo path |
+| `build_characters\|fix_obsidian` | Private script names (in docstrings) | Same |
 | `password\|secret\|api.key\|token` | Generic secrets | Must fix if real credentials |
 | `\.env\|credentials` | Config secrets | Must fix if real credentials |
 
@@ -53,14 +55,15 @@ Recommendation: Option 1 unless the scan finds actual secrets (API keys, passwor
 
 | Test | Command | Expected Result |
 |------|---------|-----------------|
-| chargen help | `d2r-chargen --help` | Shows help text, exit 0 |
-| chargen list | `d2r-chargen list` | Shows ExamplePaladin (or reveals CHARS_DIR bug) |
-| mod help | `d2r-mod --help` | Shows help text, exit 0 |
-| mod build | `d2r-mod build` | Friendly "run extract first" error |
-| core import | `python -c "from d2r_chargen.build_lib import BitWriter"` | No ImportError |
-| mod import | `python -c "from d2r_mod.casc import extract_vanilla"` | No ImportError |
-| template bundled | `python -c "import d2r_chargen; import os; print(os.path.exists(os.path.join(os.path.dirname(d2r_chargen.__file__), 'data', 'template.d2s')))"` | True |
-| pytest collection | `python -m pytest tests/ --collect-only` | No collection errors |
+| setup | `mkdir -p /tmp/d2r-pkg-test/project/chars && cp /home/deck/d2r-tools/chars/ExamplePaladin.yaml /tmp/d2r-pkg-test/project/chars/` | Setup step — creates a project dir with chars/ |
+| chargen help | `cd /tmp/d2r-pkg-test/project && d2r-chargen --help` | Shows help text, exit 0 |
+| chargen list | `cd /tmp/d2r-pkg-test/project && d2r-chargen list` | Prints `ExamplePaladin`, exit 0 |
+| mod help | `cd /tmp/d2r-pkg-test/project && d2r-mod --help` | Shows help text, exit 0 |
+| mod build | `cd /tmp/d2r-pkg-test/project && d2r-mod build 2>&1` | Prints `"Error: vanilla/ not found. Run 'd2r-mod extract' first."` to stderr, exit 1 |
+| core import | `python -c "from d2r_chargen.build_lib import BitWriter"` | No ImportError, exit 0 |
+| mod import | `python -c "from d2r_mod.casc import extract_vanilla"` | No ImportError, exit 0 |
+| template bundled | `python -c "import d2r_chargen; import os; print(os.path.exists(os.path.join(os.path.dirname(d2r_chargen.__file__), 'data', 'template.d2s')))"` | Prints `True` |
+| pytest collection | `cd /home/deck/d2r-tools && python -m pytest tests/ --collect-only` | No collection errors (run from repo dir where tests/ lives) |
 
 ### Known Issue: CHARS_DIR Resolution
 
@@ -97,8 +100,9 @@ This matches user mental model: "I run `d2r-chargen` from my project directory, 
 ## Execution Order
 
 1. Run Phase 1 (secret scan) — read-only, no code changes
-2. Review findings, decide on history approach
+2. Review findings with user, decide on history approach
 3. Run Phase 2 (packaging test) — may produce code fixes
 4. Apply CHARS_DIR fix if confirmed
 5. Re-run packaging test to verify fix
 6. Commit any fixes
+7. Run Task 3 (git filter-branch for author identity) — must be LAST since it rewrites all commit SHAs
