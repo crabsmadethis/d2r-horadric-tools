@@ -119,6 +119,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def cmd_build(args: argparse.Namespace) -> None:
     root = _project_root()
+    vanilla_dir = os.path.join(root, "vanilla")
+    if not os.path.isdir(vanilla_dir):
+        print("Error: vanilla/ not found. Run 'd2r-mod extract' first.", file=sys.stderr)
+        sys.exit(1)
     warnings = build_mod(
         vanilla_dir=os.path.join(root, "vanilla"),
         overlays_dir=os.path.join(root, "overlays"),
@@ -219,9 +223,12 @@ def cmd_audit(args: argparse.Namespace) -> None:
     )
     root = _project_root()
     vanilla_dir = os.path.join(root, "vanilla")
+    excel_dir = os.path.join(vanilla_dir, "data", "global", "excel")
+    if not os.path.isdir(excel_dir):
+        print("Error: vanilla data not found. Run 'd2r-mod extract' first.", file=sys.stderr)
+        sys.exit(1)
 
     tables = {}
-    excel_dir = os.path.join(vanilla_dir, "data", "global", "excel")
     for fname in os.listdir(excel_dir):
         if fname.endswith(".txt"):
             key = f"data/global/excel/{fname}"
