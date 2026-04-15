@@ -125,7 +125,10 @@ inventory:
           light_res: 11
 
 merc:
-  template: infinity_might    # References merc_templates.yaml
+  equipment:
+    - slot: weapon
+      unique: The Reaper's Toll
+      ethereal: true
 ```
 
 ### Slot Names

@@ -1,0 +1,70 @@
+schema_version: 1
+name: ExamplePaladin
+class: paladin
+level: 85
+
+stats:
+  strength: 156
+  dexterity: 125
+  vitality: 250
+  energy: 25
+
+skills:
+  Blessed Hammer: 20
+  Concentration: 20
+  Vigor: 20
+  Blessed Aim: 20
+  Holy Shield: 10
+  Smite: 1
+
+equipment:
+  - slot: helm
+    unique: Harlequin Crest
+
+  - slot: body
+    runeword: Enigma
+    base: utp         # Archon Plate
+
+  - slot: shield
+    unique: Herald of Zakarum
+
+  - slot: weapon
+    runeword: Heart of the Oak
+    base: fla         # Flail (4 sockets: Ko + Vex + Pul + Thul)
+
+  - slot: neck
+    unique: "Mara's Kaleidoscope"
+
+  - slot: ring_right
+    unique: The Stone of Jordan
+
+  - slot: ring_left
+    unique: Raven Frost
+
+  - slot: belt
+    unique: Arachnid Mesh
+
+  - slot: hands
+    unique: Magefist
+
+  - slot: feet
+    unique: Wartraveler
+
+inventory:
+  charms:
+    - unique: Annihilus
+      properties:
+        all_skills: 1
+        strength: 20
+        dexterity: 20
+        fire_res: 20
+        cold_res: 20
+        light_res: 20
+        poison_res: 20
+        add_exp: 10
+
+    - magic_grand_charm:
+        count: 8
+        properties:
+          skill_tab: [1, 15]   # Combat Skills (Paladin tab 0 = index 15)
+          life: 40
