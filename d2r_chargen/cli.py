@@ -151,9 +151,6 @@ def cmd_diff(args):
     print(format_diff(result))
 
 def main():
-    from d2r_chargen.data import check_data_available
-    check_data_available()
-
     parser = argparse.ArgumentParser(description='D2R Character Generation')
     sub = parser.add_subparsers(dest='command')
 
@@ -192,6 +189,15 @@ def main():
     if not args.command:
         parser.print_help()
         return
+
+    # Commands that don't need game data
+    if args.command == 'list':
+        args.func(args)
+        return
+
+    # All other commands need extracted game data
+    from d2r_chargen.data import check_data_available
+    check_data_available()
     args.func(args)
 
 if __name__ == '__main__':

@@ -16,6 +16,14 @@ _GENERATED_MODULES = [
 ]
 
 
+def data_available() -> bool:
+    """Return True if all generated data files exist."""
+    for mod in _GENERATED_MODULES:
+        if importlib.util.find_spec(mod) is None:
+            return False
+    return True
+
+
 def check_data_available():
     """Verify generated data files exist; exit with helpful message if not."""
     missing = []
