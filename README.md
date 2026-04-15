@@ -15,12 +15,24 @@ D2R modding toolkit for Linux, Steam Deck, and Windows. YAML-driven character bu
 ```bash
 git clone <repo-url>
 cd d2r-tools
-pip install -e .
+pip3 install -e .
 d2r-mod extract        # extracts + generates data from your D2R install
 d2r-chargen build MyChar
 ```
 
+(or `pip install -e .` if `pip` points to Python 3 on your system)
+
 Three commands from clone to working. The extract step generates Python data modules from your D2R installation (required for legal reasons - no game data is distributed).
+
+```bash
+# If D2R is not auto-detected:
+d2r-mod extract --game-dir /path/to/Diablo\ II\ Resurrected
+# Or set the environment variable:
+export D2R_GAME_DIR="/path/to/Diablo II Resurrected"
+```
+
+An example character YAML is included in `chars/ExamplePaladin.yaml`. 
+Create your own characters in the `chars/` directory.
 
 D2R install path is auto-detected on Linux/Steam Deck and Windows. Use `--game-dir` to override.
 
@@ -181,6 +193,9 @@ d2r-mod update                       # Re-extract after game update
 
 Overlays modify D2R data tables declaratively using YAML. Place overlay files in an `overlays/` directory and run `d2r-mod build`.
 
+Create an `overlays/` directory in your project root to add custom overlays.
+If no overlays directory exists, `d2r-mod build` will proceed with vanilla data only.
+
 ```yaml
 target: data/global/excel/UniqueItems.txt
 changes:
@@ -213,6 +228,14 @@ d2r_mod/              Data modding pipeline
   deploy.py           Deploy/undeploy mod files
   regen.py            Generate chargen data from extracted tables
 ```
+
+## Platform Support
+
+| Platform | Status |
+|----------|--------|
+| Linux / Steam Deck (Proton) | Supported, tested |
+| Windows | Untested — path detection included, contributions welcome |
+| macOS | Unsupported |
 
 ## Requirements
 
