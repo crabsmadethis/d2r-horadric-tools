@@ -3,6 +3,14 @@
 import os
 import unittest
 import yaml
+import pytest
+
+# importer.py imports scanner.py which imports generated data modules.
+# Skip this entire module if game data hasn't been extracted yet.
+pytest.importorskip(
+    "d2r_chargen.data.item_stat_cost",
+    reason="game data not extracted (run 'd2r-mod extract')",
+)
 
 from d2r_chargen.config import CHARS_DIR
 
