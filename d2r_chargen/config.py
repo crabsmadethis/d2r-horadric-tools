@@ -96,7 +96,7 @@ RW_BASE_CATEGORIES = {
 
 # YAML property name aliases -> item_stat_cost.py STAT_BY_NAME keys
 # Raw STAT_BY_NAME keys are also accepted (pass through unchanged)
-# Stat IDs verified against d2r_build_lib.py constants (CLAUDE.md Rule 14)
+# Stat IDs verified against build_lib.py constants (CLAUDE.md Rule 14)
 PROPERTY_ALIASES = {
     # Core stats (0-9)
     'strength': 'strength',              # 0

@@ -1,7 +1,7 @@
 """Item building for D2R character generation.
 
 Takes resolved item definitions (from YAML + resolve.py) and produces
-binary bytes via d2r_build_lib.build_item() + encode_socketed_rune().
+binary bytes via build_lib.build_item() + encode_socketed_rune().
 
 All items are tagged with section='char'. Merc gear goes to stash (storage=5)
 in the char JM section -- NEVER to the merc JM section (Rule 6: pre-injected
