@@ -111,3 +111,39 @@ def test_mod_build_without_vanilla(venv_dir, repo_dir):
     )
     assert r.returncode != 0
     assert "vanilla" in (r.stdout + r.stderr).lower()
+
+
+def test_import_bitwriter(venv_dir):
+    """Core build_lib.BitWriter is importable from clean install."""
+    python = os.path.join(venv_dir, "bin", "python3")
+    r = subprocess.run(
+        [python, "-c", "from d2r_chargen.build_lib import BitWriter; print('ok')"],
+        capture_output=True, text=True,
+    )
+    assert r.returncode == 0
+    assert "ok" in r.stdout
+
+
+def test_import_casc(venv_dir):
+    """d2r_mod.casc is importable from clean install."""
+    python = os.path.join(venv_dir, "bin", "python3")
+    r = subprocess.run(
+        [python, "-c", "from d2r_mod.casc import extract_vanilla; print('ok')"],
+        capture_output=True, text=True,
+    )
+    assert r.returncode == 0
+    assert "ok" in r.stdout
+
+
+def test_template_bundled(venv_dir):
+    """template.d2s is included in the installed package."""
+    python = os.path.join(venv_dir, "bin", "python3")
+    r = subprocess.run(
+        [python, "-c",
+         "import d2r_chargen, os; "
+         "print(os.path.exists(os.path.join("
+         "os.path.dirname(d2r_chargen.__file__), 'data', 'template.d2s')))"],
+        capture_output=True, text=True,
+    )
+    assert r.returncode == 0
+    assert "True" in r.stdout
