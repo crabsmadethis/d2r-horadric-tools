@@ -7,18 +7,12 @@ build_item(properties=...).
 import re
 
 from d2r_chargen.config import PROPERTY_ALIASES, CLASS_DEFS, RW_BASE_CATEGORIES
-try:
-    from d2r_chargen.data.item_stat_cost import STAT_BY_NAME, ITEM_STAT_COST
-    from d2r_chargen.data.runewords import RUNEWORDS
-    from d2r_chargen.data.runeword_stats import RUNEWORD_STATS
-    from d2r_chargen.data.unique_item_stats import UNIQUE_ITEM_STATS
-    from d2r_chargen.data.item_bases import ITEM_BASES
-    from d2r_chargen.data.skills import SKILLS
-    _DATA_AVAILABLE = True
-except ImportError:
-    STAT_BY_NAME = ITEM_STAT_COST = RUNEWORDS = RUNEWORD_STATS = None
-    UNIQUE_ITEM_STATS = ITEM_BASES = SKILLS = None
-    _DATA_AVAILABLE = False
+from d2r_chargen.data.item_stat_cost import STAT_BY_NAME, ITEM_STAT_COST
+from d2r_chargen.data.runewords import RUNEWORDS
+from d2r_chargen.data.runeword_stats import RUNEWORD_STATS
+from d2r_chargen.data.unique_item_stats import UNIQUE_ITEM_STATS
+from d2r_chargen.data.item_bases import ITEM_BASES
+from d2r_chargen.data.skills import SKILLS
 
 # Use canonical expansion map from config.py
 _RW_BASE_EXPANSION = RW_BASE_CATEGORIES
@@ -65,10 +59,7 @@ def _build_lookups():
     return skill_name_to_id, skill_code_to_class, rw_name_to_id, unique_name_to_id
 
 
-if _DATA_AVAILABLE:
-    _SKILL_NAME_TO_ID, _SKILL_CODE_TO_CLASS, _RUNEWORD_NAME_TO_ID, _UNIQUE_NAME_TO_ID = _build_lookups()
-else:
-    _SKILL_NAME_TO_ID = _SKILL_CODE_TO_CLASS = _RUNEWORD_NAME_TO_ID = _UNIQUE_NAME_TO_ID = {}
+_SKILL_NAME_TO_ID, _SKILL_CODE_TO_CLASS, _RUNEWORD_NAME_TO_ID, _UNIQUE_NAME_TO_ID = _build_lookups()
 
 
 def resolve_property_name(name):
@@ -112,16 +103,44 @@ def _lookup_skill_id(skill_name):
     return _SKILL_NAME_TO_ID[skill_name]
 
 
+# Damage min stats where min/max represent the two damage values
+# (min damage, max damage), NOT a random roll range.  The extracted
+# data uses a single 'lightmindam' entry with min=1, max=511 to mean
+# "Adds 1-511 Lightning Damage".  Return as grouped tuples since the
+# D2S encoder expects np-grouped format: (stat_id, [val1, val2, ...]).
+_DAMAGE_GROUPED = {
+    # Elemental damage stats: stat_name -> np_count (2=min/max, 3=min/max/duration)
+    # Physical mindamage/maxdamage (21/22) are NOT grouped — encoded individually.
+    'firemindam': 2,
+    'lightmindam': 2,
+    'magicmindam': 2,
+    'coldmindam': 3,
+    'poisonmindam': 3,
+}
+# maxdam stat names that are companions to mindam (skip if encountered
+# individually — the mindam entry already includes the max value)
+_DAMAGE_MAX_STATS = {
+    'firemaxdam', 'lightmaxdam', 'magicmaxdam',
+    'coldmaxdam', 'poisonmaxdam',
+}
+# Duration stat names (skip — included in grouped cold/poison)
+_DAMAGE_DURATION_STATS = {'coldlength', 'poisonlength'}
+
+# Hardcoded np (group count) overrides for D2S encoding format.
+# Vanilla ItemStatCost.txt doesn't export np, so item_stat_cost.py may not have it.
+_NP = {17: 2, 48: 2, 50: 2, 52: 2, 54: 3, 57: 3}
+
+
 def _resolve_stat_entry(stat_entry, use_max=True):
-    """Convert a stat entry from runeword_stats/unique_item_stats into a property tuple.
+    """Convert a stat entry from runeword_stats/unique_item_stats into property tuples.
 
     Args:
         stat_entry: Dict with 'stat', 'min', 'max', and optional 'param_type', 'param'.
         use_max: If True, use max roll; if False, use min roll.
 
     Returns:
-        A tuple: (stat_id, value) or (stat_id, value, param)
-        For grouped stats (np > 0): (stat_id, [val1, val2, ...])
+        A list of tuples: [(stat_id, value), ...] or [(stat_id, value, param), ...]
+        For grouped stats (np > 0): [(stat_id, [val1, val2, ...])]
     """
     stat_name = stat_entry['stat']
     if stat_name not in STAT_BY_NAME:
@@ -129,35 +148,53 @@ def _resolve_stat_entry(stat_entry, use_max=True):
     stat_id = STAT_BY_NAME[stat_name]
     value = stat_entry['max'] if use_max else stat_entry['min']
 
-    # Check for grouped stats (np > 0).  D2R encodes these as one stat ID
-    # followed by np values back-to-back (no intermediate stat IDs).
+    # Elemental damage min stats: entry min/max = damage min/max, not roll range.
+    # Return as grouped tuple since D2S encodes these with np grouping.
+    if stat_name in _DAMAGE_GROUPED and stat_entry.get('param_type') is None:
+        np_count = _DAMAGE_GROUPED[stat_name]
+        min_val = stat_entry['min']
+        max_val = stat_entry['max']
+        if np_count == 2:
+            return [(stat_id, [min_val, max_val])]
+        elif np_count == 3:
+            duration = int(stat_entry.get('param', 0))
+            return [(stat_id, [min_val, max_val, duration])]
+
+    # Skip standalone elemental maxdam/duration stats — already included
+    # in the grouped mindam tuple above.
+    if stat_name in _DAMAGE_MAX_STATS or stat_name in _DAMAGE_DURATION_STATS:
+        return []
+
+    # Physical mindamage: entry min/max = min damage / max damage.
+    # Encode as two separate stats (not grouped — no np in D2S encoding).
+    if stat_name == 'mindamage' and stat_entry.get('param_type') is None:
+        min_val = stat_entry['min']
+        max_val = stat_entry['max']
+        if min_val != max_val:
+            max_stat_id = STAT_BY_NAME['maxdamage']
+            return [(stat_id, min_val), (max_stat_id, max_val)]
+
+    # Check for grouped stats (np > 0) — non-damage grouped stats.
     # Examples:
     #   item_maxdamage_percent (17, np=2): [maxdmg%, mindmg%]
-    #   firemindam (48, np=2): [mindam, maxdam]
-    #   coldmindam (54, np=3): [mindam, maxdam, length]
-    #   poisonmindam (57, np=3): [mindam, maxdam, length]
     stat_info = ITEM_STAT_COST.get(stat_id, {})
-    np_count = stat_info.get('np', 0)
+    np_count = _NP.get(stat_id, stat_info.get('np', 0))
     if np_count > 0:
         min_val = stat_entry['min']
         max_val = stat_entry['max']
         if np_count == 2:
-            # Group of 2: [first_value, second_value]
-            # e.g. enhanced_dmg: [max%, min%], fire: [mindam, maxdam]
-            return (stat_id, [max_val if use_max else min_val,
-                              max_val if use_max else min_val])
+            return [(stat_id, [max_val if use_max else min_val,
+                               max_val if use_max else min_val])]
         elif np_count == 3:
-            # Group of 3: [first_value, second_value, duration]
-            # Duration comes from 'param' field
             duration = int(stat_entry.get('param', 0))
-            return (stat_id, [max_val if use_max else min_val,
-                              max_val if use_max else min_val,
-                              duration])
+            return [(stat_id, [max_val if use_max else min_val,
+                               max_val if use_max else min_val,
+                               duration])]
 
     param_type = stat_entry.get('param_type')
     if param_type is None:
         # Simple stat, no param
-        return (stat_id, value)
+        return [(stat_id, value)]
 
     param_raw = stat_entry['param']
 
@@ -170,18 +207,18 @@ def _resolve_stat_entry(stat_entry, use_max=True):
                 skill_id = _lookup_skill_id(param_raw)
         else:
             skill_id = int(param_raw)
-        return (stat_id, value, skill_id)
+        return [(stat_id, value, skill_id)]
 
     elif param_type == 'skill_tab':
         # Convert global tab index to D2R binary encoding
-        return (stat_id, value, encode_skill_tab_param(int(param_raw)))
+        return [(stat_id, value, encode_skill_tab_param(int(param_raw)))]
 
     elif param_type == 'class':
         # param is a class ID (int) or "varies" (special case)
         if param_raw == "varies":
             # Default to 0 (Amazon); caller should override
-            return (stat_id, value, 0)
-        return (stat_id, value, int(param_raw))
+            return [(stat_id, value, 0)]
+        return [(stat_id, value, int(param_raw))]
 
     elif param_type == 'ctc':
         # In runeword_stats: descriptive string like "level 17 Chain Lightning on striking"
@@ -194,7 +231,7 @@ def _resolve_stat_entry(stat_entry, use_max=True):
                 level = int(expr_match.group(1))
                 skill_id = int(expr_match.group(2))
                 encoded_param = (level << 10) | skill_id
-                return (stat_id, value, encoded_param)
+                return [(stat_id, value, encoded_param)]
 
             # Plain numeric skill ID (e.g. '93'): min=chance, max=level
             try:
@@ -202,7 +239,7 @@ def _resolve_stat_entry(stat_entry, use_max=True):
                 chance = stat_entry['min']
                 level = stat_entry['max']
                 encoded_param = (level << 10) | skill_id
-                return (stat_id, chance, encoded_param)
+                return [(stat_id, chance, encoded_param)]
             except (ValueError, TypeError):
                 pass
 
@@ -216,20 +253,20 @@ def _resolve_stat_entry(stat_entry, use_max=True):
                 skill_name = desc_match.group(2).strip()
                 skill_id = _lookup_skill_id(skill_name)
                 encoded_param = (level << 10) | skill_id
-                return (stat_id, value, encoded_param)
+                return [(stat_id, value, encoded_param)]
 
             # Format 3: plain skill name (e.g. "Confuse", "Decrepify")
             # Look up skill ID directly — level comes from min/max fields
             try:
                 skill_id = _lookup_skill_id(param_raw)
-                return (stat_id, value, skill_id)
+                return [(stat_id, value, skill_id)]
             except ValueError:
                 pass  # Fall through to the error below
 
             raise ValueError(f"Cannot parse CTC param: '{param_raw}'")
         else:
             # Already an integer
-            return (stat_id, value, int(param_raw))
+            return [(stat_id, value, int(param_raw))]
 
     elif param_type == 'charges':
         # In unique_item_stats: expression string like "(3 << 10) | 278"
@@ -245,7 +282,7 @@ def _resolve_stat_entry(stat_entry, use_max=True):
                 # From the data file, 'value' is stored as 'min'/'max' representing max_charges
                 # current_charges defaults to same as max
                 charge_val = (value << 8) | value
-                return (stat_id, charge_val, encoded_param)
+                return [(stat_id, charge_val, encoded_param)]
             # Plain numeric skill ID (e.g. '54'): min=max_charges, max=level
             try:
                 skill_id = int(param_raw)
@@ -253,20 +290,20 @@ def _resolve_stat_entry(stat_entry, use_max=True):
                 level = stat_entry['max']
                 encoded_param = (level << 10) | skill_id
                 charge_val = (max_charges << 8) | max_charges
-                return (stat_id, charge_val, encoded_param)
+                return [(stat_id, charge_val, encoded_param)]
             except (ValueError, TypeError):
                 pass
             # Plain skill name (e.g. "Venom") — look up skill ID, use level from max/min
             try:
                 skill_id = _lookup_skill_id(param_raw)
                 charge_val = (value << 8) | value
-                return (stat_id, charge_val, skill_id)
+                return [(stat_id, charge_val, skill_id)]
             except ValueError:
                 pass
             raise ValueError(f"Cannot parse charges param: '{param_raw}'")
         else:
             charge_val = (value << 8) | value
-            return (stat_id, charge_val, int(param_raw))
+            return [(stat_id, charge_val, int(param_raw))]
 
     else:
         raise ValueError(f"Unknown param_type: '{param_type}'")
@@ -334,8 +371,8 @@ def resolve_runeword(name, base_code):
     properties = []
     for stat_entry in rw_stats['stats']:
         try:
-            prop = _resolve_stat_entry(stat_entry, use_max=True)
-            properties.append(prop)
+            props = _resolve_stat_entry(stat_entry, use_max=True)
+            properties.extend(props)
         except (ValueError, KeyError):
             pass
 
@@ -383,8 +420,8 @@ def resolve_unique(name):
     properties = []
     for stat_entry in uinfo['stats']:
         try:
-            prop = _resolve_stat_entry(stat_entry, use_max=True)
-            properties.append(prop)
+            props = _resolve_stat_entry(stat_entry, use_max=True)
+            properties.extend(props)
         except (ValueError, KeyError):
             pass
 
@@ -490,7 +527,7 @@ def resolve_properties(prop_dict):
 
         if isinstance(value, (int, float)) and not isinstance(value, bool):
             # Simple value — but check for grouped stats (np > 0)
-            np_count = stat_info.get('np', 0)
+            np_count = _NP.get(stat_id, stat_info.get('np', 0))
             if np_count > 0:
                 # Grouped stat: auto-expand scalar to list of np values.
                 # e.g. 'enhanced_dmg': 300 → (17, [300, 300]) for np=2
@@ -504,7 +541,7 @@ def resolve_properties(prop_dict):
         elif isinstance(value, list):
             # Check for grouped stats first: if np_count matches list length
             # and all elements are plain numbers, treat as raw grouped values.
-            np_count = stat_info.get('np', 0)
+            np_count = _NP.get(stat_id, stat_info.get('np', 0))
             if np_count > 0 and len(value) == np_count and all(
                 isinstance(v, (int, float)) and not isinstance(v, bool)
                 for v in value

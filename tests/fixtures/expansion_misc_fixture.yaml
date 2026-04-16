@@ -1,0 +1,151 @@
+schema_version: 1
+name: TestMisc
+class: necromancer
+level: 90
+
+stats:
+  strength: 100
+  dexterity: 60
+  vitality: 250
+  energy: 80
+
+skills:
+  Raise Skeleton: 20
+  Skeleton Mastery: 20
+  Corpse Explosion: 20
+  Amplify Damage: 1
+  Decrepify: 1
+  Lower Resist: 1
+
+equipment:
+  # Harlequin Crest (Shako) - UID 248
+  - slot: helm
+    unique: Harlequin Crest
+
+  # Enigma in Archon Plate
+  - slot: body
+    runeword: Enigma
+    base: utp
+
+  # Heart of the Oak (Flail)
+  - slot: weapon
+    runeword: "Heart of the Oak"
+    base: fla
+
+  # Homunculus (Hierophant Trophy) - UID 288
+  - slot: shield
+    unique: Homunculus
+
+merc:
+  equipment:
+    # ===== Worldstone Shards (xa1-xa5) — 1x1 normal misc items =====
+    - normal: true
+      base: xa1
+      ilvl: 99
+    - normal: true
+      base: xa2
+      ilvl: 99
+    - normal: true
+      base: xa3
+      ilvl: 99
+    - normal: true
+      base: xa4
+      ilvl: 99
+    - normal: true
+      base: xa5
+      ilvl: 99
+
+    # ===== Uber Ancient Summon Materials (ua1-ua5) — 1x2 normal misc =====
+    - normal: true
+      base: ua1
+      ilvl: 99
+    - normal: true
+      base: ua2
+      ilvl: 99
+    - normal: true
+      base: ua3
+      ilvl: 99
+    - normal: true
+      base: ua4
+      ilvl: 99
+    - normal: true
+      base: ua5
+      ilvl: 99
+
+    # ===== Uber Ancient Upgrade Materials (um1-um6) — 1x1 normal misc =====
+    - normal: true
+      base: um1
+      ilvl: 99
+    - normal: true
+      base: um2
+      ilvl: 99
+    - normal: true
+      base: um3
+      ilvl: 99
+    - normal: true
+      base: um4
+      ilvl: 99
+    - normal: true
+      base: um5
+      ilvl: 99
+    - normal: true
+      base: um6
+      ilvl: 99
+
+    # ===== Essences — 1x1 normal misc =====
+    - normal: true
+      base: bet
+      ilvl: 99
+    - normal: true
+      base: fed
+      ilvl: 99
+    - normal: true
+      base: tes
+      ilvl: 99
+
+    # ===== Token of Absolution — 1x1 normal misc =====
+    - normal: true
+      base: toa
+      ilvl: 99
+
+    # ===== Standard of Heroes — 1x1 normal misc (levelreq 90) =====
+    - normal: true
+      base: std
+      ilvl: 99
+
+    # ===== Crafted Sunder Charms (cs2) — unique quality, 1x3 =====
+    # UID 427: Crafted Cold Rupture
+    - unique: "Crafted Cold Rupture"
+      properties:
+        item_pierce_cold_immunity: 300
+        cold_res: -70
+
+    # UID 433: Crafted Flame Rift
+    - unique: "Crafted Flame Rift"
+      properties:
+        item_pierce_fire_immunity: 300
+        fire_res: -70
+
+    # ===== New elite class-specific bases — rare items =====
+    # Guardian Crown (baf) — barb helm, 2x2, elite
+    - rare: true
+      base: baf
+      ilvl: 90
+      defense: 150
+      properties:
+        all_skills: 2
+        strength: 20
+        fire_res: 30
+        cold_res: 30
+        light_res: 30
+        poison_res: 30
+
+    # Hellspawn Skull (neg) — necro head, 2x2, elite
+    - rare: true
+      base: neg
+      ilvl: 90
+      defense: 120
+      properties:
+        all_skills: 2
+        energy: 30
+        mana: 80

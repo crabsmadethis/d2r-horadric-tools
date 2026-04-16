@@ -13,16 +13,43 @@ _CLASS_CODES = {
 }
 
 _ITYPE_TO_CATEGORY = {
+    # Weapons — broad
     "weap": "Weapon", "mele": "Melee Weapon", "miss": "Missile Weapon",
+    # Weapons — specific
     "swor": "Sword", "axe": "Axe", "mace": "Mace", "hamm": "Hammer",
     "club": "Club", "scep": "Scepter", "pole": "Polearm", "spea": "Spear",
     "staf": "Staff", "bow": "Bow", "xbow": "Crossbow",
     "dagg": "Dagger", "knif": "Dagger", "wand": "Wand",
-    "shld": "Shield", "shie": "Shield", "ashd": "Auric Shields",
-    "tors": "Body Armor", "helm": "Helm", "helx": "Helm",
-    "armo": "Any Armor",
+    "orb": "Orb",
+    # Weapons — class-specific
     "h2h": "Hand to Hand", "h2h2": "Hand to Hand",
-    "orb": "Orb", "head": "Voodoo Heads", "pelt": "Pelt",
+    "abow": "Amazon Bow", "ajav": "Amazon Javelin", "aspe": "Amazon Spear",
+    "taxe": "Throwing Axe", "tkni": "Throwing Knife",
+    "jave": "Javelin",
+    # Armor — broad
+    "armo": "Any Armor",
+    # Armor — specific
+    "tors": "Body Armor", "body": "Body Armor",
+    "helm": "Helm", "helx": "Helm", "phlm": "Barbarian Helm", "circ": "Circlet",
+    "shld": "Shield", "shie": "Shield", "ashd": "Auric Shields",
+    "glov": "Gloves", "boot": "Boots", "belt": "Belt",
+    "head": "Voodoo Heads", "pelt": "Pelt", "grim": "Necromancer Shrunken Head",
+    # Accessories
+    "ring": "Ring", "amul": "Amulet",
+    "jewl": "Jewel",
+    "scha": "Small Charm", "mcha": "Medium Charm", "lcha": "Large Charm",
+    # Runes & gems
+    "rune": "Rune",
+    "gem0": "Gem", "gem1": "Gem", "gem2": "Gem", "gem3": "Gem", "gem4": "Gem",
+    "gema": "Gem", "gemd": "Gem", "geme": "Gem", "gemr": "Gem",
+    "gems": "Gem", "gemt": "Gem", "gemz": "Gem",
+    # Consumables
+    "hpot": "Healing Potion", "mpot": "Mana Potion", "rpot": "Rejuvenation Potion",
+    "tpot": "Throwing Potion", "apot": "Antidote Potion", "spot": "Stamina Potion",
+    "wpot": "Thawing Potion",
+    # Misc
+    "book": "Tome", "scro": "Scroll", "key": "Key", "gold": "Gold",
+    "ques": "Quest", "bowq": "Bow Quiver", "xboq": "Crossbow Quiver",
 }
 
 
@@ -690,6 +717,15 @@ def regen_item_stat_cost(rows: list[dict]) -> tuple[dict, dict]:
 
         isc[stat_id] = entry
         sbn[stat_name] = stat_id
+
+    # Inject np (group count) values for grouped stats.
+    # The D2S binary format encodes these as one stat ID header followed by
+    # np consecutive values.  This is hardcoded format knowledge — the
+    # vanilla ItemStatCost.txt doesn't export an np column.
+    _NP_VALUES = {17: 2, 48: 2, 50: 2, 52: 2, 54: 3, 57: 3}
+    for sid, np_val in _NP_VALUES.items():
+        if sid in isc:
+            isc[sid]['np'] = np_val
 
     return isc, sbn
 

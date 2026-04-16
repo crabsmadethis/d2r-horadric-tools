@@ -5,10 +5,13 @@ import os
 import glob
 import shutil
 
+import yaml
+
 from d2r_mod.tsv import read_tsv_file, write_tsv_file
 from d2r_mod.overlay import load_overlay_file, apply_overlay
 from d2r_mod.scripts import run_script
 from d2r_mod.version import check_stale
+
 
 
 def _detect_game_dir() -> str | None:
@@ -49,7 +52,6 @@ def _detect_game_dir() -> str | None:
 
 
 DEFAULT_GAME_DIR = _detect_game_dir()
-
 
 def _find_txt_files(vanilla_dir: str) -> dict[str, str]:
     result = {}
@@ -182,6 +184,42 @@ def build_mod(
             result = mod.apply(build_dir)
             if result:
                 warnings.extend(result)
+
+    # Step 5c: Patch .tbl string tables
+    from d2r_mod.assets.tbl import patch_tbl
+    patches_strings_dir = os.path.join(
+        os.path.dirname(overlays_dir), "patches", "strings"
+    )
+    if os.path.isdir(patches_strings_dir):
+        string_yamls = sorted(glob.glob(
+            os.path.join(patches_strings_dir, "*.yaml")
+        ))
+        for yaml_path in string_yamls:
+            basename = os.path.basename(yaml_path)
+            if basename.startswith("_"):
+                continue  # skip smoke tests / templates
+            with open(yaml_path) as f:
+                config = yaml.safe_load(f)
+            target = config.get("target", "")
+            entries_list = config.get("entries", [])
+            if not target or not entries_list:
+                continue
+            overrides = {e["key"]: e["value"] for e in entries_list}
+            # Find all matching .tbl files in build output (one per language)
+            tbl_paths = []
+            for root, _, files in os.walk(build_dir):
+                for fn in files:
+                    if fn == target:
+                        tbl_paths.append(os.path.join(root, fn))
+            if not tbl_paths:
+                warnings.append(f"StringPatch: target not found: {target}")
+                continue
+            for tbl_path in tbl_paths:
+                patch_tbl(tbl_path, overrides, tbl_path)
+            warnings.append(
+                f"StringPatch: patched {len(overrides)} strings in {target} "
+                f"({len(tbl_paths)} files) ({basename})"
+            )
 
     # Step 6: Write modinfo.json (required for D2R to load mod .txt files)
     import json

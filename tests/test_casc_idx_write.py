@@ -9,7 +9,6 @@ import pytest
 
 pytestmark = pytest.mark.slow
 
-from d2r_mod.build import DEFAULT_GAME_DIR
 from d2r_mod.casc_write import (
     IDX_FILE_SIZE,
     MAX_ENTRIES_PER_IDX,
@@ -454,7 +453,8 @@ class TestWriteNewIdxFiles:
 
 # ── Real .idx validation ──────────────────────────────────────────────
 
-IDX_DIR = os.path.join(DEFAULT_GAME_DIR, "data", "data") if DEFAULT_GAME_DIR else ""
+from d2r_mod.build import DEFAULT_GAME_DIR
+IDX_DIR = os.path.join(DEFAULT_GAME_DIR, "data", "data") if DEFAULT_GAME_DIR else None
 
 
 def _idx_available():

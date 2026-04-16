@@ -12,7 +12,6 @@ import pytest
 item_stat_cost = pytest.importorskip("d2r_chargen.data.item_stat_cost",
                                       reason="game data not extracted (run 'd2r-mod extract')")
 STAT_BY_NAME = item_stat_cost.STAT_BY_NAME
-
 from d2r_chargen.build_lib import build_item
 from d2r_chargen.config import PROPERTY_ALIASES, CHARS_DIR
 from d2r_chargen.resolve import resolve_properties, resolve_unique, resolve_runeword
@@ -176,7 +175,7 @@ class TestRunewordResolution(unittest.TestCase):
         entry = {'stat': 'item_skillonhit', 'min': 10, 'max': 15,
                  'param_type': 'ctc', 'param': 'Confuse'}
         result = _resolve_stat_entry(entry)
-        stat_id, value, param = result
+        stat_id, value, param = result[0]
         self.assertIsInstance(param, int)
         self.assertGreater(param, 0, "CTC param should encode a skill ID")
 
@@ -555,7 +554,7 @@ class TestSkillTabEncoding(unittest.TestCase):
                 if stat_entry.get('param_type') != 'skill_tab':
                     continue
                 result = _resolve_stat_entry(stat_entry)
-                param = result[2]
+                param = result[0][2]
                 tab_enc = param & 0x7
                 cls_enc = (param >> 3) & 0x1F
                 self.assertLessEqual(tab_enc, 2,
@@ -585,7 +584,7 @@ class TestSkillTabEncoding(unittest.TestCase):
             itype, ilvl, quality, uid, storage, col, row, bodyloc, location, ext = hdr
             flags32 = int.from_bytes(item_bytes[0:4], 'little')
             is_rw = bool(flags32 & (1 << 26))
-            is_sock = bool(flags32 & (1 << 27))
+            is_sock = bool(flags32 & (1 << 11))
             ok, err, _ = validate_item_properties(
                 item_bytes, 0, itype, quality, is_rw, is_sock, flags32)
             self.assertTrue(ok, f"Item {itype} uid={uid}: {err}")

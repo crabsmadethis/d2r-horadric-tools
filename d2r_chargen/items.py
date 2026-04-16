@@ -1,7 +1,7 @@
 """Item building for D2R character generation.
 
 Takes resolved item definitions (from YAML + resolve.py) and produces
-binary bytes via build_lib.build_item() + encode_socketed_rune().
+binary bytes via d2r_build_lib.build_item() + encode_socketed_rune().
 
 All items are tagged with section='char'. Merc gear goes to stash (storage=5)
 in the char JM section -- NEVER to the merc JM section (Rule 6: pre-injected
@@ -13,6 +13,70 @@ from d2r_chargen.resolve import (
     resolve_runeword, resolve_unique, resolve_set_item, resolve_properties,
 )
 from d2r_chargen.data.item_bases import ITEM_BASES
+from d2r_chargen.data.magic_affixes import (
+    auto_select_affixes, resolve_affix_name, auto_select_rare_names,
+)
+
+def _resolve_magic_affixes(prefix_val, suffix_val, type_code, resolved_props):
+    """Resolve magic prefix/suffix values to numeric IDs.
+
+    Supports three input forms:
+      - int > 0: used as-is (explicit row ID)
+      - str: resolved by affix name (e.g., "Entrapping", "of Vita")
+      - 0 or missing: auto-selected from item properties
+
+    Args:
+        prefix_val: Explicit prefix (int ID, string name, or 0 for auto)
+        suffix_val: Explicit suffix (int ID, string name, or 0 for auto)
+        type_code: Item type code (e.g., 'cm3', 'xtb')
+        resolved_props: List of resolved property tuples
+
+    Returns:
+        (prefix_id, suffix_id) tuple of ints
+    """
+    # Resolve string names to IDs
+    if isinstance(prefix_val, str):
+        prefix_val = resolve_affix_name(prefix_val, is_prefix=True)
+    if isinstance(suffix_val, str):
+        suffix_val = resolve_affix_name(suffix_val, is_prefix=False)
+
+    # Auto-select if either is 0
+    if not prefix_val or not suffix_val:
+        auto_prefix, auto_suffix = auto_select_affixes(type_code, resolved_props)
+        if not prefix_val:
+            prefix_val = auto_prefix
+        if not suffix_val:
+            suffix_val = auto_suffix
+
+    return (prefix_val, suffix_val)
+
+
+def _resolve_rare_names(first_val, last_val, type_code, props):
+    """Resolve rare item first/last name values to numeric IDs.
+
+    Supports:
+      - int > 0: used as-is (explicit row ID)
+      - 0 or missing: auto-selected based on item type
+
+    Args:
+        first_val: Explicit first name ID or 0 for auto
+        last_val: Explicit last name ID or 0 for auto
+        type_code: Item type code (e.g., 'amu', 'xhm')
+        props: Resolved properties list (used as seed for variety)
+
+    Returns:
+        (first_name_id, last_name_id) tuple of ints
+    """
+    if not first_val or not last_val:
+        # Use a deterministic seed from type_code + properties for variety
+        seed = hash((type_code, tuple(str(p) for p in props))) & 0x7FFFFFFF
+        auto_first, auto_last = auto_select_rare_names(type_code, seed)
+        if not first_val:
+            first_val = auto_first
+        if not last_val:
+            last_val = auto_last
+    return (first_val, last_val)
+
 
 # Default base type codes for rare items when no explicit base is given
 RARE_SLOT_BASES = {
@@ -207,6 +271,12 @@ def _build_rare(item_def, slot):
 
     base_info = ITEM_BASES[base_code]
 
+    first, last = _resolve_rare_names(
+        item_def.get('rare_first_name', 0),
+        item_def.get('rare_last_name', 0),
+        base_code, props,
+    )
+
     item_bytes = build_item(
         type_code=base_code,
         col=0, row=0, storage=0,
@@ -217,8 +287,8 @@ def _build_rare(item_def, slot):
         max_dur=base_info.get('durability', 0),
         cur_dur=base_info.get('durability', 0),
         properties=props,
-        rare_first_name=item_def.get('rare_first_name', 0),
-        rare_last_name=item_def.get('rare_last_name', 0),
+        rare_first_name=first,
+        rare_last_name=last,
         ethereal=item_def.get('ethereal', False),
     )
     return [('char', item_bytes)]
@@ -237,6 +307,12 @@ def _build_magic(item_def, slot):
 
     base_info = ITEM_BASES[base_code]
 
+    prefix, suffix = _resolve_magic_affixes(
+        item_def.get('magic_prefix', 0),
+        item_def.get('magic_suffix', 0),
+        base_code, props,
+    )
+
     item_bytes = build_item(
         type_code=base_code,
         col=0, row=0, storage=0,
@@ -247,8 +323,8 @@ def _build_magic(item_def, slot):
         max_dur=base_info.get('durability', 0),
         cur_dur=base_info.get('durability', 0),
         properties=props,
-        magic_prefix=item_def.get('magic_prefix', 0),
-        magic_suffix=item_def.get('magic_suffix', 0),
+        magic_prefix=prefix,
+        magic_suffix=suffix,
         ethereal=item_def.get('ethereal', False),
     )
     return [('char', item_bytes)]
@@ -267,6 +343,12 @@ def _build_crafted(item_def, slot):
 
     base_info = ITEM_BASES[base_code]
 
+    first, last = _resolve_rare_names(
+        item_def.get('rare_first_name', 0),
+        item_def.get('rare_last_name', 0),
+        base_code, props,
+    )
+
     item_bytes = build_item(
         type_code=base_code,
         col=0, row=0, storage=0,
@@ -277,8 +359,8 @@ def _build_crafted(item_def, slot):
         max_dur=base_info.get('durability', 0),
         cur_dur=base_info.get('durability', 0),
         properties=props,
-        rare_first_name=item_def.get('rare_first_name', 0),
-        rare_last_name=item_def.get('rare_last_name', 0),
+        rare_first_name=first,
+        rare_last_name=last,
         ethereal=item_def.get('ethereal', False),
     )
     return [('char', item_bytes)]
@@ -319,14 +401,21 @@ def build_charm(charm_def, col, row):
             charm_info = charm_def[key]
             type_code = _CHARM_TYPE_CODES[key]
             props = resolve_properties(charm_info.get('properties', {}))
+
+            prefix, suffix = _resolve_magic_affixes(
+                charm_info.get('magic_prefix', 0),
+                charm_info.get('magic_suffix', 0),
+                type_code, props,
+            )
+
             charm_bytes = build_item(
                 type_code=type_code,
                 col=col, row=row, storage=1,  # inventory
                 location=0,
                 quality=4,  # magic
                 properties=props,
-                magic_prefix=charm_info.get('magic_prefix', 0),
-                magic_suffix=charm_info.get('magic_suffix', 0),
+                magic_prefix=prefix,
+                magic_suffix=suffix,
             )
             return [('char', charm_bytes)]
 
@@ -361,6 +450,8 @@ def build_merc_item(item_def, stash_col, stash_row):
         return _build_merc_rare(item_def, stash_col, stash_row)
     elif 'magic_prefix' in item_def or 'magic_suffix' in item_def:
         return _build_merc_magic(item_def, stash_col, stash_row)
+    elif 'normal' in item_def:
+        return _build_merc_normal(item_def, stash_col, stash_row)
     else:
         raise ValueError(
             f"Cannot determine merc item quality type from keys: "
@@ -463,6 +554,12 @@ def _build_merc_rare(item_def, col, row):
 
     base_info = ITEM_BASES[base_code]
 
+    first, last = _resolve_rare_names(
+        item_def.get('rare_first_name', 0),
+        item_def.get('rare_last_name', 0),
+        base_code, props,
+    )
+
     item_bytes = build_item(
         type_code=base_code,
         col=col, row=row, storage=5,  # stash
@@ -473,8 +570,8 @@ def _build_merc_rare(item_def, col, row):
         max_dur=base_info.get('durability', 0),
         cur_dur=base_info.get('durability', 0),
         properties=props,
-        rare_first_name=item_def.get('rare_first_name', 0),
-        rare_last_name=item_def.get('rare_last_name', 0),
+        rare_first_name=first,
+        rare_last_name=last,
         ethereal=item_def.get('ethereal', False),
     )
     return [('char', item_bytes)]
@@ -490,6 +587,12 @@ def _build_merc_magic(item_def, col, row):
 
     base_info = ITEM_BASES[base_code]
 
+    prefix, suffix = _resolve_magic_affixes(
+        item_def.get('magic_prefix', 0),
+        item_def.get('magic_suffix', 0),
+        base_code, props,
+    )
+
     item_bytes = build_item(
         type_code=base_code,
         col=col, row=row, storage=5,  # stash
@@ -500,8 +603,33 @@ def _build_merc_magic(item_def, col, row):
         max_dur=base_info.get('durability', 0),
         cur_dur=base_info.get('durability', 0),
         properties=props,
-        magic_prefix=item_def.get('magic_prefix', 0),
-        magic_suffix=item_def.get('magic_suffix', 0),
+        magic_prefix=prefix,
+        magic_suffix=suffix,
         ethereal=item_def.get('ethereal', False),
+    )
+    return [('char', item_bytes)]
+
+
+def _build_merc_normal(item_def, col, row):
+    """Build a normal (quality=2) item in stash.
+
+    Used for quest/misc items like Worldstone Shards, essences,
+    Uber Ancient materials, etc.
+    """
+    base_code = item_def.get('base')
+    if base_code is None:
+        raise ValueError("Normal items must specify 'base' code.")
+
+    base_info = ITEM_BASES[base_code]
+
+    item_bytes = build_item(
+        type_code=base_code,
+        col=col, row=row, storage=5,  # stash
+        location=0, bodyloc=0,
+        quality=2,
+        ilvl=item_def.get('ilvl', 99),
+        defense=base_info.get('max_ac', 0),
+        max_dur=base_info.get('durability', 0),
+        cur_dur=base_info.get('durability', 0),
     )
     return [('char', item_bytes)]

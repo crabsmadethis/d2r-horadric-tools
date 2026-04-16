@@ -5,7 +5,6 @@ import struct
 import glob
 import pytest
 
-from d2r_mod.build import DEFAULT_GAME_DIR
 from d2r_mod.jenkins import (
     hashlittle,
     hashlittle2,
@@ -137,7 +136,8 @@ class TestHashlittle2:
 
 # === CASC .idx integration tests ===
 
-IDX_DIR = os.path.join(DEFAULT_GAME_DIR, "data", "data") if DEFAULT_GAME_DIR else ""
+from d2r_mod.build import DEFAULT_GAME_DIR
+IDX_DIR = os.path.join(DEFAULT_GAME_DIR, "data", "data") if DEFAULT_GAME_DIR else None
 
 
 def _idx_available():

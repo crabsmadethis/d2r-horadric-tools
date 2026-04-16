@@ -34,7 +34,10 @@ def _detect_chars_dir():
     """Character YAML directory. Override with D2R_CHARS env var."""
     if 'D2R_CHARS' in os.environ:
         return os.environ['D2R_CHARS']
-    return os.path.join(os.getcwd(), 'chars')
+
+    # Default: chars/ directory next to the package
+    pkg_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(pkg_dir, 'chars')
 
 
 SAVES = _detect_saves_dir()
@@ -96,7 +99,7 @@ RW_BASE_CATEGORIES = {
 
 # YAML property name aliases -> item_stat_cost.py STAT_BY_NAME keys
 # Raw STAT_BY_NAME keys are also accepted (pass through unchanged)
-# Stat IDs verified against build_lib.py constants (CLAUDE.md Rule 14)
+# Stat IDs verified against d2r_build_lib.py constants (CLAUDE.md Rule 14)
 PROPERTY_ALIASES = {
     # Core stats (0-9)
     'strength': 'strength',              # 0

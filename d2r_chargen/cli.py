@@ -60,9 +60,8 @@ def cmd_validate(args):
         )
 
         from d2r_chargen.config import SAVES
-        saves = SAVES
         # Prefer existing .d2s as template (has correct status/expansion bits)
-        existing_d2s = os.path.join(saves, f"{char_def['name']}.d2s")
+        existing_d2s = os.path.join(SAVES, f"{char_def['name']}.d2s")
         if os.path.exists(existing_d2s):
             template_path = existing_d2s
 
@@ -122,8 +121,7 @@ def cmd_scan(args):
 def cmd_import(args):
     from d2r_chargen.importer import import_character, dict_to_yaml
     from d2r_chargen.config import SAVES
-    saves = SAVES
-    d2s_path = os.path.join(saves, f"{args.name}.d2s")
+    d2s_path = os.path.join(SAVES, f"{args.name}.d2s")
     if not os.path.exists(d2s_path):
         print(f"  ERROR: {d2s_path} not found")
         return
@@ -177,7 +175,7 @@ def main():
                        help='Only validate YAML structure, skip binary build+scan')
     p_val.set_defaults(func=cmd_validate)
 
-    p_scan = sub.add_parser('scan', help='Run diagnostic scanner on save file')
+    p_scan = sub.add_parser('scan', help='Run d2rdoctor scanner')
     p_scan.add_argument('name')
     p_scan.set_defaults(func=cmd_scan)
 
@@ -185,15 +183,6 @@ def main():
     if not args.command:
         parser.print_help()
         return
-
-    # Commands that don't need game data
-    if args.command == 'list':
-        args.func(args)
-        return
-
-    # All other commands need extracted game data
-    from d2r_chargen.data import check_data_available
-    check_data_available()
     args.func(args)
 
 if __name__ == '__main__':

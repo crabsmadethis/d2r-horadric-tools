@@ -2,26 +2,23 @@
 """
 d2r_scanner.py -- D2R save file diagnostic scanner.
 
-Can be:
+Extracted from d2rdoctor.md skill file. Can be:
   1. Run standalone: python3 d2r_scanner.py [character_name|all]
   2. Imported: from d2r_chargen.scanner import run_scanner, scan_character_data
+  3. Called from d2rdoctor.md skill (thin wrapper)
+
+Produces identical output to the original inline d2rdoctor.md scanner.
 """
 
 import struct, sys, os, time, json
 
 from d2r_chargen.data.huffman import HUFFMAN_TREE, RUNE_NAMES
-try:
-    from d2r_chargen.data.item_stat_cost import ITEM_STAT_COST
-    from d2r_chargen.data.item_dimensions import ITEM_DIMENSIONS
-    from d2r_chargen.data.unique_items import UNIQUE_ITEMS
-    from d2r_chargen.data.set_items import SET_ITEMS
-    from d2r_chargen.data.item_bases import ITEM_BASES as ITEM_BASES_FULL
-    from d2r_chargen.data.runewords import RUNEWORDS
-    _SCANNER_DATA_AVAILABLE = True
-except ImportError:
-    ITEM_STAT_COST = ITEM_DIMENSIONS = UNIQUE_ITEMS = SET_ITEMS = None
-    ITEM_BASES_FULL = RUNEWORDS = None
-    _SCANNER_DATA_AVAILABLE = False
+from d2r_chargen.data.item_stat_cost import ITEM_STAT_COST
+from d2r_chargen.data.item_dimensions import ITEM_DIMENSIONS
+from d2r_chargen.data.unique_items import UNIQUE_ITEMS
+from d2r_chargen.data.set_items import SET_ITEMS
+from d2r_chargen.data.item_bases import ITEM_BASES as ITEM_BASES_FULL
+from d2r_chargen.data.runewords import RUNEWORDS
 
 # ============================================================
 # Constants
@@ -340,10 +337,13 @@ def validate_item_properties(data, pos, itype, quality, is_runeword, is_socketed
             return False, f"stat {stat_id} ({stat_name}): value {decoded_val} implausibly negative (raw={raw_val}, sA={sA})", br
 
         # (c) Duplicate stat detection (RC-10, WARNING only)
-        if stat_id in seen_stats:
+        # Skip for parameterized stats (sP>0) — multiple instances with
+        # different params are legitimate (e.g. multiple +skill bonuses)
+        if sP == 0 and stat_id in seen_stats:
             stat_name = info.get('s', f'stat_{stat_id}')
             prop_warnings.append(f"duplicate stat_id={stat_id} ({stat_name})")
-        seen_stats.add(stat_id)
+        if sP == 0:
+            seen_stats.add(stat_id)
 
         # P1-5: np-grouped stat handling
         if np_count > 1:
@@ -835,7 +835,7 @@ def scan_characters(target, all_files, ghost_chars):
                 if avg<25:
                     print(f"  \u26a0 Unique items avg {avg:.0f}B \u2014 likely missing stat properties (expect 30-45B)")
                     print(f"    Items built with build_item(unique_id=X) without properties?")
-                    print(f"    Use build_lib.encode_property() for full stat encoding.")
+                    print(f"    Ensure items include magic_attributes with encode_property() for full stat encoding.")
             if rw_sizes:
                 avg_rw=sum(rw_sizes)/len(rw_sizes)
                 if avg_rw<25:
@@ -1102,7 +1102,7 @@ def scan_characters(target, all_files, ghost_chars):
 # ============================================================
 def delta_and_summary(files, ghost_chars, save_total, bak_total, bak_files):
     """Delta tracking and save directory summary."""
-    snapshot_path = os.path.join(SAVES, '.d2r_scanner_snapshot.json')
+    snapshot_path = os.path.join(SAVES, '.d2rdoctor_snapshot.json')
     current_snapshot = {}
     for fname_s in files:
         path_s = os.path.join(SAVES, fname_s)
@@ -1150,10 +1150,6 @@ def delta_and_summary(files, ghost_chars, save_total, bak_total, bak_files):
         print(f"  ! Consider pruning old backups to reclaim {bak_total//1024}KB")
     print(f"\nScan complete.")
 
-
-# ============================================================
-# Progression Consistency Check
-# ============================================================
 
 def check_progression_consistency(data, yaml_progression=None):
     """Validate progression byte vs waypoint/quest state.
@@ -1313,46 +1309,57 @@ def scan_character_data(filepath):
     if jm >= 0:
         char_item_end = jf_marker if jf_marker > 0 else len(data) - 4
         runeword_flags = {}
-        for pos in range(jm + 4, char_item_end):
+        pos = jm + 4
+        while pos < char_item_end:
             b0, b2 = data[pos], data[pos + 2] if pos + 2 < len(data) else 0
-            if b0 == 0x10 and b2 in (0x80, 0xa0, 0xc0, 0xe0):
+            if b0 != 0x10 or b2 not in (0x80, 0xa0, 0xc0, 0xe0):
+                pos += 1
+                continue
+            try:
+                itype, ilvl, quality, uid, storage, col, row, bodyloc, location, ext = \
+                    decode_item_header(data, pos)
+            except Exception:
+                pos += 1
+                continue
+            # Reject phantom matches from random item_id bytes. Real items
+            # must have a known type code or '???' (Huffman decode failure).
+            tc_check = itype.strip()
+            if tc_check != '???' and tc_check not in ITEM_BASES_FULL:
+                pos += 1
+                continue
+            flags32 = struct.unpack_from('<I', data, pos)[0]
+            if flags32 & (1 << 26):
+                runeword_flags[pos] = True
+            # UID validation
+            tc = itype.strip()
+            if quality == 7 and uid is not None:
+                uinfo = UNIQUE_ITEMS.get(uid)
+                if uinfo is None:
+                    errors.append(f"item@{pos:#x}: uid={uid} not in UNIQUE_ITEMS")
+                elif uinfo['code'] != tc and tc != '???':
+                    errors.append(f"item@{pos:#x}: uid={uid} ({uinfo['name']}) expects '{uinfo['code']}' got '{tc}'")
+            if quality == 5 and uid is not None:
+                sinfo = SET_ITEMS.get(uid)
+                if sinfo is None:
+                    errors.append(f"item@{pos:#x}: set_id={uid} not in SET_ITEMS")
+                elif sinfo['code'] != tc and tc != '???':
+                    errors.append(f"item@{pos:#x}: set_id={uid} ({sinfo['name']}) expects '{sinfo['code']}' got '{tc}'")
+            # Property stream validation
+            if quality >= 1:
                 try:
-                    itype, ilvl, quality, uid, storage, col, row, bodyloc, location, ext = \
-                        decode_item_header(data, pos)
-                except Exception:
-                    continue
-                flags32 = struct.unpack_from('<I', data, pos)[0]
-                if flags32 & (1 << 26):
-                    runeword_flags[pos] = True
-                # UID validation
-                tc = itype.strip()
-                if quality == 7 and uid is not None:
-                    uinfo = UNIQUE_ITEMS.get(uid)
-                    if uinfo is None:
-                        errors.append(f"item@{pos:#x}: uid={uid} not in UNIQUE_ITEMS")
-                    elif uinfo['code'] != tc and tc != '???':
-                        errors.append(f"item@{pos:#x}: uid={uid} ({uinfo['name']}) expects '{uinfo['code']}' got '{tc}'")
-                if quality == 5 and uid is not None:
-                    sinfo = SET_ITEMS.get(uid)
-                    if sinfo is None:
-                        errors.append(f"item@{pos:#x}: set_id={uid} not in SET_ITEMS")
-                    elif sinfo['code'] != tc and tc != '???':
-                        errors.append(f"item@{pos:#x}: set_id={uid} ({sinfo['name']}) expects '{sinfo['code']}' got '{tc}'")
-                # Property stream validation
-                if quality >= 1:
-                    try:
-                        prop_ok, prop_err, _ = validate_item_properties(
-                            data, pos, itype, quality,
-                            pos in runeword_flags,
-                            bool(flags32 & (1 << 11)),
-                            flags32
-                        )
-                        if not prop_ok:
-                            errors.append(f"item@{pos:#x} ({tc}): {prop_err}")
-                        elif prop_err:
-                            warnings.append(f"item@{pos:#x} ({tc}): {prop_err}")
-                    except Exception as ex:
-                        warnings.append(f"item@{pos:#x} ({tc}): property parse exception: {ex}")
+                    prop_ok, prop_err, _ = validate_item_properties(
+                        data, pos, itype, quality,
+                        pos in runeword_flags,
+                        bool(flags32 & (1 << 11)),
+                        flags32
+                    )
+                    if not prop_ok:
+                        errors.append(f"item@{pos:#x} ({tc}): {prop_err}")
+                    elif prop_err:
+                        warnings.append(f"item@{pos:#x} ({tc}): {prop_err}")
+                except Exception as ex:
+                    warnings.append(f"item@{pos:#x} ({tc}): property parse exception: {ex}")
+            pos += 1
 
     return {
         'name': char_name,
@@ -1371,7 +1378,7 @@ def scan_character_data(filepath):
 # Main Entry Point
 # ============================================================
 def run_scanner(target='all'):
-    """Run the full scanner.
+    """Run the full scanner (identical output to original d2rdoctor.md).
 
     Args:
         target: Character name filter (lowercase), or 'all'

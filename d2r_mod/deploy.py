@@ -259,11 +259,9 @@ def deploy_mod(build_dir: str, game_dir: str = DEFAULT_GAME_DIR,
     else:
         print(f"Add to Steam launch options: {launch_opts}")
 
-    # Generate patches.json for runtime patcher (optional — requires host module)
+    # Generate patches.json for LD_PRELOAD runtime patcher (optional)
     try:
         _deploy_patches_json(game_dir)
-    except ImportError:
-        pass  # host module not available — binary patching not supported
     except Exception as e:
         print(f"Warning: patches.json generation failed ({e}) — "
               "binary patching disabled, mod data still active")

@@ -27,6 +27,7 @@ _UNIQUE_CHARM_POSITIONS = {
     'gheed\'s fortune':    ('cm3', 8, 0),
     'crack of the heavens': ('cm3', 8, 0),
     'black cleft':         ('cm3', 8, 0),
+    'flame rift':          ('cm3', 8, 0),
 }
 
 # Inventory grid: 10 cols x 4 rows
@@ -553,43 +554,56 @@ def build_all_items(char_def):
     2. Inventory charms -> build_charm() with auto-calculated grid positions
     3. Merc equipment -> build_merc_item() with stash positions
 
+    Pre-encode warnings are collected and printed before the scanner runs,
+    giving the user earlier diagnostic info. Warnings never halt the build.
+
     Args:
         char_def: Validated character definition dict.
 
     Returns:
         List of (section, bytes) tuples. Section is always 'char'.
     """
-    all_items = []
+    from d2r_chargen.warnings import BuildWarnings
+    from d2r_chargen.build_lib import set_build_warnings
 
-    # 1. Build equipment items
-    for item_def in char_def.get('equipment', []):
-        items = build_equipment_item(item_def)
-        all_items.extend(items)
+    bw = BuildWarnings()
+    set_build_warnings(bw)
+    try:
+        all_items = []
 
-    # 2. Build inventory charms (expand count: N into individual defs)
-    inventory = char_def.get('inventory', {})
-    raw_charms = inventory.get('charms', []) if isinstance(inventory, dict) else []
-    charms = _expand_charms(raw_charms)
-    if charms:
-        positions = _calculate_charm_positions(charms)
-        for i, charm_def in enumerate(charms):
-            col, row = positions[i]
-            items = build_charm(charm_def, col=col, row=row)
+        # 1. Build equipment items
+        for item_def in char_def.get('equipment', []):
+            items = build_equipment_item(item_def)
             all_items.extend(items)
 
-    # 3. Build merc items (placed in stash)
-    merc = char_def.get('merc', {})
-    merc_equipment = []
-    if isinstance(merc, dict):
-        merc_equipment = merc.get('equipment', [])
-    if merc_equipment:
-        stash_positions = _calculate_merc_stash_positions(merc_equipment)
-        for i, item_def in enumerate(merc_equipment):
-            col, row = stash_positions[i]
-            items = build_merc_item(item_def, stash_col=col, stash_row=row)
-            all_items.extend(items)
+        # 2. Build inventory charms (expand count: N into individual defs)
+        inventory = char_def.get('inventory', {})
+        raw_charms = inventory.get('charms', []) if isinstance(inventory, dict) else []
+        charms = _expand_charms(raw_charms)
+        if charms:
+            positions = _calculate_charm_positions(charms)
+            for i, charm_def in enumerate(charms):
+                col, row = positions[i]
+                items = build_charm(charm_def, col=col, row=row)
+                all_items.extend(items)
 
-    return all_items
+        # 3. Build merc items (placed in stash)
+        merc = char_def.get('merc', {})
+        merc_equipment = []
+        if isinstance(merc, dict):
+            merc_equipment = merc.get('equipment', [])
+        if merc_equipment:
+            stash_positions = _calculate_merc_stash_positions(merc_equipment)
+            for i, item_def in enumerate(merc_equipment):
+                col, row = stash_positions[i]
+                items = build_merc_item(item_def, stash_col=col, stash_row=row)
+                all_items.extend(items)
+
+        return all_items
+    finally:
+        set_build_warnings(None)
+        if bw.has_warnings():
+            bw.dump()
 
 
 def deploy_character(char_name, phase=4, force=False):
@@ -773,7 +787,7 @@ def deploy_character(char_name, phase=4, force=False):
                 os.unlink(temp_path)
         print(f"  Phase {p}: deployed {len(phase_items)} items, checksum OK")
 
-        # Run scanner after each phase (Rule 4)
+        # Run d2rdoctor scanner after each phase (Rule 4)
         try:
             from d2r_chargen.scanner import scan_character_data
             result = scan_character_data(char_path)

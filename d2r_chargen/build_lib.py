@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 """
-build_lib.py — Single authoritative item encoder for D2R save file editing.
+d2r_build_lib.py — Single authoritative item encoder for D2R save file editing.
 
 Consolidated item encoder for D2R save file editing.
-Replaces three competing build_item() implementations with a single
-correct version.
 
-Key fixes:
+Key features:
   1. Dynamic BASES lookup from item_bases.py (659 entries) — no hardcoded dict
   2. Runeword double-terminator support
   3. Overflow protection on all property encoding
@@ -23,8 +21,6 @@ import random
 
 # Huffman encoding table (static, always available)
 from d2r_chargen.data.huffman import HUFFMAN
-
-from d2r_chargen.config import RW_BASE_CATEGORIES
 
 # Generated data modules — require 'd2r-mod extract' to exist
 try:
@@ -53,10 +49,12 @@ def _require_data():
             "Game data not available. Run 'd2r-mod extract' first."
         )
 
+from d2r_chargen.config import RW_BASE_CATEGORIES
 
 # ---------------------------------------------------------------------------
 # Canonical Constants
-# Reference: D2R save format spec lines 696-698 (bodyloc), D2R save format spec line 38 (storage)
+# Reference: d2rdoctor.md lines 696-698 (bodyloc), d2rdoctor.md line 38 (storage)
+# Reference: rca_master_plan.md lines 207-221
 # ---------------------------------------------------------------------------
 BODYLOC = {
     'helm': 1, 'neck': 2, 'body': 3, 'rhand': 4, 'lhand': 5,
@@ -72,9 +70,24 @@ STORAGE = {
     'stash': 5       # personal stash (10x8 in Reign of the Warlock)
 }
 
+# ---------------------------------------------------------------------------
+# Module-level warning context
+# Avoids threading a 'warnings' parameter through 12 private builder
+# functions in items.py.  build_all_items() sets this before building and
+# clears it afterward.
+# ---------------------------------------------------------------------------
+_current_warnings = None
+
+
+def set_build_warnings(w):
+    """Set the active BuildWarnings collector. Called by build_all_items()."""
+    global _current_warnings
+    _current_warnings = w
+
 
 # ---------------------------------------------------------------------------
 # A. Dynamic BASES Lookup
+# Reference: rca_master_plan.md lines 182-193
 # Reference: item_bases.py flags field (bit 0=quantity, bit 1=durability,
 #            bit 2=defense, bit 3=book)
 # ---------------------------------------------------------------------------
@@ -93,7 +106,8 @@ def get_base_flags(type_code):
     have flags=1 (quantity only) in item_bases.py, but the D2R binary format
     includes a 5-bit book type field. We detect books via the 'Book' category
     and OR in bit 3 (8) accordingly.
-    Reference: D2R save format spec line 196 — 'if base & 8: br += 5'
+    Reference: d2rdoctor.md line 196 — 'if base & 8: br += 5'
+    Reference: fix_obsidian_rw.py line 102 — 'tbk': 9, 'ibk': 9
     """
     tc = type_code.strip()
     info = ITEM_BASES_FULL.get(tc)
@@ -112,6 +126,8 @@ def get_base_flags(type_code):
 
 # ---------------------------------------------------------------------------
 # B. BitWriter — writes bits LSB-first (D2S format)
+# Reference: fix_obsidian_rw.py lines 33-54
+# Reference: build_characters.py lines 27-49
 # ---------------------------------------------------------------------------
 class BitWriter:
     """Write bits in LSB-first order, matching D2R save file format."""
@@ -129,7 +145,7 @@ class BitWriter:
 
     def write_huff(self, code):
         """Write 4-char Huffman type code (3 chars + space terminator).
-        Uses HUFFMAN table for LSB-first character encoding."""
+        Uses HUFFMAN table from d2r-editor/item_injector.py lines 43-51."""
         for ch in code:
             val, bits = HUFFMAN[ch]
             self.write_bits(val, bits)
@@ -146,8 +162,31 @@ class BitWriter:
 
 # ---------------------------------------------------------------------------
 # C. Property Encoder
+# Reference: fix_obsidian_rw.py lines 58-84 (the working implementation)
+# Reference: rca_master_plan.md lines 223-230 (overflow protection)
 # Reference: item_stat_cost.py header lines 1-31 (encoding type docs)
 # ---------------------------------------------------------------------------
+
+# Grouped stat counts (np) for the D2S encoding format.
+# These are hardcoded D2S format knowledge — the vanilla ItemStatCost.txt
+# doesn't export np, so item_stat_cost.py may not have it.
+_NP_OVERRIDES = {
+    17: 2,   # item_maxdamage_percent: [maxdmg%, mindmg%]
+    48: 2,   # firemindam: [min, max]
+    50: 2,   # lightmindam: [min, max]
+    52: 2,   # magicmindam: [min, max]
+    54: 3,   # coldmindam: [min, max, length]
+    57: 3,   # poisonmindam: [min, max, length]
+}
+
+
+def _get_np(stat_id, info):
+    """Get the np (group count) for a stat, using hardcoded overrides."""
+    if stat_id in _NP_OVERRIDES:
+        return _NP_OVERRIDES[stat_id]
+    return info.get('np', 0)
+
+
 def encode_property(w, stat_id, value, param=0):
     """Write a single item property (stat) into the BitWriter bitstream.
 
@@ -173,7 +212,6 @@ def encode_property(w, stat_id, value, param=0):
     Raises:
         ValueError: If stat_id unknown, sB=0, or value overflows sB bits
     """
-    _require_data()
     info = ITEM_STAT_COST.get(stat_id)
     if info is None:
         raise ValueError(f"Unknown stat_id {stat_id} — not in ITEM_STAT_COST")
@@ -182,7 +220,7 @@ def encode_property(w, stat_id, value, param=0):
     sA = info.get('sA', 0)
     sP = info.get('sP', 0)
     e = info.get('e', 0)
-    np_count = info.get('np', 0)
+    np_count = _get_np(stat_id, info)
 
     if sB == 0:
         raise ValueError(
@@ -211,7 +249,17 @@ def encode_property(w, stat_id, value, param=0):
             member_sA = member_info.get('sA', 0)
             encoded_val = value[i] + member_sA
             max_val = (1 << member_sB) - 1
-            if encoded_val < 0 or encoded_val > max_val:
+            member_sS = member_info.get('sS', 0)
+            if member_sS and encoded_val < 0:
+                min_signed = -(1 << (member_sB - 1))
+                if encoded_val < min_signed:
+                    raise ValueError(
+                        f"Stat {stat_id + i} ({member_info.get('s', '?')}): "
+                        f"value {value[i]} + sA={member_sA} = {encoded_val} "
+                        f"exceeds signed {member_sB}-bit range [{min_signed}, {(1 << (member_sB-1))-1}]"
+                    )
+                encoded_val = encoded_val & max_val  # two's complement
+            elif encoded_val < 0 or encoded_val > max_val:
                 raise ValueError(
                     f"Stat {stat_id + i} ({member_info.get('s', '?')}): "
                     f"value {value[i]} + sA={member_sA} = {encoded_val} "
@@ -226,6 +274,7 @@ def encode_property(w, stat_id, value, param=0):
     if e == 3:
         # Charges encoding: param = (skill_id << 6) | skill_level
         # value is raw (NOT offset by sA), stored directly in sB bits
+        # Reference: fix_obsidian_rw.py lines 69-74
         skill_id = param & 0x3FF       # 10 bits
         skill_level = (param >> 10) & 0x3F  # 6 bits
         encoded_param = (skill_id << 6) | skill_level
@@ -236,6 +285,7 @@ def encode_property(w, stat_id, value, param=0):
     elif e == 2:
         # Chance to cast: param = (skill_id << 6) | skill_level
         # value IS offset by sA
+        # Reference: fix_obsidian_rw.py lines 75-80
         skill_id = param & 0x3FF       # 10 bits
         skill_level = (param >> 10) & 0x3F  # 6 bits
         encoded_param = (skill_id << 6) | skill_level
@@ -253,13 +303,23 @@ def encode_property(w, stat_id, value, param=0):
     else:
         # e=0 (standard) and e=1 (skill by class): same encoding
         # Optional param bits, then value + sA in sB bits
+        # Reference: fix_obsidian_rw.py lines 81-84
         if sP > 0:
             w.write_bits(param, sP)
 
         encoded_val = value + sA
         max_val = (1 << sB) - 1
-        # Overflow protection
-        if encoded_val < 0 or encoded_val > max_val:
+        # Signed stats (sS=1): use two's complement for negative values
+        sS = info.get('sS', 0)
+        if sS and encoded_val < 0:
+            min_signed = -(1 << (sB - 1))
+            if encoded_val < min_signed:
+                raise ValueError(
+                    f"Stat {stat_id} ({info.get('s', '?')}): value {value} + sA={sA} = "
+                    f"{encoded_val} exceeds signed {sB}-bit range [{min_signed}, {(1 << (sB-1))-1}]"
+                )
+            encoded_val = encoded_val & max_val  # two's complement
+        elif encoded_val < 0 or encoded_val > max_val:
             raise ValueError(
                 f"Stat {stat_id} ({info.get('s', '?')}): value {value} + sA={sA} = "
                 f"{encoded_val} exceeds {sB}-bit range [0, {max_val}]"
@@ -269,7 +329,9 @@ def encode_property(w, stat_id, value, param=0):
 
 # ---------------------------------------------------------------------------
 # D. Property List Termination
-# Reference: D2R save format spec line 229 — terminators_expected = 2 if is_runeword
+# Reference: rca_master_plan.md lines 196-204
+# Reference: fix_obsidian_rw.py lines 227-240 (runeword double terminator)
+# Reference: d2rdoctor.md line 229 — terminators_expected = 2 if is_runeword
 # ---------------------------------------------------------------------------
 def encode_properties_terminated(w, props, is_runeword=False):
     """Write a list of property tuples, followed by 0x1FF terminator(s).
@@ -292,7 +354,6 @@ def encode_properties_terminated(w, props, is_runeword=False):
     For injected runewords, we write all props in the first list and
     leave the second list empty (just a terminator).
     """
-    _require_data()
     i = 0
     while i < len(props):
         stat_id, value = props[i][0], props[i][1]
@@ -335,11 +396,13 @@ def encode_properties_terminated(w, props, is_runeword=False):
 
     if is_runeword:
         # Second terminator: empty runeword bonus list
+        # Reference: fix_obsidian_rw.py lines 233-240
         w.write_bits(0x1FF, 9)
 
 
 # ---------------------------------------------------------------------------
 # E. Validation Functions
+# Reference: rca_master_plan.md lines 232-244
 # ---------------------------------------------------------------------------
 def validate_unique_item(type_code, unique_id):
     """Verify that a unique item UID exists and matches the given type code.
@@ -428,7 +491,9 @@ def validate_runeword(type_code, runeword_id):
 
 # ---------------------------------------------------------------------------
 # F. build_item() — The Single Correct Implementation
-# Reference: D2R save format spec lines 105-225 (scanner field order = ground truth)
+# Reference: fix_obsidian_rw.py lines 132-248 (the working version)
+# Reference: d2r-editor/item_injector.py lines 171-287 (ext bits, format docs)
+# Reference: d2rdoctor.md lines 105-225 (scanner field order = ground truth)
 # ---------------------------------------------------------------------------
 def build_item(type_code, col, row, storage,
                quality=2, ilvl=99, item_id=None,
@@ -445,7 +510,8 @@ def build_item(type_code, col, row, storage,
                rare_first_name=0, rare_last_name=0,
                rare_affixes=None,
                multi_pic=None, gfx_idx=0,
-               rune_codes=None):
+               rune_codes=None,
+               warnings=None):
     """Build a complete D2R v105 item byte sequence.
 
     Supports ALL quality types:
@@ -489,7 +555,6 @@ def build_item(type_code, col, row, storage,
         ValueError: On validation failures (UID mismatch, overflow, etc.)
         AssertionError: On structural issues (bad type_code length)
     """
-    _require_data()
     # --- Validation ---
     if item_id is None:
         item_id = random.randint(1, 0xFFFFFFFF)
@@ -497,6 +562,7 @@ def build_item(type_code, col, row, storage,
     tc = type_code.strip()
 
     # Dynamic base flags lookup (replaces hardcoded BASES dicts)
+    # Reference: rca_master_plan.md lines 186-192
     base = get_base_flags(tc)
 
     # Validate unique items (quality=7)
@@ -511,6 +577,99 @@ def build_item(type_code, col, row, storage,
     if runeword:
         validate_runeword(tc, runeword_id)
 
+    # ------------------------------------------------------------------
+    # Pre-encode warning checks (diagnostic only, never halt the build)
+    # ------------------------------------------------------------------
+    wc = warnings if warnings is not None else _current_warnings
+    if wc is not None:
+        # 1. Socket count vs base max_sockets
+        base_info = ITEM_BASES_FULL.get(tc)
+        if base_info is not None and num_sockets > 0:
+            max_sock = base_info.get('max_sockets', 6)
+            if num_sockets > max_sock:
+                wc.warn(tc, f"num_sockets={num_sockets} exceeds base max_sockets={max_sock}")
+
+        # 2. Durability max (8-bit field)
+        if max_dur > 255:
+            wc.warn(tc, f"max_dur={max_dur} exceeds 8-bit max (255)")
+
+        # 3. Durability current (9-bit field)
+        if cur_dur > 511:
+            wc.warn(tc, f"cur_dur={cur_dur} exceeds 9-bit max (511)")
+
+        # 4. Defense (11-bit field)
+        if defense > 2047:
+            wc.warn(tc, f"defense={defense} exceeds 11-bit max (2047)")
+
+        # 5. Quantity (9-bit field)
+        if quantity > 511:
+            wc.warn(tc, f"quantity={quantity} exceeds 9-bit max (511)")
+
+        # 6. Property value overflow checks
+        if properties:
+            for prop in properties:
+                p_stat_id = prop[0]
+                p_value = prop[1]
+                p_info = ITEM_STAT_COST.get(p_stat_id)
+                if p_info is None:
+                    continue
+                p_sB = p_info.get('sB', 0)
+                p_sA = p_info.get('sA', 0)
+                if p_sB == 0:
+                    continue
+                np_count = _get_np(p_stat_id, p_info)
+                if np_count > 0:
+                    # Grouped stat: check each member
+                    if not isinstance(p_value, (list, tuple)):
+                        wc.warn(tc,
+                            f"stat {p_stat_id} ({p_info.get('s', '?')}): "
+                            f"grouped stat (np={np_count}) given scalar value; "
+                            f"bounds check skipped")
+                    elif isinstance(p_value, (list, tuple)):
+                        for i, v in enumerate(p_value):
+                            m_info = ITEM_STAT_COST.get(p_stat_id + i)
+                            if m_info is None:
+                                continue
+                            m_sB = m_info.get('sB', 0)
+                            m_sA = m_info.get('sA', 0)
+                            m_sS = m_info.get('sS', 0)
+                            encoded = v + m_sA
+                            max_val = (1 << m_sB) - 1
+                            # Mirror encode_property logic: sS only matters
+                            # for negative encoded values (two's complement).
+                            # Positive values use the unsigned max_val check.
+                            if m_sS and encoded < 0:
+                                lo = -(1 << (m_sB - 1))
+                                if encoded < lo:
+                                    wc.warn(tc,
+                                        f"stat {p_stat_id + i} ({m_info.get('s', '?')}): "
+                                        f"value {v} + sA={m_sA} = {encoded} "
+                                        f"exceeds signed {m_sB}-bit min ({lo})")
+                            elif encoded < 0 or encoded > max_val:
+                                wc.warn(tc,
+                                    f"stat {p_stat_id + i} ({m_info.get('s', '?')}): "
+                                    f"value {v} + sA={m_sA} = {encoded} "
+                                    f"exceeds {m_sB}-bit range [0, {max_val}]")
+                else:
+                    # Simple stat: mirror encode_property logic exactly
+                    p_e = p_info.get('e', 0)
+                    p_sS = p_info.get('sS', 0)
+                    # e=3 (charges): value is raw, NOT offset by sA
+                    encoded = p_value if p_e == 3 else p_value + p_sA
+                    max_val = (1 << p_sB) - 1
+                    if p_sS and encoded < 0:
+                        lo = -(1 << (p_sB - 1))
+                        if encoded < lo:
+                            wc.warn(tc,
+                                f"stat {p_stat_id} ({p_info.get('s', '?')}): "
+                                f"value {p_value} + sA={p_sA} = {encoded} "
+                                f"exceeds signed {p_sB}-bit min ({lo})")
+                    elif encoded < 0 or encoded > max_val:
+                        wc.warn(tc,
+                            f"stat {p_stat_id} ({p_info.get('s', '?')}): "
+                            f"value {p_value} + sA={p_sA} = {encoded} "
+                            f"exceeds {p_sB}-bit range [0, {max_val}]")
+
     # Pad type code to 4 chars (3 + space terminator for Huffman)
     if len(type_code) == 3:
         type_code = type_code + ' '
@@ -520,6 +679,8 @@ def build_item(type_code, col, row, storage,
 
     # ==========================================================
     # FLAGS (32 bits)
+    # Reference: d2r-editor/item_injector.py lines 7-8
+    # Reference: fix_obsidian_rw.py lines 154-164
     # ==========================================================
     flags = 0
     flags |= (1 << 4)    # bit 4: identified
@@ -534,15 +695,17 @@ def build_item(type_code, col, row, storage,
 
     # ==========================================================
     # D2R EXTENSION BITS (3 bits, value=5 → binary 101)
-    # Reference: D2R save format spec line 1333 — assert ((item[4]&7)==5)
-    # Reference: D2R save format spec line 1555 — "Always verify ext bits"
+    # Reference: d2r-editor/item_injector.py line 214 — w.write_bits(5, 3)
+    # Reference: d2rdoctor.md line 1333 — assert ((item[4]&7)==5)
+    # Reference: d2rdoctor.md line 1555 — "Always verify ext bits"
     # Value 5 = bits (1,0,1) in LSB order = the D2R version marker
     # ==========================================================
     w.write_bits(5, 3)
 
     # ==========================================================
     # LOCATION FIELDS
-    # Reference: D2R save format spec lines 65-68
+    # Reference: d2r-editor/item_injector.py lines 9-14
+    # Reference: d2rdoctor.md lines 65-68
     # ==========================================================
     w.write_bits(location, 3)   # 3 bits: 0=stored, 1=equipped
     w.write_bits(bodyloc, 4)    # 4 bits: body location (1-12 if equipped)
@@ -553,12 +716,14 @@ def build_item(type_code, col, row, storage,
 
     # ==========================================================
     # TYPE CODE (Huffman encoded, variable length)
+    # Reference: d2r_inject.py lines 20-82 (Huffman tree)
     # ==========================================================
     w.write_huff(type_code)
 
     # ==========================================================
     # NON-SIMPLE ITEM DATA
-    # Reference: D2R save format spec lines 132-135
+    # Reference: d2r-editor/item_injector.py lines 17-33
+    # Reference: d2rdoctor.md lines 132-135
     # ==========================================================
     nr_socketed = len(rune_codes) if rune_codes else 0
     w.write_bits(nr_socketed, 3)  # 3 bits: nr_of_items_in_sockets
@@ -577,7 +742,8 @@ def build_item(type_code, col, row, storage,
 
     # ==========================================================
     # QUALITY-SPECIFIC DATA
-    # Reference: D2R save format spec lines 144-156
+    # Reference: d2rdoctor.md lines 144-156
+    # Reference: d2r-editor/item_injector.py lines 236-251
     # ==========================================================
     if quality == 1:
         # Inferior: 3 bits type
@@ -594,15 +760,15 @@ def build_item(type_code, col, row, storage,
         w.write_bits(magic_suffix, 11)
     elif quality == 5:
         # Set: 12-bit set_id
-        # Reference: D2R save format spec line 147
+        # Reference: d2rdoctor.md line 147
         w.write_bits(set_id, 12)
     elif quality == 7:
         # Unique: 12-bit unique_id
-        # Reference: D2R save format spec line 148
+        # Reference: d2rdoctor.md line 148
         w.write_bits(unique_id, 12)
     elif quality in (6, 8):
         # Rare (6) or Crafted (8): 8-bit first_name + 8-bit last_name + 6 affix slots
-        # Reference: D2R save format spec lines 149-154
+        # Reference: d2rdoctor.md lines 149-154
         w.write_bits(rare_first_name, 8)
         w.write_bits(rare_last_name, 8)
         affixes = rare_affixes if rare_affixes else [0] * 6
@@ -616,7 +782,7 @@ def build_item(type_code, col, row, storage,
 
     # ==========================================================
     # RUNEWORD ID (16 bits, only if runeword flag set)
-    # Reference: D2R save format spec lines 158-162
+    # Reference: d2rdoctor.md lines 158-162
     # ==========================================================
     if runeword:
         w.write_bits(runeword_id, 16)
@@ -625,7 +791,8 @@ def build_item(type_code, col, row, storage,
 
     # ==========================================================
     # BOOK FIELD (5 bits if base & 8)
-    # Reference: D2R save format spec lines 195-196 — "C4: book field BEFORE extended body"
+    # Reference: d2rdoctor.md lines 195-196 — "C4: book field BEFORE extended body"
+    # Reference: d2r-editor/item_injector.py line 26 — "[5 bits if base&8]"
     # Items: tbk (Tome of Town Portal), ibk (Tome of Identify)
     # ==========================================================
     if base & 8:
@@ -633,14 +800,14 @@ def build_item(type_code, col, row, storage,
 
     # ==========================================================
     # EXTENDED BODY (timestamp) — 1-bit flag, +96 if set
-    # Reference: D2R save format spec lines 198-200
+    # Reference: d2rdoctor.md lines 198-200
     # We always set to 0 (no extended body for injected items)
     # ==========================================================
     w.write_bits(0, 1)
 
     # ==========================================================
     # DEFENSE (11 bits if base & 4)
-    # Reference: D2R save format spec lines 202-210
+    # Reference: d2rdoctor.md lines 202-210
     # ==========================================================
     if base & 4:
         w.write_bits(defense, 11)
@@ -648,7 +815,7 @@ def build_item(type_code, col, row, storage,
     # ==========================================================
     # DURABILITY (8-bit max + 9-bit current if max > 0)
     # Condition: base & 6 nonzero (has durability field)
-    # Reference: D2R save format spec lines 212-215
+    # Reference: d2rdoctor.md lines 212-215
     # ==========================================================
     if base & 6:
         w.write_bits(max_dur, 8)
@@ -657,7 +824,8 @@ def build_item(type_code, col, row, storage,
 
     # ==========================================================
     # QUANTITY (v105: 1-bit presence flag + conditional 9-bit value)
-    # Reference: D2R save format spec lines 217-219
+    # Reference: d2rdoctor.md lines 217-219
+    # Reference: d2r-editor/item_injector.py lines 268-273
     # ==========================================================
     if base & 1:
         # Stackable item: set presence flag and write quantity
@@ -669,14 +837,15 @@ def build_item(type_code, col, row, storage,
 
     # ==========================================================
     # SOCKET COUNT (4 bits if socketed flag set)
-    # Reference: D2R save format spec lines 221-222
+    # Reference: d2rdoctor.md lines 221-222
     # ==========================================================
     if socketed:
         w.write_bits(num_sockets, 4)
 
     # ==========================================================
     # SET FLAGS (5 bits if quality=5, BEFORE property lists)
-    # Reference: D2R save format spec lines 224-225 — "C3: set item setflags"
+    # Reference: d2rdoctor.md lines 224-225 — "C3: set item setflags"
+    # Reference: d2r-editor/item_injector.py line 32 — "[5 bits setflags if quality=5]"
     # These flags indicate which set bonus property lists are present
     # ==========================================================
     if quality == 5:
@@ -684,7 +853,8 @@ def build_item(type_code, col, row, storage,
 
     # ==========================================================
     # PROPERTIES — WITH CORRECT TERMINATION
-    # Reference: D2R save format spec line 229 — terminators_expected = 2 if is_runeword
+    # Reference: fix_obsidian_rw.py lines 227-245 (THE FIX)
+    # Reference: d2rdoctor.md line 229 — terminators_expected = 2 if is_runeword
     #
     # Runeword items need TWO property lists:
     #   List 1: base item magic properties (empty for quality=2) → 0x1FF
@@ -727,7 +897,6 @@ def encode_socketed_rune(rune_code, socket_idx=0):
         rune_code: Rune type code (e.g., 'r18' for Ko rune)
         socket_idx: Socket slot index (0-based). First rune=0, second=1, etc.
     """
-    _require_data()
     w = BitWriter()
     # Flags: identified (bit 4) + simple (bit 21) + always-1 (bit 23)
     flags = (1 << 4) | (1 << 21) | (1 << 23)
@@ -768,6 +937,8 @@ def encode_socketed_rune(rune_code, socket_idx=0):
 def find_item_list(data, search_from=0x300):
     """Find character item list JM header in a .d2s file.
 
+    Reference: d2r_inject.py lines 410-415
+
     Returns the byte offset of the JM marker, or -1 if not found.
     Searches from 0x300 to 0x500 (typical range for character item list).
     """
@@ -780,7 +951,8 @@ def find_item_list(data, search_from=0x300):
 def calc_checksum(data):
     """Calculate D2S file checksum (rotate-left accumulate).
 
-    Reference: D2R save format spec lines 98-103
+    Reference: d2r-editor/item_injector.py lines 70-76
+    Reference: d2rdoctor.md lines 98-103
 
     The checksum field at bytes 12-15 is treated as zero during calculation.
     """
@@ -794,6 +966,8 @@ def calc_checksum(data):
 
 def write_d2s(path, data):
     """Write .d2s data to file with updated file size and checksum.
+
+    Reference: d2r_inject.py lines 399-407
 
     Updates:
         - File size field at offset 8 (4 bytes, little-endian)
@@ -820,36 +994,36 @@ def write_d2s(path, data):
 
 # ---------------------------------------------------------------------------
 # H. Stat ID Shortcuts (convenience aliases)
+# Reference: build_characters.py lines 325-349
 # Reference: item_stat_cost.py (verified IDs)
 # ---------------------------------------------------------------------------
-if _HAS_DATA:
-    S = STAT_BY_NAME
+S = STAT_BY_NAME
 
-    # Common stat IDs for item building
-    STRENGTH     = S['strength']              # 0  (sB=8,  sA=32)
-    ENERGY       = S['energy']                # 1  (sB=7,  sA=32)
-    DEXTERITY    = S['dexterity']             # 2  (sB=7,  sA=32)
-    VITALITY     = S['vitality']              # 3  (sB=7,  sA=32)
-    MAXHP        = S['maxhp']                 # 7  (sB=9,  sA=32)
-    MAXMANA      = S['maxmana']               # 9  (sB=8,  sA=32)
-    ED           = S['item_armor_percent']     # 16 (sB=9,  sA=0)
-    FLAT_DEF     = S['armorclass']             # 31 (sB=11, sA=10)
-    FIRE_RES     = S['fireresist']             # 39 (sB=9,  sA=200)
-    LIGHT_RES    = S['lightresist']            # 41 (sB=9,  sA=200)
-    COLD_RES     = S['coldresist']             # 43 (sB=9,  sA=200)
-    POISON_RES   = S['poisonresist']           # 45 (sB=9,  sA=200)
-    FCR          = S['item_fastercastrate']    # 105 (sB=9, sA=0)
-    FHR          = S['item_fastergethitrate']  # 99  (sB=7, sA=20)
-    FRW          = S['item_fastermovevelocity'] # 96  (sB=7, sA=20)
-    IAS          = S['item_fasterattackrate']  # 93  (sB=7, sA=0)
-    MF           = S['item_magicbonus']        # 80  (sB=7, sA=100)
-    ALL_SKILLS   = S['item_allskills']         # 127 (sB=3, sA=0)
-    MAGIC_ABSORB     = S['item_absorbmagic']       # 147 (sB=7, sA=0)
-    ABSORB_COLD_PCT  = S['item_absorbcold_percent'] # 148 (sB=7, sA=0) — NOT the same as MAGIC_ABSORB
-    REPLENISH        = S['hpregen']                # 74  (sB=6, sA=30)
-    SKILL_TAB        = S['item_addskill_tab']      # 188 (sB=3, sA=0, sP=16)
-    NON_CLASS_SKILL  = S['item_nonclassskill']     # 97  (sB=6, sA=0, sP=9) — oskills (Teleport, BO, etc.)
-    ITEM_AURA        = S['item_aura']              # 151 (sB=5, sA=0, sP=9) — aura when equipped
+# Common stat IDs for item building
+STRENGTH     = S['strength']              # 0  (sB=8,  sA=32)
+ENERGY       = S['energy']                # 1  (sB=7,  sA=32)
+DEXTERITY    = S['dexterity']             # 2  (sB=7,  sA=32)
+VITALITY     = S['vitality']              # 3  (sB=7,  sA=32)
+MAXHP        = S['maxhp']                 # 7  (sB=9,  sA=32)
+MAXMANA      = S['maxmana']               # 9  (sB=8,  sA=32)
+ED           = S['item_armor_percent']     # 16 (sB=9,  sA=0)
+FLAT_DEF     = S['armorclass']             # 31 (sB=11, sA=10)
+FIRE_RES     = S['fireresist']             # 39 (sB=9,  sA=200)
+LIGHT_RES    = S['lightresist']            # 41 (sB=9,  sA=200)
+COLD_RES     = S['coldresist']             # 43 (sB=9,  sA=200)
+POISON_RES   = S['poisonresist']           # 45 (sB=9,  sA=200)
+FCR          = S['item_fastercastrate']    # 105 (sB=9, sA=0)
+FHR          = S['item_fastergethitrate']  # 99  (sB=7, sA=20)
+FRW          = S['item_fastermovevelocity'] # 96  (sB=7, sA=20)
+IAS          = S['item_fasterattackrate']  # 93  (sB=7, sA=0)
+MF           = S['item_magicbonus']        # 80  (sB=7, sA=100)
+ALL_SKILLS   = S['item_allskills']         # 127 (sB=3, sA=0)
+MAGIC_ABSORB     = S['item_absorbmagic']       # 147 (sB=7, sA=0)
+ABSORB_COLD_PCT  = S['item_absorbcold_percent'] # 148 (sB=7, sA=0) — NOT the same as MAGIC_ABSORB
+REPLENISH        = S['hpregen']                # 74  (sB=6, sA=30)
+SKILL_TAB        = S['item_addskill_tab']      # 188 (sB=3, sA=0, sP=16)
+NON_CLASS_SKILL  = S['item_nonclassskill']     # 97  (sB=6, sA=0, sP=9) — oskills (Teleport, BO, etc.)
+ITEM_AURA        = S['item_aura']              # 151 (sB=5, sA=0, sP=9) — aura when equipped
 
 
 # ===========================================================================
@@ -857,7 +1031,7 @@ if _HAS_DATA:
 # ===========================================================================
 if __name__ == '__main__':
     print("=" * 60)
-    print("build_lib.py — Smoke Tests")
+    print("d2r_build_lib.py — Smoke Tests")
     print("=" * 60)
 
     errors = 0

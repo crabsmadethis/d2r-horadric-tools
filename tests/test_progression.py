@@ -1,4 +1,10 @@
 import unittest
+import pytest
+
+# resolve.py imports generated data modules
+pytest.importorskip("d2r_chargen.data.item_stat_cost",
+                     reason="game data not extracted (run 'd2r-mod extract')")
+
 from d2r_chargen.resolve import resolve_progression
 
 

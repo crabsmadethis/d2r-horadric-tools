@@ -3,20 +3,18 @@ import os
 from unittest.mock import patch
 
 
-def test_detect_chars_dir_uses_cwd_not_file_location():
-    """CHARS_DIR must not depend on __file__ location (breaks non-editable installs)."""
+def test_detect_chars_dir_uses_package_relative_path():
+    """CHARS_DIR defaults to chars/ relative to the package location."""
     from d2r_chargen import config
 
-    # Simulate __file__ being in site-packages (non-editable install)
-    with patch.object(config, '__file__', '/fake/site-packages/d2r_chargen/config.py'):
-        # Clear D2R_CHARS to test default behavior
-        with patch.dict(os.environ, {}, clear=False):
-            env = os.environ.copy()
-            env.pop('D2R_CHARS', None)
-            with patch.dict(os.environ, env, clear=True):
-                result = config._detect_chars_dir()
-                assert result == os.path.join(os.getcwd(), 'chars')
-                assert 'site-packages' not in result
+    with patch.dict(os.environ, {}, clear=False):
+        env = os.environ.copy()
+        env.pop('D2R_CHARS', None)
+        with patch.dict(os.environ, env, clear=True):
+            result = config._detect_chars_dir()
+            # Should be relative to the package's parent directory
+            pkg_parent = os.path.dirname(os.path.dirname(os.path.abspath(config.__file__)))
+            assert result == os.path.join(pkg_parent, 'chars')
 
 
 def test_detect_chars_dir_respects_env_var(tmp_path):

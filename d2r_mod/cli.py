@@ -30,7 +30,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
     p_deploy = sub.add_parser("deploy", help="Build + deploy mod to game mod folder")
     p_deploy.add_argument("--game-dir", default=DEFAULT_GAME_DIR,
-                          help="D2R install directory (auto-detected, or set D2R_GAME_DIR)")
+                         help="D2R install directory (auto-detected, or set D2R_GAME_DIR)")
     p_deploy.add_argument("--force", action="store_true",
                           help="Deploy even if vanilla data is stale")
     p_deploy.add_argument("--no-casc", action="store_true",
@@ -44,7 +44,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
     p_undeploy = sub.add_parser("undeploy", help="Remove mod from game")
     p_undeploy.add_argument("--game-dir", default=DEFAULT_GAME_DIR,
-                            help="D2R install directory (auto-detected, or set D2R_GAME_DIR)")
+                         help="D2R install directory (auto-detected, or set D2R_GAME_DIR)")
     p_undeploy.add_argument("--keep-mod", action="store_true",
                             help="Keep mod files, only remove patcher artifacts and launch options")
 
@@ -52,11 +52,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
     p_extract = sub.add_parser("extract", help="Extract vanilla data from CASC archive")
     p_extract.add_argument("--game-dir", default=DEFAULT_GAME_DIR,
-                           help="D2R install directory (auto-detected, or set D2R_GAME_DIR)")
+                         help="D2R install directory (auto-detected, or set D2R_GAME_DIR)")
 
     p_update = sub.add_parser("update", help="Re-extract, rebuild, and redeploy (recovery after game update)")
     p_update.add_argument("--game-dir", default=DEFAULT_GAME_DIR,
-                          help="D2R install directory (auto-detected, or set D2R_GAME_DIR)")
+                         help="D2R install directory (auto-detected, or set D2R_GAME_DIR)")
     p_update.add_argument("--warn-conflicts", action="store_true",
                           help="Warn when two overlays touch the same cell")
     p_update.add_argument("--no-regen", action="store_true",
@@ -80,7 +80,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p_inject.add_argument("--dry-run", action="store_true",
                           help="Show what would be injected")
     p_inject.add_argument("--game-dir", default=DEFAULT_GAME_DIR,
-                          help="D2R install directory (auto-detected, or set D2R_GAME_DIR)")
+                         help="D2R install directory (auto-detected, or set D2R_GAME_DIR)")
 
     p_audit = sub.add_parser("audit", help="Audit vanilla skills and items")
     p_audit.add_argument("--skills", action="store_true", help="Run skills audit")
@@ -223,12 +223,12 @@ def cmd_audit(args: argparse.Namespace) -> None:
     )
     root = _project_root()
     vanilla_dir = os.path.join(root, "vanilla")
+
+    tables = {}
     excel_dir = os.path.join(vanilla_dir, "data", "global", "excel")
     if not os.path.isdir(excel_dir):
         print("Error: vanilla data not found. Run 'd2r-mod extract' first.", file=sys.stderr)
         sys.exit(1)
-
-    tables = {}
     for fname in os.listdir(excel_dir):
         if fname.endswith(".txt"):
             key = f"data/global/excel/{fname}"
@@ -426,15 +426,6 @@ def cmd_diff(args: argparse.Namespace) -> None:
 
 def main(argv: list[str] | None = None) -> None:
     args = parse_args(argv)
-
-    needs_game_dir = {"extract", "build", "deploy", "undeploy", "update", "inject"}
-    if args.command in needs_game_dir and getattr(args, "game_dir", None) is None:
-        print("Error: Could not auto-detect D2R installation directory.\n"
-              "Use --game-dir /path/to/Diablo\\ II\\ Resurrected\n"
-              "  or set D2R_GAME_DIR environment variable.",
-              file=sys.stderr)
-        sys.exit(1)
-
     cmd = {
         "build": cmd_build,
         "deploy": cmd_deploy,
@@ -466,4 +457,14 @@ def main(argv: list[str] | None = None) -> None:
 
     if args.command is None:
         parse_args(["--help"])
+
+    # Commands that require a valid game directory
+    needs_game_dir = {"build", "deploy", "undeploy", "extract", "update", "inject"}
+    if args.command in needs_game_dir and DEFAULT_GAME_DIR is None:
+        print("Error: Could not find D2R installation directory.\n"
+              "  Set D2R_GAME_DIR environment variable,\n"
+              "  or use --game-dir to specify the path.",
+              file=sys.stderr)
+        sys.exit(1)
+
     cmd[args.command](args)
