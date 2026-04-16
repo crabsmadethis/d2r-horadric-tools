@@ -7,12 +7,18 @@ build_item(properties=...).
 import re
 
 from d2r_chargen.config import PROPERTY_ALIASES, CLASS_DEFS, RW_BASE_CATEGORIES
-from d2r_chargen.data.item_stat_cost import STAT_BY_NAME, ITEM_STAT_COST
-from d2r_chargen.data.runewords import RUNEWORDS
-from d2r_chargen.data.runeword_stats import RUNEWORD_STATS
-from d2r_chargen.data.unique_item_stats import UNIQUE_ITEM_STATS
-from d2r_chargen.data.item_bases import ITEM_BASES
-from d2r_chargen.data.skills import SKILLS
+try:
+    from d2r_chargen.data.item_stat_cost import STAT_BY_NAME, ITEM_STAT_COST
+    from d2r_chargen.data.runewords import RUNEWORDS
+    from d2r_chargen.data.runeword_stats import RUNEWORD_STATS
+    from d2r_chargen.data.unique_item_stats import UNIQUE_ITEM_STATS
+    from d2r_chargen.data.item_bases import ITEM_BASES
+    from d2r_chargen.data.skills import SKILLS
+    _DATA_AVAILABLE = True
+except ImportError:
+    STAT_BY_NAME = ITEM_STAT_COST = RUNEWORDS = RUNEWORD_STATS = None
+    UNIQUE_ITEM_STATS = ITEM_BASES = SKILLS = None
+    _DATA_AVAILABLE = False
 
 # Use canonical expansion map from config.py
 _RW_BASE_EXPANSION = RW_BASE_CATEGORIES
@@ -59,7 +65,10 @@ def _build_lookups():
     return skill_name_to_id, skill_code_to_class, rw_name_to_id, unique_name_to_id
 
 
-_SKILL_NAME_TO_ID, _SKILL_CODE_TO_CLASS, _RUNEWORD_NAME_TO_ID, _UNIQUE_NAME_TO_ID = _build_lookups()
+if _DATA_AVAILABLE:
+    _SKILL_NAME_TO_ID, _SKILL_CODE_TO_CLASS, _RUNEWORD_NAME_TO_ID, _UNIQUE_NAME_TO_ID = _build_lookups()
+else:
+    _SKILL_NAME_TO_ID = _SKILL_CODE_TO_CLASS = _RUNEWORD_NAME_TO_ID = _UNIQUE_NAME_TO_ID = {}
 
 
 def resolve_property_name(name):
@@ -624,3 +633,99 @@ def resolve_set_item(name):
     raise ValueError(
         f"Unknown set item: '{name}'. Check d2r_data/set_items.py."
     )
+
+
+# ============================================================
+# Progression Resolution
+# ============================================================
+
+_PROGRESSION_PRESETS = {
+    'hell_complete':      {'difficulty': 'hell',      'complete_through': 'hell'},
+    'hell_start':         {'difficulty': 'hell',      'complete_through': 'nightmare'},
+    'nightmare_complete': {'difficulty': 'nightmare', 'complete_through': 'nightmare'},
+    'nightmare_start':    {'difficulty': 'nightmare', 'complete_through': 'normal'},
+    'normal_complete':    {'difficulty': 'normal',    'complete_through': 'normal'},
+    'normal_start':       {'difficulty': 'normal',    'complete_through': None},
+}
+
+_DIFF_ORDER = ['normal', 'nightmare', 'hell']
+_WP_ACT_NAMES = ['act1', 'act2', 'act3', 'act4', 'act5']
+_QUEST_ACT_NAMES = ['act1', 'act2', 'act3', 'act4', 'act5', 'act6']
+
+
+def resolve_progression(progression_value):
+    """Resolve a YAML progression field into structured waypoint/quest config.
+
+    Args:
+        progression_value: Either a preset string (e.g. 'hell_complete')
+            or a dict with 'preset' key and optional 'waypoints'/'quests' overrides.
+
+    Returns:
+        Dict with keys:
+            'difficulty': str ('normal', 'nightmare', 'hell')
+            'waypoints': dict mapping difficulty -> True (all) / False (none) / dict of act->bool
+            'quests': dict mapping difficulty -> True / False / dict of act->bool
+
+    Raises:
+        ValueError: If preset name is unknown.
+    """
+    if isinstance(progression_value, str):
+        preset_name = progression_value
+        overrides = {}
+    elif isinstance(progression_value, dict):
+        preset_name = progression_value.get('preset', 'hell_start')
+        overrides = progression_value
+    else:
+        raise ValueError(f"progression must be a string or dict, got {type(progression_value)}")
+
+    if preset_name not in _PROGRESSION_PRESETS:
+        raise ValueError(
+            f"Unknown progression preset: '{preset_name}'. "
+            f"Valid presets: {', '.join(_PROGRESSION_PRESETS.keys())}"
+        )
+
+    preset = _PROGRESSION_PRESETS[preset_name]
+    complete_through = preset['complete_through']
+
+    waypoints = {}
+    quests = {}
+    for diff in _DIFF_ORDER:
+        if complete_through and _DIFF_ORDER.index(diff) <= _DIFF_ORDER.index(complete_through):
+            waypoints[diff] = True
+            quests[diff] = True
+        else:
+            waypoints[diff] = False
+            quests[diff] = False
+
+    # Apply overrides: acts not listed inherit from preset
+    wp_overrides = overrides.get('waypoints', {})
+    for diff, acts in wp_overrides.items():
+        if diff not in _DIFF_ORDER:
+            raise ValueError(f"Unknown difficulty in waypoints override: '{diff}'")
+        if isinstance(acts, dict):
+            base_val = waypoints[diff]
+            act_dict = {act: base_val for act in _WP_ACT_NAMES}
+            for act, val in acts.items():
+                if act not in _WP_ACT_NAMES:
+                    raise ValueError(f"Unknown act in waypoints override: '{act}'")
+                act_dict[act] = bool(val)
+            waypoints[diff] = act_dict
+
+    quest_overrides = overrides.get('quests', {})
+    for diff, acts in quest_overrides.items():
+        if diff not in _DIFF_ORDER:
+            raise ValueError(f"Unknown difficulty in quests override: '{diff}'")
+        if isinstance(acts, dict):
+            base_val = quests[diff]
+            act_dict = {act: base_val for act in _QUEST_ACT_NAMES}
+            for act, val in acts.items():
+                if act not in _QUEST_ACT_NAMES:
+                    raise ValueError(f"Unknown act in quests override: '{act}'")
+                act_dict[act] = bool(val)
+            quests[diff] = act_dict
+
+    return {
+        'difficulty': preset['difficulty'],
+        'waypoints': waypoints,
+        'quests': quests,
+    }

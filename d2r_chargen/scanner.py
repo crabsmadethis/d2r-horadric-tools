@@ -10,12 +10,18 @@ Can be:
 import struct, sys, os, time, json
 
 from d2r_chargen.data.huffman import HUFFMAN_TREE, RUNE_NAMES
-from d2r_chargen.data.item_stat_cost import ITEM_STAT_COST
-from d2r_chargen.data.item_dimensions import ITEM_DIMENSIONS
-from d2r_chargen.data.unique_items import UNIQUE_ITEMS
-from d2r_chargen.data.set_items import SET_ITEMS
-from d2r_chargen.data.item_bases import ITEM_BASES as ITEM_BASES_FULL
-from d2r_chargen.data.runewords import RUNEWORDS
+try:
+    from d2r_chargen.data.item_stat_cost import ITEM_STAT_COST
+    from d2r_chargen.data.item_dimensions import ITEM_DIMENSIONS
+    from d2r_chargen.data.unique_items import UNIQUE_ITEMS
+    from d2r_chargen.data.set_items import SET_ITEMS
+    from d2r_chargen.data.item_bases import ITEM_BASES as ITEM_BASES_FULL
+    from d2r_chargen.data.runewords import RUNEWORDS
+    _SCANNER_DATA_AVAILABLE = True
+except ImportError:
+    ITEM_STAT_COST = ITEM_DIMENSIONS = UNIQUE_ITEMS = SET_ITEMS = None
+    ITEM_BASES_FULL = RUNEWORDS = None
+    _SCANNER_DATA_AVAILABLE = False
 
 # ============================================================
 # Constants
@@ -573,6 +579,13 @@ def scan_characters(target, all_files, ghost_chars):
         print(f"  Items:     {item_count} char + {merc_count} merc")
         wp_ok = '\u2713' if hell_wp=='ffffffff7f00' else '?'
         print(f"  WP NM:     {nm_wp}  Hell: {hell_wp} {wp_ok}")
+        prog_errors, prog_warnings = check_progression_consistency(data)
+        if prog_errors:
+            for pe in prog_errors:
+                print(f"  !! PROGRESSION: {pe}")
+        if prog_warnings:
+            for pw in prog_warnings:
+                print(f"  \u26a0 PROGRESSION: {pw}")
         CLASS_BASE_STATS={
             0:(20,15,25,20),1:(10,35,25,10),2:(15,25,25,15),3:(25,15,20,25),
             4:(30,10,20,25),5:(15,20,20,25),6:(20,25,20,20),7:(8,20,20,8),
@@ -1139,6 +1152,106 @@ def delta_and_summary(files, ghost_chars, save_total, bak_total, bak_files):
 
 
 # ============================================================
+# Progression Consistency Check
+# ============================================================
+
+def check_progression_consistency(data, yaml_progression=None):
+    """Validate progression byte vs waypoint/quest state.
+
+    Args:
+        data: bytearray of .d2s file
+        yaml_progression: Optional string preset name from YAML (e.g. 'hell_complete').
+            When provided, also checks that binary state matches the YAML declaration.
+
+    Returns:
+        Tuple of (errors: list[str], warnings: list[str]).
+        Errors are deployment blockers. Warnings are informational.
+    """
+    errors = []
+    warnings = []
+
+    prog_byte = data[0x15] if len(data) > 0x15 else 0
+    prog_tier = {0x00: 0, 0x05: 1, 0x0F: 2}.get(prog_byte, -1)
+    diff_names = ['Normal', 'Nightmare', 'Hell']
+    is_hc = bool(data[0x14] & 0x04) if len(data) > 0x14 else False
+    lvl_byte = data[0x1B] if len(data) > 0x1B else 1
+
+    # HC act byte check
+    if is_hc and len(data) > 0xA9 and data[0xA9] != 0:
+        warnings.append(
+            f"HC character has act byte 0xA9={data[0xA9]} set — "
+            f"game validates act vs quest state for HC; should be 0"
+        )
+
+    # Check waypoints for lower difficulties
+    ws = data.find(b'WS')
+    if ws >= 0 and prog_tier > 0:
+        for diff_idx in range(prog_tier):
+            base = ws + 8 + diff_idx * 24
+            wp_bytes = data[base+2:base+7]
+            if all(b == 0 for b in wp_bytes):
+                errors.append(
+                    f"{diff_names[diff_idx]} waypoints are empty but "
+                    f"{diff_names[prog_tier]} is unlocked (prog=0x{prog_byte:02X})"
+                )
+
+    # Check quests for lower difficulties
+    woo = data.find(b'Woo!')
+    if woo >= 0 and prog_tier > 0:
+        for diff_idx in range(prog_tier):
+            base = woo + 10 + diff_idx * 96
+            quest_bytes = data[base:base+96]
+            if all(b == 0 for b in quest_bytes):
+                errors.append(
+                    f"{diff_names[diff_idx]} quests are empty but "
+                    f"{diff_names[prog_tier]} is unlocked (prog=0x{prog_byte:02X})"
+                )
+
+    # WP/quest inconsistency within a difficulty
+    if ws >= 0 and woo >= 0:
+        for diff_idx in range(3):
+            wp_base = ws + 8 + diff_idx * 24
+            wp_bytes = data[wp_base+2:wp_base+7]
+            has_wp = any(b != 0 for b in wp_bytes)
+
+            q_base = woo + 10 + diff_idx * 96
+            q_bytes = data[q_base:q_base+96]
+            has_quests = any(b != 0 for b in q_bytes)
+
+            if has_quests and not has_wp:
+                warnings.append(
+                    f"{diff_names[diff_idx]}: quests completed but waypoints missing"
+                )
+            elif has_wp and not has_quests and diff_idx < prog_tier:
+                warnings.append(
+                    f"{diff_names[diff_idx]}: waypoints set but quests incomplete"
+                )
+
+    # Level vs progression
+    if prog_byte == 0x00 and lvl_byte >= 40:
+        warnings.append(
+            f"lv{lvl_byte} but only Normal unlocked (prog=0x{prog_byte:02X})"
+        )
+
+    # YAML-vs-binary check (only when YAML context available)
+    if yaml_progression and ws >= 0:
+        _COMPLETE_PRESETS = {
+            'hell_complete': 2, 'nightmare_complete': 1, 'normal_complete': 0,
+        }
+        if yaml_progression in _COMPLETE_PRESETS:
+            expected_tier = _COMPLETE_PRESETS[yaml_progression]
+            target_base = ws + 8 + expected_tier * 24
+            target_wp = data[target_base+2:target_base+7]
+            if all(b == 0 for b in target_wp):
+                warnings.append(
+                    f"YAML declares '{yaml_progression}' but "
+                    f"{diff_names[expected_tier]} waypoints are empty"
+                )
+
+    return errors, warnings
+
+
+# ============================================================
 # Programmatic Scan (returns structured data)
 # ============================================================
 def scan_character_data(filepath):
@@ -1190,6 +1303,11 @@ def scan_character_data(filepath):
         errors.append(f"Checksum mismatch: stored=0x{stored_cs:08X} calc=0x{calc_cs:08X}")
     if len(data) != stored_size:
         errors.append(f"Size mismatch: actual={len(data)} stored={stored_size}")
+
+    # Progression consistency
+    prog_errs, prog_warns = check_progression_consistency(data)
+    errors.extend(prog_errs)
+    warnings.extend(prog_warns)
 
     # Item-level property validation (matches interactive scanner)
     if jm >= 0:

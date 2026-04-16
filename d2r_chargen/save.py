@@ -315,6 +315,112 @@ def set_all_quests(data):
     return data
 
 
+# Quests per act: 8 quests per act × 6 acts = 48 quests per difficulty
+_QUESTS_PER_ACT = 8
+_WP_ACT_NAMES = ['act1', 'act2', 'act3', 'act4', 'act5']
+_QUEST_ACT_NAMES = ['act1', 'act2', 'act3', 'act4', 'act5', 'act6']
+
+
+def set_waypoints_granular(data, waypoints_dict):
+    """Set waypoints from a resolved progression dict.
+
+    Args:
+        data: bytearray of .d2s file
+        waypoints_dict: dict mapping difficulty -> True (all WPs) / False (none)
+                        / dict of act_name -> bool
+
+    Returns:
+        Modified bytearray.
+    """
+    ws_pos = find_section(data, b'WS')
+    if ws_pos < 0:
+        print("  WARNING: WS marker not found!")
+        return data
+
+    diff_names = ['normal', 'nightmare', 'hell']
+    for diff_idx, diff_name in enumerate(diff_names):
+        base = ws_pos + 8 + diff_idx * 24
+        val = waypoints_dict.get(diff_name, False)
+
+        if val is True:
+            data[base] = 0x02
+            data[base+1] = 0x01
+            for i in range(5):
+                data[base+2+i] = 0xFF
+        elif val is False:
+            data[base] = 0x02
+            data[base+1] = 0x01
+            for i in range(5):
+                data[base+2+i] = 0x00
+        elif isinstance(val, dict):
+            data[base] = 0x02
+            data[base+1] = 0x01
+            mask = 0
+            bit_offset = 0
+            for act_idx, act_name in enumerate(_WP_ACT_NAMES):
+                act_wps = _WP_COUNTS[act_idx]
+                if val.get(act_name, False):
+                    for b in range(act_wps):
+                        mask |= (1 << (bit_offset + b))
+                bit_offset += act_wps
+            for i in range(5):
+                data[base+2+i] = (mask >> (i * 8)) & 0xFF
+
+    print(f"  Waypoints set (granular)")
+    return data
+
+
+def set_quests_granular(data, quests_dict):
+    """Set quests from a resolved progression dict.
+
+    Args:
+        data: bytearray of .d2s file
+        quests_dict: dict mapping difficulty -> True (all quests) / False (none)
+                     / dict of act_name -> bool
+
+    Returns:
+        Modified bytearray.
+    """
+    woo_pos = find_section(data, b'Woo!')
+    if woo_pos < 0:
+        print("  WARNING: Woo! marker not found!")
+        return data
+
+    diff_names = ['normal', 'nightmare', 'hell']
+    for diff_idx, diff_name in enumerate(diff_names):
+        base = woo_pos + 10 + diff_idx * 96
+        val = quests_dict.get(diff_name, False)
+
+        if val is True:
+            for quest in range(48):
+                offset = base + quest * 2
+                if offset + 1 < len(data):
+                    data[offset] = 0x01
+                    data[offset+1] = 0x10
+        elif val is False:
+            for quest in range(48):
+                offset = base + quest * 2
+                if offset + 1 < len(data):
+                    data[offset] = 0x00
+                    data[offset+1] = 0x00
+        elif isinstance(val, dict):
+            for act_idx, act_name in enumerate(_QUEST_ACT_NAMES):
+                act_start = act_idx * _QUESTS_PER_ACT
+                act_complete = val.get(act_name, False)
+                for q in range(_QUESTS_PER_ACT):
+                    offset = base + (act_start + q) * 2
+                    if offset + 1 < len(data):
+                        if act_complete:
+                            data[offset] = 0x01
+                            data[offset+1] = 0x10
+                        else:
+                            data[offset] = 0x00
+                            data[offset+1] = 0x00
+
+    print(f"  Quests set (granular)")
+    return data
+
+
 def set_skills(data, skill_levels):
     """Set skill levels (30 skills, 1 byte each after 'if' marker)."""
     if_pos = data.find(b'if')

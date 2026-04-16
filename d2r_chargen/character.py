@@ -13,6 +13,7 @@ from d2r_chargen.config import (
 )
 from d2r_chargen.resolve import (
     resolve_property_name, resolve_skills, resolve_runeword, resolve_unique,
+    resolve_progression,
 )
 from d2r_chargen.items import build_equipment_item, build_charm, build_merc_item
 from d2r_chargen.data.item_bases import ITEM_BASES
@@ -612,6 +613,7 @@ def deploy_character(char_name, phase=4, force=False):
     from d2r_chargen.save import (
         create_new_character, set_character_stats, set_skills,
         set_waypoints, set_quests, set_difficulty,
+        set_waypoints_granular, set_quests_granular,
         rebuild_items, calc_checksum,
     )
     from d2r_chargen.scanner import decode_item_header, bits_at
@@ -685,13 +687,14 @@ def deploy_character(char_name, phase=4, force=False):
     )
     data = set_skills(data, skill_array)
 
-    # Only set waypoints/quests/difficulty for NEW characters.
-    # Existing characters preserve their in-game progress.
-    difficulty = char_def.get('difficulty', 'hell')
+    # Set waypoints/quests/difficulty from YAML progression field.
+    # Only for NEW characters — existing characters preserve in-game progress.
     if is_new_character:
-        data = set_waypoints(data, difficulty)
-        data = set_quests(data, difficulty)
-        data = set_difficulty(data, difficulty)
+        progression_raw = char_def.get('progression', 'hell_start')
+        progression = resolve_progression(progression_raw)
+        data = set_waypoints_granular(data, progression['waypoints'])
+        data = set_quests_granular(data, progression['quests'])
+        data = set_difficulty(data, progression['difficulty'])
     else:
         print(f"  Preserving existing WP/quest/difficulty progress")
 

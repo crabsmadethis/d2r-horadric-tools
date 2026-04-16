@@ -2,6 +2,7 @@ schema_version: 1
 name: ExamplePaladin
 class: paladin
 level: 85
+progression: hell_complete
 
 stats:
   strength: 156
