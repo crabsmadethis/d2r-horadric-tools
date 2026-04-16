@@ -7,6 +7,8 @@ import os
 import subprocess
 import pytest
 
+pytestmark = pytest.mark.smoke
+
 REPO_URL = "https://github.com/crabsmadethis/d2r-horadric-tools.git"
 WORK_DIR = "/tmp/d2r-smoke-test"
 
