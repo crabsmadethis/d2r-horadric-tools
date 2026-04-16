@@ -147,3 +147,31 @@ def test_template_bundled(venv_dir):
     )
     assert r.returncode == 0
     assert "True" in r.stdout
+
+
+@pytest.fixture(scope="module")
+def editable_venv_dir(repo_dir):
+    """Create a second venv with editable install (as README suggests)."""
+    venv = os.path.join(WORK_DIR, ".smoke-venv-editable")
+    subprocess.run(["python3", "-m", "venv", venv], check=True, timeout=30)
+    pip = os.path.join(venv, "bin", "pip")
+    result = subprocess.run(
+        [pip, "install", "-e", repo_dir],
+        capture_output=True, text=True, timeout=120,
+    )
+    assert result.returncode == 0, f"editable install failed: {result.stderr}"
+    yield venv
+
+
+def test_editable_chargen_list(editable_venv_dir, repo_dir):
+    """Editable install: d2r-chargen list works from repo dir."""
+    r = _run_in_venv(editable_venv_dir, ["d2r-chargen", "list"], cwd=repo_dir)
+    assert r.returncode == 0
+    assert "ExamplePaladin" in r.stdout
+
+
+def test_editable_mod_help(editable_venv_dir):
+    """Editable install: d2r-mod --help works."""
+    r = _run_in_venv(editable_venv_dir, ["d2r-mod", "--help"])
+    assert r.returncode == 0
+    assert "extract" in r.stdout.lower()
