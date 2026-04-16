@@ -71,3 +71,43 @@ def test_pip_install_succeeds(venv_dir):
     )
     assert result.returncode == 0
     assert "d2r-tools" in result.stdout
+
+
+def test_chargen_help(venv_dir):
+    """d2r-chargen --help shows usage and exits 0."""
+    r = _run_in_venv(venv_dir, ["d2r-chargen", "--help"])
+    assert r.returncode == 0
+    assert "build" in r.stdout.lower()
+
+
+def test_chargen_list(venv_dir, repo_dir):
+    """d2r-chargen list finds ExamplePaladin from chars/ in cwd."""
+    r = _run_in_venv(venv_dir, ["d2r-chargen", "list"], cwd=repo_dir)
+    assert r.returncode == 0
+    assert "ExamplePaladin" in r.stdout
+
+
+def test_mod_help(venv_dir):
+    """d2r-mod --help shows usage and exits 0."""
+    r = _run_in_venv(venv_dir, ["d2r-mod", "--help"])
+    assert r.returncode == 0
+    assert "extract" in r.stdout.lower()
+
+
+def test_mod_build_without_vanilla(venv_dir, repo_dir):
+    """d2r-mod build fails gracefully when vanilla/ is missing."""
+    # Set D2R_GAME_DIR to a dummy path so the game-dir check passes
+    # and we reliably hit the "vanilla/ not found" error.
+    fake_game_dir = "/tmp/fake-d2r-game-dir"
+    os.makedirs(fake_game_dir, exist_ok=True)
+    env_patch = {"D2R_GAME_DIR": fake_game_dir}
+    env = os.environ.copy()
+    env.update(env_patch)
+    env["PATH"] = os.path.join(venv_dir, "bin") + ":" + env.get("PATH", "")
+    env["VIRTUAL_ENV"] = venv_dir
+    r = subprocess.run(
+        ["d2r-mod", "build"], capture_output=True, text=True,
+        timeout=30, cwd=repo_dir, env=env,
+    )
+    assert r.returncode != 0
+    assert "vanilla" in (r.stdout + r.stderr).lower()
