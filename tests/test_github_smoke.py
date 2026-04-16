@@ -35,3 +35,39 @@ def test_clone_has_expected_structure(repo_dir):
     assert os.path.isfile(
         os.path.join(repo_dir, "d2r_chargen", "data", "template.d2s")
     )
+
+
+@pytest.fixture(scope="module")
+def venv_dir(repo_dir):
+    """Create a clean venv and install the package (non-editable)."""
+    venv = os.path.join(WORK_DIR, ".smoke-venv")
+    subprocess.run(["python3", "-m", "venv", venv], check=True, timeout=30)
+    pip = os.path.join(venv, "bin", "pip")
+    result = subprocess.run(
+        [pip, "install", repo_dir],
+        capture_output=True, text=True, timeout=120,
+    )
+    assert result.returncode == 0, f"pip install failed: {result.stderr}"
+    yield venv
+
+
+def _run_in_venv(venv_dir, cmd, cwd=None, timeout=30):
+    """Run a command using the venv's Python/bin."""
+    env = os.environ.copy()
+    env["PATH"] = os.path.join(venv_dir, "bin") + ":" + env.get("PATH", "")
+    env["VIRTUAL_ENV"] = venv_dir
+    return subprocess.run(
+        cmd, capture_output=True, text=True, timeout=timeout,
+        cwd=cwd, env=env,
+    )
+
+
+def test_pip_install_succeeds(venv_dir):
+    """Non-editable pip install completes without error."""
+    pip = os.path.join(venv_dir, "bin", "pip")
+    result = subprocess.run(
+        [pip, "show", "d2r-tools"],
+        capture_output=True, text=True,
+    )
+    assert result.returncode == 0
+    assert "d2r-tools" in result.stdout
