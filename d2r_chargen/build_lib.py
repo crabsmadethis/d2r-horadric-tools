@@ -997,33 +997,34 @@ def write_d2s(path, data):
 # Reference: build_characters.py lines 325-349
 # Reference: item_stat_cost.py (verified IDs)
 # ---------------------------------------------------------------------------
-S = STAT_BY_NAME
+if _HAS_DATA:
+    S = STAT_BY_NAME
 
-# Common stat IDs for item building
-STRENGTH     = S['strength']              # 0  (sB=8,  sA=32)
-ENERGY       = S['energy']                # 1  (sB=7,  sA=32)
-DEXTERITY    = S['dexterity']             # 2  (sB=7,  sA=32)
-VITALITY     = S['vitality']              # 3  (sB=7,  sA=32)
-MAXHP        = S['maxhp']                 # 7  (sB=9,  sA=32)
-MAXMANA      = S['maxmana']               # 9  (sB=8,  sA=32)
-ED           = S['item_armor_percent']     # 16 (sB=9,  sA=0)
-FLAT_DEF     = S['armorclass']             # 31 (sB=11, sA=10)
-FIRE_RES     = S['fireresist']             # 39 (sB=9,  sA=200)
-LIGHT_RES    = S['lightresist']            # 41 (sB=9,  sA=200)
-COLD_RES     = S['coldresist']             # 43 (sB=9,  sA=200)
-POISON_RES   = S['poisonresist']           # 45 (sB=9,  sA=200)
-FCR          = S['item_fastercastrate']    # 105 (sB=9, sA=0)
-FHR          = S['item_fastergethitrate']  # 99  (sB=7, sA=20)
-FRW          = S['item_fastermovevelocity'] # 96  (sB=7, sA=20)
-IAS          = S['item_fasterattackrate']  # 93  (sB=7, sA=0)
-MF           = S['item_magicbonus']        # 80  (sB=7, sA=100)
-ALL_SKILLS   = S['item_allskills']         # 127 (sB=3, sA=0)
-MAGIC_ABSORB     = S['item_absorbmagic']       # 147 (sB=7, sA=0)
-ABSORB_COLD_PCT  = S['item_absorbcold_percent'] # 148 (sB=7, sA=0) — NOT the same as MAGIC_ABSORB
-REPLENISH        = S['hpregen']                # 74  (sB=6, sA=30)
-SKILL_TAB        = S['item_addskill_tab']      # 188 (sB=3, sA=0, sP=16)
-NON_CLASS_SKILL  = S['item_nonclassskill']     # 97  (sB=6, sA=0, sP=9) — oskills (Teleport, BO, etc.)
-ITEM_AURA        = S['item_aura']              # 151 (sB=5, sA=0, sP=9) — aura when equipped
+    # Common stat IDs for item building
+    STRENGTH     = S['strength']              # 0  (sB=8,  sA=32)
+    ENERGY       = S['energy']                # 1  (sB=7,  sA=32)
+    DEXTERITY    = S['dexterity']             # 2  (sB=7,  sA=32)
+    VITALITY     = S['vitality']              # 3  (sB=7,  sA=32)
+    MAXHP        = S['maxhp']                 # 7  (sB=9,  sA=32)
+    MAXMANA      = S['maxmana']               # 9  (sB=8,  sA=32)
+    ED           = S['item_armor_percent']     # 16 (sB=9,  sA=0)
+    FLAT_DEF     = S['armorclass']             # 31 (sB=11, sA=10)
+    FIRE_RES     = S['fireresist']             # 39 (sB=9,  sA=200)
+    LIGHT_RES    = S['lightresist']            # 41 (sB=9,  sA=200)
+    COLD_RES     = S['coldresist']             # 43 (sB=9,  sA=200)
+    POISON_RES   = S['poisonresist']           # 45 (sB=9,  sA=200)
+    FCR          = S['item_fastercastrate']    # 105 (sB=9, sA=0)
+    FHR          = S['item_fastergethitrate']  # 99  (sB=7, sA=20)
+    FRW          = S['item_fastermovevelocity'] # 96  (sB=7, sA=20)
+    IAS          = S['item_fasterattackrate']  # 93  (sB=7, sA=0)
+    MF           = S['item_magicbonus']        # 80  (sB=7, sA=100)
+    ALL_SKILLS   = S['item_allskills']         # 127 (sB=3, sA=0)
+    MAGIC_ABSORB     = S['item_absorbmagic']       # 147 (sB=7, sA=0)
+    ABSORB_COLD_PCT  = S['item_absorbcold_percent'] # 148 (sB=7, sA=0) — NOT the same as MAGIC_ABSORB
+    REPLENISH        = S['hpregen']                # 74  (sB=6, sA=30)
+    SKILL_TAB        = S['item_addskill_tab']      # 188 (sB=3, sA=0, sP=16)
+    NON_CLASS_SKILL  = S['item_nonclassskill']     # 97  (sB=6, sA=0, sP=9) — oskills (Teleport, BO, etc.)
+    ITEM_AURA        = S['item_aura']              # 151 (sB=5, sA=0, sP=9) — aura when equipped
 
 
 # ===========================================================================

@@ -35,9 +35,15 @@ def _detect_chars_dir():
     if 'D2R_CHARS' in os.environ:
         return os.environ['D2R_CHARS']
 
-    # Default: chars/ directory next to the package
+    # Default: chars/ directory next to the package, then cwd
     pkg_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    return os.path.join(pkg_dir, 'chars')
+    pkg_chars = os.path.join(pkg_dir, 'chars')
+    if os.path.isdir(pkg_chars):
+        return pkg_chars
+    cwd_chars = os.path.join(os.getcwd(), 'chars')
+    if os.path.isdir(cwd_chars):
+        return cwd_chars
+    return pkg_chars
 
 
 SAVES = _detect_saves_dir()

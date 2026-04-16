@@ -30,7 +30,7 @@ jobs:
       - name: Run tests (Tier 1 — no game data required)
         run: |
           pytest tests/ -v --timeout=60 \
-            -m "not integration and not slow and not e2e" \
+            -m "not integration and not slow and not e2e and not smoke" \
             --ignore=tests/fixtures/ \
             --ignore=tests/test_chargen.py \
             --ignore=tests/test_decoder.py \
