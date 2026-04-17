@@ -2,6 +2,9 @@
 import json
 import pytest
 
+pytest.importorskip("d2r_chargen.data.unique_items",
+                     reason="requires extracted game data")
+
 
 class TestLookupUnique:
     """Tests for lookup_unique()."""
