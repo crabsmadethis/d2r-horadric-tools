@@ -9,7 +9,7 @@ Look up `$ARGUMENTS` in the D2R game data files.
 
 ## How to Look Up
 
-Use the MCP data tools (d2r-data server) if available. These query the extracted game data in `d2r_chargen/data/` — the ONLY authoritative source (Rule 9).
+Use the MCP data tools (d2r-data server). These query the extracted game data in `d2r_chargen/data/` — the ONLY authoritative source (Rule 9).
 
 **By type (when you know what you're looking for):**
 - `d2r_lookup_unique` — unique items by name/UID
@@ -22,10 +22,18 @@ Use the MCP data tools (d2r-data server) if available. These query the extracted
 **Cross-type search (when you're not sure):**
 - `d2r_search` — searches uniques, sets, runewords, and bases
 
-**Fallback (if MCP server not available):**
-Read the data files directly from `d2r_chargen/data/` using Grep or Read tools.
-
 ## Rules
 
-- Rule 1: NEVER hallucinate UIDs, item codes, or binary format values.
+- Rule 1: NEVER hallucinate UIDs, item codes, or binary format values. Every value MUST come from the data files.
 - Rule 9: NEVER trust web research for D2R game data. If data isn't in these files, it doesn't exist.
+- Rule 14: Verify stat aliases against `d2r_chargen/config.py` PROPERTY_ALIASES.
+
+## Data File Locations
+
+All in `/home/deck/d2r-editor/d2r_chargen/data/`:
+- `unique_items.py` + `unique_item_stats.py` — unique item definitions and stats
+- `set_items.py` — set item definitions
+- `item_bases.py` — base item types (dimensions, requirements, sockets)
+- `runewords.py` + `runeword_stats.py` — runeword definitions and stats
+- `item_stat_cost.py` — stat encoding parameters (save_bits, save_add, etc.)
+- `skills.py` — skill definitions

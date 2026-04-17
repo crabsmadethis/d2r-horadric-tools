@@ -1,6 +1,6 @@
 ---
 description: Validate a D2R character YAML definition without building or deploying
-argument-hint: "Character name (e.g. MyPaladin)"
+argument-hint: "Character name (e.g. Tempest)"
 ---
 
 # D2R Validate
@@ -8,14 +8,14 @@ argument-hint: "Character name (e.g. MyPaladin)"
 Validate the YAML definition for `$ARGUMENTS` without building or deploying.
 
 ```bash
-d2r-chargen validate $ARGUMENTS
+python3 -m d2r_chargen validate $ARGUMENTS
 ```
 
 This checks:
 - YAML syntax and schema
 - Item UIDs exist in data files (Rule 1)
 - Item codes match base types in item_bases.py
-- Stat aliases resolve via PROPERTY_ALIASES
+- Stat aliases resolve via PROPERTY_ALIASES (Rule 14)
 - Runeword indices exist in runewords.py
 - Socket filler validity
 

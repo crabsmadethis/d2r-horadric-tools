@@ -329,6 +329,9 @@ def extract_vanilla(
     prefix_filter: set[str] | None = {
         "data/global/excel/", "data/global/string/", "data/global/ui/",
     },
+    extra_files: set[str] | None = {
+        "data/global/dataversionbuild.txt",
+    },
     verbose: bool = True,
 ) -> dict[str, str]:
     """Extract moddable files from CASC archive.
@@ -377,16 +380,19 @@ def extract_vanilla(
     errors = 0
 
     for tvfs_path, ekey in sorted(file_map.items()):
-        # Extension filter
-        if extensions:
-            ext = os.path.splitext(tvfs_path)[1].lower()
-            if ext not in extensions:
-                continue
+        # Always extract explicitly listed extra files
+        is_extra = extra_files and tvfs_path in extra_files
+        if not is_extra:
+            # Extension filter
+            if extensions:
+                ext = os.path.splitext(tvfs_path)[1].lower()
+                if ext not in extensions:
+                    continue
 
-        # Prefix filter
-        if prefix_filter:
-            if not any(tvfs_path.startswith(p) for p in prefix_filter):
-                continue
+            # Prefix filter
+            if prefix_filter:
+                if not any(tvfs_path.startswith(p) for p in prefix_filter):
+                    continue
 
         # Restore casing
         out_path = _restore_casing(tvfs_path)

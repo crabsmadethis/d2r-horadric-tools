@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Round-trip tests: encode via build_lib → decode via decoder → compare."""
 import unittest
-import pytest
 
 # Skip entire file if game data not extracted
+import pytest
 pytest.importorskip("d2r_chargen.data.item_stat_cost",
                      reason="game data not extracted (run 'd2r-mod extract')")
 

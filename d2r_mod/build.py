@@ -228,6 +228,31 @@ def build_mod(
         json.dump({"name": "rebalance", "savepath": "../"}, f, indent=2)
         f.write("\n")
 
+    # Step 6b: Write dataversionbuild.txt (prevents "Data version mismatch" warning)
+    # Read build number from .build.info, or copy from vanilla/ if already extracted
+    dvb_vanilla = os.path.join(vanilla_dir, "data", "global", "dataversionbuild.txt")
+    dvb_out = os.path.join(build_dir, "data", "global", "dataversionbuild.txt")
+    if os.path.exists(dvb_vanilla):
+        os.makedirs(os.path.dirname(dvb_out), exist_ok=True)
+        shutil.copy2(dvb_vanilla, dvb_out)
+    else:
+        # Generate from .build.info
+        from d2r_mod.casc import _parse_build_info
+        build_info_path = os.path.join(game_dir, ".build.info")
+        if os.path.exists(build_info_path):
+            with open(build_info_path, "r") as f:
+                lines = f.read().strip().split("\n")
+            headers = [h.split("!")[0] for h in lines[0].split("|")]
+            values = lines[1].split("|")
+            for h, v in zip(headers, values):
+                if h == "Version":
+                    # Version is like "3.1.92198" — take the last component
+                    build_num = v.strip().rsplit(".", 1)[-1]
+                    os.makedirs(os.path.dirname(dvb_out), exist_ok=True)
+                    with open(dvb_out, "w") as f:
+                        f.write(build_num)
+                    break
+
     # Step 7: Regen chargen data
     if regen:
         from d2r_mod.regen import regen_all

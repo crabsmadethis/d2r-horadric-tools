@@ -114,46 +114,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     except ImportError:
         pass
 
-    sub.add_parser("claude-setup", help="Set up Claude Code integration (MCP server + hooks)")
-    sub.add_parser("claude-teardown", help="Remove Claude Code integration")
-
     return parser.parse_args(argv)
-
-
-def cmd_claude_setup(args: argparse.Namespace) -> None:
-    from d2r_mod.claude_setup import (
-        check_dependencies, apply_setup, check_game_data, GAME_DATA_MODULES,
-    )
-    root = _project_root()
-
-    deps = check_dependencies()
-    if not deps["ok"]:
-        print(f"Missing packages: {', '.join(deps['missing'])}")
-        print("Install with: pip install mcp")
-        sys.exit(1)
-    print("Dependencies: OK")
-
-    result = apply_setup(root)
-    print(f"MCP server 'd2r-data' {result['mcp']} in ~/.claude/settings.json")
-    print(f"Hooks registered ({result['hooks']} entries in ~/.claude/settings.json)")
-
-    data = check_game_data(root)
-    if data["ok"]:
-        print(f"Game data: OK ({len(GAME_DATA_MODULES)} modules found)")
-    else:
-        print(f"Game data: MISSING ({', '.join(data['missing'])})")
-        print("  Run 'd2r-mod extract' to generate game data files.")
-
-    print("\nClaude Code integration ready. Open a new Claude Code session in this directory.")
-
-
-def cmd_claude_teardown(args: argparse.Namespace) -> None:
-    from d2r_mod.claude_setup import apply_teardown
-    root = _project_root()
-    result = apply_teardown(root)
-    print(f"MCP server: {result['mcp']}")
-    print(f"Hooks removed: {result['hooks']}")
-    print("Claude Code integration removed.")
 
 
 def cmd_build(args: argparse.Namespace) -> None:
@@ -475,8 +436,6 @@ def main(argv: list[str] | None = None) -> None:
         "diff": cmd_diff,
         "audit": cmd_audit,
         "inject": cmd_inject,
-        "claude-setup": cmd_claude_setup,
-        "claude-teardown": cmd_claude_teardown,
     }
     # Optional commands — only available when modules are present
     try:
@@ -498,7 +457,6 @@ def main(argv: list[str] | None = None) -> None:
 
     if args.command is None:
         parse_args(["--help"])
-
     # Commands that require a valid game directory
     needs_game_dir = {"build", "deploy", "undeploy", "extract", "update", "inject"}
     if args.command in needs_game_dir and DEFAULT_GAME_DIR is None:

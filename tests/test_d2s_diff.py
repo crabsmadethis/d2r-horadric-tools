@@ -3,13 +3,6 @@
 import os
 import struct
 import unittest
-import pytest
-
-# diff.py imports scanner.py which imports generated data modules.
-pytest.importorskip(
-    "d2r_chargen.data.item_stat_cost",
-    reason="game data not extracted (run 'd2r-mod extract')",
-)
 
 
 class TestDiffSameFile(unittest.TestCase):

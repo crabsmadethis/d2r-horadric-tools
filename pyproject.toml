@@ -16,7 +16,7 @@ d2r-chargen = "d2r_chargen.cli:main"
 d2r-mod = "d2r_mod.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["d2r_chargen*", "d2r_mod*", "d2r_mcp*"]
+include = ["d2r_chargen*", "d2r_mod*"]
 
 [tool.setuptools.package-data]
 d2r_chargen = ["data/template.d2s"]
@@ -27,7 +27,6 @@ markers = [
     "integration: tests requiring real D2R binaries on SD card",
     "slow: tests involving engine disasm, host patching, or CASC I/O",
     "e2e: end-to-end tests requiring D2R running",
-    "smoke: GitHub release smoke tests requiring network access",
 ]
 timeout = 300
 

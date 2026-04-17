@@ -6,7 +6,6 @@ bit-width boundaries, grouped stats, signed values, and parameterized stats.
 Runtime: ~30s
 """
 import pytest
-
 # Skip entire file if game data not extracted
 pytest.importorskip("d2r_chargen.data.item_stat_cost",
                      reason="game data not extracted (run 'd2r-mod extract')")

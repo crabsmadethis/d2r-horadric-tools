@@ -59,7 +59,10 @@ def cmd_validate(args):
             os.path.dirname(os.path.abspath(__file__)), 'data', 'template.d2s'
         )
 
-        from d2r_chargen.config import SAVES
+        saves = os.path.expanduser(
+            '~/.local/share/Steam/steamapps/compatdata/2536520/pfx/'
+            'drive_c/users/steamuser/Saved Games/Diablo II Resurrected'
+        )
         # Prefer existing .d2s as template (has correct status/expansion bits)
         existing_d2s = os.path.join(SAVES, f"{char_def['name']}.d2s")
         if os.path.exists(existing_d2s):

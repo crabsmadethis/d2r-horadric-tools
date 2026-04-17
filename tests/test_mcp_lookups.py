@@ -2,10 +2,6 @@
 import json
 import pytest
 
-# MCP lookups import generated data modules
-pytest.importorskip("d2r_chargen.data.item_stat_cost",
-                     reason="game data not extracted (run 'd2r-mod extract')")
-
 
 class TestLookupUnique:
     """Tests for lookup_unique()."""
