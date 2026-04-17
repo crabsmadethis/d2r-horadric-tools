@@ -246,3 +246,42 @@ d2r_mod/              Data modding pipeline
 ## License
 
 MIT
+
+## Claude Code Integration
+
+d2r-tools includes optional [Claude Code](https://claude.ai/code) integration
+for natural-language character building, safe save editing, and mod development.
+
+### Setup
+
+```bash
+pip install mcp                   # required for data lookup server
+d2r-mod claude-setup              # registers MCP server + installs hooks
+```
+
+Open a new Claude Code session in the repo directory. Claude automatically
+picks up the slash commands and skills.
+
+### Slash Commands
+
+| Command | Description |
+|---------|-------------|
+| `/d2r-build <name>` | Safe build cycle (backup → build → scan → verify) |
+| `/d2r-validate <name>` | Validate character YAML without building |
+| `/d2r-scan <name>` | Run diagnostic scanner |
+| `/d2r-lookup <query>` | Look up items, stats, skills from game data |
+| `/d2r-deploy` | Build and deploy mod to game |
+| `/d2r-undeploy` | Remove mod from game |
+
+### Skills (activate automatically)
+
+- **d2r-safe-edit** — enforces backup→edit→scan→verify on every save file change
+- **d2r-character-design** — guides new character creation with verified game data
+- **d2r-mod-overlay** — guides game balance changes via overlay YAMLs
+- **d2r-troubleshoot** — systematic diagnosis for crashes and load errors
+
+### Uninstall
+
+```bash
+d2r-mod claude-teardown           # removes hooks + MCP registration
+```
