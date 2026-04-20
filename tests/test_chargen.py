@@ -591,5 +591,120 @@ class TestSkillTabEncoding(unittest.TestCase):
             self.assertTrue(ok, f"Item {itype} uid={uid}: {err}")
 
 
+class TestMaxLevelDefaults(unittest.TestCase):
+    """Verify max_level_defaults injection: anni + torch + cube."""
+
+    def _minimal_char(self, **overrides):
+        c = {
+            'schema_version': 1,
+            'name': 'TestDefaults',
+            'class': 'warlock',
+            'level': 99,
+            'stats': {'strength': 156, 'dexterity': 35, 'vitality': 340, 'energy': 35},
+            'equipment': [],
+            'max_level_defaults': True,
+        }
+        c.update(overrides)
+        return c
+
+    def test_injects_anni_torch_cube_when_missing(self):
+        from d2r_chargen.character import _inject_max_level_defaults
+        c = self._minimal_char()
+        _inject_max_level_defaults(c)
+
+        charm_uniques = [
+            ch.get('unique') for ch in c['inventory']['charms']
+            if isinstance(ch, dict)
+        ]
+        self.assertIn('Annihilus', charm_uniques)
+        self.assertIn('Hellfire Torch', charm_uniques)
+
+        # Torch must be class-matched
+        torch = next(ch for ch in c['inventory']['charms']
+                     if ch.get('unique') == 'Hellfire Torch')
+        self.assertEqual(
+            torch['extra_properties']['class_skills'],
+            [3, 'warlock'],
+        )
+
+        # Cube placed in stash_items
+        self.assertTrue(any(
+            it.get('base') == 'box' for it in c.get('stash_items', [])
+        ))
+
+    def test_skips_items_already_present(self):
+        from d2r_chargen.character import _inject_max_level_defaults
+        c = self._minimal_char(
+            inventory={'charms': [
+                {'unique': 'Annihilus'},
+                {'unique': 'Hellfire Torch'},
+            ]},
+            stash_items=[{'normal': True, 'base': 'box'}],
+        )
+        _inject_max_level_defaults(c)
+        anni_count = sum(
+            1 for ch in c['inventory']['charms']
+            if ch.get('unique') == 'Annihilus'
+        )
+        torch_count = sum(
+            1 for ch in c['inventory']['charms']
+            if ch.get('unique') == 'Hellfire Torch'
+        )
+        cube_count = sum(
+            1 for it in c['stash_items'] if it.get('base') == 'box'
+        )
+        self.assertEqual(anni_count, 1)
+        self.assertEqual(torch_count, 1)
+        self.assertEqual(cube_count, 1)
+
+    def test_defaults_off_by_default(self):
+        """No flag == no injection."""
+        from d2r_chargen.character import _inject_max_level_defaults
+        c = {
+            'schema_version': 1, 'name': 'T', 'class': 'sorceress', 'level': 99,
+            'stats': {'strength': 10, 'dexterity': 25, 'vitality': 10, 'energy': 35},
+            'equipment': [],
+            # no max_level_defaults flag
+        }
+        # When called directly it still injects (caller's responsibility);
+        # the guard is in load_character_yaml. Verify load_character_yaml
+        # does not inject absent the flag — simulate by writing tmp file.
+        import tempfile, yaml as _yaml
+        from d2r_chargen.character import load_character_yaml
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+            _yaml.safe_dump(c, f)
+            tmp = f.name
+        try:
+            loaded = load_character_yaml(tmp)
+            inventory = loaded.get('inventory', {})
+            charms = inventory.get('charms', []) if isinstance(inventory, dict) else []
+            self.assertEqual(len(charms), 0,
+                             "Should not inject charms without max_level_defaults flag")
+            self.assertEqual(loaded.get('stash_items', []), [],
+                             "Should not inject stash_items without flag")
+        finally:
+            os.unlink(tmp)
+
+    def test_torch_class_matches_char_class(self):
+        from d2r_chargen.character import _inject_max_level_defaults
+        for cls in ('amazon', 'sorceress', 'necromancer', 'paladin',
+                    'barbarian', 'druid', 'assassin', 'warlock'):
+            c = self._minimal_char(**{'class': cls})
+            _inject_max_level_defaults(c)
+            torch = next(ch for ch in c['inventory']['charms']
+                         if ch.get('unique') == 'Hellfire Torch')
+            self.assertEqual(torch['extra_properties']['class_skills'], [3, cls])
+
+    def test_full_build_with_defaults(self):
+        """End-to-end: injected items build successfully (cube in stash, torch + anni in inv)."""
+        from d2r_chargen.character import _inject_max_level_defaults
+        c = self._minimal_char()
+        _inject_max_level_defaults(c)
+        validate_char_def(c)
+        items = build_all_items(c)
+        # Expect at least 3 items: anni + torch + cube (equipment is empty)
+        self.assertGreaterEqual(len(items), 3)
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)

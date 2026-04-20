@@ -31,6 +31,17 @@ _UNIQUE_CHARM_POSITIONS = {
     'flame rift':          ('cm3', 8, 0),
 }
 
+# Sunder charm names (all variants). Used by max_level_defaults to warn
+# when a build specifies no sunder.
+_SUNDER_CHARM_NAMES = frozenset([
+    'black cleft',         # magic
+    'flame rift',          # fire
+    'cold rupture',        # cold
+    'crack of the heavens',  # lightning
+    'bone break',          # physical
+    'rotting fissure',     # poison
+])
+
 # Inventory grid: 10 cols x 4 rows
 _INV_COLS = 10
 _INV_ROWS = 4
@@ -94,7 +105,127 @@ def load_character_yaml(path):
     if merc and isinstance(merc, dict) and 'template' in merc:
         _resolve_merc_template(char_def)
 
+    # Resolve merc.level to merc.xp via the closed-form curve
+    if merc and isinstance(merc, dict) and 'level' in merc:
+        _resolve_merc_level_to_xp(char_def)
+
+    # Apply max-level defaults (anni/torch/cube) if opted in
+    if char_def.get('max_level_defaults'):
+        _inject_max_level_defaults(char_def)
+
     return char_def
+
+
+def _resolve_merc_level_to_xp(char_def):
+    """Convert `merc.level` into `merc.xp` using the closed-form curve.
+
+    Formula: merc_xp = Exp/Lvl × (level + 1) × level²  (see
+    d2r_chargen/data/merc_xp_curve.py and
+    docs/superpowers/specs/2026-04-20-merc-xp-formula.md).
+
+    Precedence: if both `level` and `xp` are set, `xp` wins (explicit
+    override) and a warning is printed. If only `level` is set, it's
+    converted. If only `xp` is set, no-op. Requires `merc.type` to be
+    resolved first (templates supply it automatically).
+    """
+    from d2r_chargen.data.merc_xp_curve import xp_for_level
+    from d2r_chargen.save import MERC_HIRELING_ID
+
+    merc = char_def['merc']
+    level = merc.get('level')
+    if level is None:
+        return
+
+    if 'xp' in merc:
+        print(f"  WARNING: merc has both 'level' ({level}) and 'xp' "
+              f"({merc['xp']}); using explicit 'xp'.")
+        return
+
+    merc_type = merc.get('type')
+    if not merc_type:
+        raise ValueError(
+            "merc.level requires merc.type (or a template that supplies it) "
+            "to resolve XP."
+        )
+    if merc_type not in MERC_HIRELING_ID:
+        raise ValueError(
+            f"Unknown merc type '{merc_type}'. Known: "
+            f"{sorted(MERC_HIRELING_ID.keys())}"
+        )
+    hireling_id = MERC_HIRELING_ID[merc_type]
+    merc['xp'] = xp_for_level(hireling_id, int(level))
+
+
+def _inject_max_level_defaults(char_def):
+    """Inject default charms/items for max-level characters (opt-in via
+    `max_level_defaults: true` in YAML).
+
+    Injects only items NOT already specified:
+      - Annihilus (unique small charm) -> inventory.charms
+      - Hellfire Torch matched to char class -> inventory.charms
+      - Empty Horadric Cube -> stash_items
+
+    Emits a WARNING if no sunder charm is specified (user must pick one
+    per build — no default sunder).
+
+    Mutates char_def in place.
+    """
+    class_name = char_def.get('class', '').lower()
+
+    inventory = char_def.setdefault('inventory', {})
+    if not isinstance(inventory, dict):
+        return  # malformed — let validation catch it
+    charms = inventory.setdefault('charms', [])
+    stash_items = char_def.setdefault('stash_items', [])
+
+    # Detect what's already present (case-insensitive match on unique names)
+    def _has_unique(items, name):
+        target = name.lower()
+        for it in items:
+            if isinstance(it, dict) and str(it.get('unique', '')).lower() == target:
+                return True
+        return False
+
+    # 1. Annihilus
+    if not _has_unique(charms, 'Annihilus'):
+        charms.append({'unique': 'Annihilus'})
+
+    # 2. Hellfire Torch — class-matched via extra_properties
+    if not _has_unique(charms, 'Hellfire Torch'):
+        torch = {
+            'unique': 'Hellfire Torch',
+            'extra_properties': {
+                'class_skills': [3, class_name],
+            },
+        }
+        charms.append(torch)
+
+    # 3. Empty Horadric Cube in stash (normal-quality base 'box', 2x2)
+    def _has_cube(items):
+        for it in items:
+            if not isinstance(it, dict):
+                continue
+            if it.get('base') == 'box':
+                return True
+        return False
+
+    merc_equip = []
+    merc = char_def.get('merc')
+    if isinstance(merc, dict):
+        merc_equip = merc.get('equipment', []) or []
+
+    if not _has_cube(stash_items) and not _has_cube(merc_equip):
+        stash_items.append({'normal': True, 'base': 'box'})
+
+    # 4. Sunder warning (no auto-inject — build-specific)
+    has_sunder = any(
+        isinstance(it, dict) and str(it.get('unique', '')).lower() in _SUNDER_CHARM_NAMES
+        for it in charms
+    )
+    if not has_sunder:
+        print(f"  WARNING: max_level_defaults enabled but no sunder charm "
+              f"specified. Consider adding one of: "
+              f"{', '.join(sorted(_SUNDER_CHARM_NAMES))}")
 
 
 def _resolve_merc_template(char_def):
@@ -199,6 +330,12 @@ def validate_char_def(char_def):
     if isinstance(merc, dict):
         for item_def in merc.get('equipment', []):
             _validate_item_def(item_def, errors)
+        equipment_mode = merc.get('equipment_mode')
+        if equipment_mode is not None and equipment_mode not in ('stash', 'direct'):
+            raise ValueError(
+                f"Invalid merc.equipment_mode: '{equipment_mode}'. "
+                f"Must be 'stash' or 'direct'."
+            )
 
     if errors:
         raise ValueError(
@@ -757,16 +894,36 @@ def build_all_items(char_def):
                 items = build_charm(charm_def, col=col, row=row)
                 all_items.extend(items)
 
-        # 3. Build merc items: either injected into JM[merc] (experimental,
-        # merc: inject: true) or placed in character stash for manual equip.
+        # 3. Build merc items: either injected into JM[merc] (direct mode) or
+        # placed in character stash for manual equip (stash mode, the default).
+        #
+        # equipment_mode resolution priority:
+        #   1. Explicit merc.equipment_mode field ('stash' | 'direct')
+        #   2. Legacy merc.inject bool (inject: true → 'direct', false → 'stash')
+        #   3. Default: 'stash'
         merc = char_def.get('merc', {})
         merc_equipment = []
-        inject_merc = False
+        equipment_mode = 'stash'
         if isinstance(merc, dict):
             merc_equipment = merc.get('equipment', [])
-            inject_merc = bool(merc.get('inject', False))
+            explicit_mode = merc.get('equipment_mode')
+            legacy_inject = merc.get('inject')
+            if explicit_mode is not None and legacy_inject is not None:
+                print(
+                    f"  WARNING: merc has both 'equipment_mode' and legacy 'inject' fields; "
+                    f"using 'equipment_mode: {explicit_mode}'"
+                )
+            if explicit_mode is not None:
+                equipment_mode = explicit_mode
+            elif legacy_inject is not None:
+                equipment_mode = 'direct' if bool(legacy_inject) else 'stash'
+        if equipment_mode not in ('stash', 'direct'):
+            raise ValueError(
+                f"Invalid merc.equipment_mode: '{equipment_mode}'. "
+                f"Must be 'stash' or 'direct'."
+            )
         if merc_equipment:
-            if inject_merc:
+            if equipment_mode == 'direct':
                 # Build as equipped-on-merc (same encoding as char-equipped,
                 # but tagged section='merc' so the rebuild pipeline routes
                 # them into JM[merc]).
@@ -774,12 +931,25 @@ def build_all_items(char_def):
                     built = build_equipment_item(item_def)
                     for _section, item_bytes in built:
                         all_items.append(('merc', item_bytes))
-            else:
-                stash_positions = _calculate_merc_stash_positions(merc_equipment)
-                for i, item_def in enumerate(merc_equipment):
-                    col, row = stash_positions[i]
-                    items = build_merc_item(item_def, stash_col=col, stash_row=row)
-                    all_items.extend(items)
+
+        # 4. Build stash_items (non-merc items placed in stash, e.g. cube).
+        # Combined with merc stash items into a single placement pass so they
+        # don't collide.
+        stash_items = char_def.get('stash_items', []) or []
+        stash_merc = merc_equipment if (merc_equipment and equipment_mode == 'stash') else []
+        combined_stash = list(stash_merc) + list(stash_items)
+        if combined_stash:
+            stash_positions = _calculate_merc_stash_positions(combined_stash)
+            # First: merc items via build_merc_item
+            for i, item_def in enumerate(stash_merc):
+                col, row = stash_positions[i]
+                items = build_merc_item(item_def, stash_col=col, stash_row=row)
+                all_items.extend(items)
+            # Then: stash_items (non-merc) via same builder
+            for j, item_def in enumerate(stash_items):
+                col, row = stash_positions[len(stash_merc) + j]
+                items = build_merc_item(item_def, stash_col=col, stash_row=row)
+                all_items.extend(items)
 
         return all_items
     finally:
@@ -906,8 +1076,13 @@ def deploy_character(char_name, phase=4, force=False):
                     f"{sorted(MERC_HIRELING_ID.keys())}"
                 )
             hireling_id = MERC_HIRELING_ID[merc_type]
-            data = set_merc_header(data, hireling_id)
-            print(f"  Merc header: type={merc_type!r} hireling_id={hireling_id}")
+            # merc.xp: raw XP value to write at disk offset 0xAB (u32).
+            # Chargen default is 0 (fresh hire). Setting this preserves
+            # level 98 mercs across rebuilds. Task 2.2 will add merc.level
+            # with auto-resolve via xp_for_level().
+            merc_xp = int(merc.get('xp', 0))
+            data = set_merc_header(data, hireling_id, xp=merc_xp)
+            print(f"  Merc header: type={merc_type!r} hireling_id={hireling_id} xp={merc_xp}")
 
     # Write updated base data
     struct.pack_into('<I', data, 8, len(data))
