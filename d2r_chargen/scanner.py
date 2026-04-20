@@ -13,12 +13,22 @@ Produces identical output to the original inline d2rdoctor.md scanner.
 import struct, sys, os, time, json
 
 from d2r_chargen.data.huffman import HUFFMAN_TREE, RUNE_NAMES
-from d2r_chargen.data.item_stat_cost import ITEM_STAT_COST
-from d2r_chargen.data.item_dimensions import ITEM_DIMENSIONS
-from d2r_chargen.data.unique_items import UNIQUE_ITEMS
-from d2r_chargen.data.set_items import SET_ITEMS
-from d2r_chargen.data.item_bases import ITEM_BASES as ITEM_BASES_FULL
-from d2r_chargen.data.runewords import RUNEWORDS
+try:
+    from d2r_chargen.data.item_stat_cost import ITEM_STAT_COST
+    from d2r_chargen.data.item_dimensions import ITEM_DIMENSIONS
+    from d2r_chargen.data.unique_items import UNIQUE_ITEMS
+    from d2r_chargen.data.set_items import SET_ITEMS
+    from d2r_chargen.data.item_bases import ITEM_BASES as ITEM_BASES_FULL
+    from d2r_chargen.data.runewords import RUNEWORDS
+    _HAS_DATA = True
+except ImportError:
+    ITEM_STAT_COST = None
+    ITEM_DIMENSIONS = None
+    UNIQUE_ITEMS = None
+    SET_ITEMS = None
+    ITEM_BASES_FULL = None
+    RUNEWORDS = None
+    _HAS_DATA = False
 
 # ============================================================
 # Constants
@@ -178,10 +188,17 @@ def navigate_item_structure(data, pos, quality, is_runeword, is_socketed, flags3
             if has_affix: br += 11
 
     # Runeword ID (16 bits if runeword flag set)
+    # D2R canonical form: low 12 bits = runeword_id + 27, high 4 bits = 5
+    # (D2R version marker). Legacy chargen form (pre-2026-04-20): low 12 bits
+    # = runeword_id, high 4 bits = 0. Accept both.
     rw_id = None
     if is_runeword:
-        rw_id = bits_at(data, br, 16)
+        raw16 = bits_at(data, br, 16)
         br += 16
+        if (raw16 >> 12) == 5:
+            rw_id = (raw16 & 0xFFF) - 27
+        else:
+            rw_id = raw16 & 0xFFF
 
     # Personalized item name (7-bit null-terminated)
     if flags32 & (1 << 24):
@@ -588,7 +605,7 @@ def scan_characters(target, all_files, ghost_chars):
                 print(f"  \u26a0 PROGRESSION: {pw}")
         CLASS_BASE_STATS={
             0:(20,15,25,20),1:(10,35,25,10),2:(15,25,25,15),3:(25,15,20,25),
-            4:(30,10,20,25),5:(15,20,20,25),6:(20,25,20,20),7:(8,20,20,8),
+            4:(30,10,20,25),5:(15,20,20,25),6:(20,25,20,20),7:(15,20,20,25),
         }
         if stats:
             hp=stats.get(7,0)/256; mana=stats.get(9,0)/256

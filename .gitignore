@@ -27,4 +27,5 @@ build/
 
 # Save files
 *.d2s
+*.d2s.*bak
 !d2r_chargen/data/template.d2s

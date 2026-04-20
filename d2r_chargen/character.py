@@ -924,11 +924,15 @@ def build_all_items(char_def):
             )
         if merc_equipment:
             if equipment_mode == 'direct':
-                # Build as equipped-on-merc (same encoding as char-equipped,
-                # but tagged section='merc' so the rebuild pipeline routes
-                # them into JM[merc]).
+                # Build as equipped-on-merc.  Merc-owned items use the same
+                # encoding as char-equipped items EXCEPT that `col` carries
+                # the merc equip-slot index (== bodyloc).  Char-equipped uses
+                # col=0.  Observed in golden fixture hexshade_lv98_haseen:
+                # Insight 7wc col=4 (bodyloc=4), Andariel's usk col=1
+                # (bodyloc=1), Fortitude utp col=3 (bodyloc=3).
+                # See docs/superpowers/specs/2026-04-20-merc-direct-mode-gap.md.
                 for item_def in merc_equipment:
-                    built = build_equipment_item(item_def)
+                    built = build_equipment_item(item_def, is_merc=True)
                     for _section, item_bytes in built:
                         all_items.append(('merc', item_bytes))
 

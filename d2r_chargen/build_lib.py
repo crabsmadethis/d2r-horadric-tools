@@ -782,9 +782,20 @@ def build_item(type_code, col, row, storage,
     # ==========================================================
     # RUNEWORD ID (16 bits, only if runeword flag set)
     # Reference: d2rdoctor.md lines 158-162
+    #
+    # D2R canonical form (observed in D2R-written saves, e.g. golden fixture
+    # tests/fixtures/hexshade_lv98_haseen.d2s):
+    #   low 12 bits = runeword_id + 27  (legacy "runeword bias")
+    #   high 4 bits = 5                 (D2R version marker)
+    #
+    # D2R accepts the raw form (low12 = runeword_id, high4 = 0) for
+    # char-equipped items but rejects it for merc-equipped items during
+    # game-enter validation. Writing the canonical biased form satisfies
+    # both code paths.  See docs/superpowers/specs/2026-04-20-merc-direct-mode-gap.md.
     # ==========================================================
     if runeword:
-        w.write_bits(runeword_id, 16)
+        w.write_bits(runeword_id + 27, 12)
+        w.write_bits(5, 4)
 
     # No personalized name (we never set bit 24)
 

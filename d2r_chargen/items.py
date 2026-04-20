@@ -117,7 +117,7 @@ def _merge_properties(base_props, extra_props):
     return result
 
 
-def build_equipment_item(item_def):
+def build_equipment_item(item_def, *, is_merc=False):
     """Build an equipment item from a YAML definition dict.
 
     Dispatches based on keys present in item_def:
@@ -130,6 +130,9 @@ def build_equipment_item(item_def):
 
     Args:
         item_def: Dict with slot, quality type key, and optional properties.
+        is_merc: When True, build for merc-equipped encoding (col=bodyloc).
+            D2R stores merc-owned items with col set to the merc equip slot
+            (matches bodyloc). Char-equipped items use col=0.
 
     Returns:
         List of (section, bytes) tuples. Section is always 'char'.
@@ -138,17 +141,17 @@ def build_equipment_item(item_def):
     slot = SLOT_MAP[slot_name]
 
     if 'runeword' in item_def:
-        return _build_runeword(item_def, slot)
+        return _build_runeword(item_def, slot, is_merc=is_merc)
     elif 'unique' in item_def:
-        return _build_unique(item_def, slot)
+        return _build_unique(item_def, slot, is_merc=is_merc)
     elif 'set' in item_def:
-        return _build_set(item_def, slot)
+        return _build_set(item_def, slot, is_merc=is_merc)
     elif 'rare' in item_def:
-        return _build_rare(item_def, slot)
+        return _build_rare(item_def, slot, is_merc=is_merc)
     elif 'magic_prefix' in item_def or 'magic_suffix' in item_def:
-        return _build_magic(item_def, slot)
+        return _build_magic(item_def, slot, is_merc=is_merc)
     elif 'crafted' in item_def:
-        return _build_crafted(item_def, slot)
+        return _build_crafted(item_def, slot, is_merc=is_merc)
     else:
         raise ValueError(
             f"Cannot determine item quality type from keys: {list(item_def.keys())}"
@@ -174,7 +177,7 @@ def _resolve_final_properties(item_def, auto_props, *, has_canonical=False):
     return auto_props
 
 
-def _build_runeword(item_def, slot):
+def _build_runeword(item_def, slot, *, is_merc=False):
     """Build a runeword item: parent + rune fillers."""
     name = item_def['runeword']
     base_code = item_def['base']
@@ -184,7 +187,7 @@ def _build_runeword(item_def, slot):
 
     parent_bytes = build_item(
         type_code=base_code,
-        col=0, row=0, storage=0,
+        col=slot['bodyloc'] if is_merc else 0, row=0, storage=0,
         location=1, bodyloc=slot['bodyloc'],
         quality=2,
         ilvl=item_def.get('ilvl', 99),
@@ -208,7 +211,7 @@ def _build_runeword(item_def, slot):
     return items
 
 
-def _build_unique(item_def, slot):
+def _build_unique(item_def, slot, *, is_merc=False):
     """Build a unique item."""
     name = item_def['unique']
     resolved = resolve_unique(name)
@@ -217,7 +220,7 @@ def _build_unique(item_def, slot):
 
     item_bytes = build_item(
         type_code=resolved['type_code'],
-        col=0, row=0, storage=0,
+        col=slot['bodyloc'] if is_merc else 0, row=0, storage=0,
         location=1, bodyloc=slot['bodyloc'],
         quality=7,
         ilvl=item_def.get('ilvl', 99),
@@ -231,7 +234,7 @@ def _build_unique(item_def, slot):
     return [('char', item_bytes)]
 
 
-def _build_set(item_def, slot):
+def _build_set(item_def, slot, *, is_merc=False):
     """Build a set item (quality=5).
 
     Requires explicit 'properties:' in the YAML (no auto-resolved stats).
@@ -248,7 +251,7 @@ def _build_set(item_def, slot):
 
     item_bytes = build_item(
         type_code=resolved['type_code'],
-        col=0, row=0, storage=0,
+        col=slot['bodyloc'] if is_merc else 0, row=0, storage=0,
         location=1, bodyloc=slot['bodyloc'],
         quality=5,
         ilvl=item_def.get('ilvl', 99),
@@ -262,7 +265,7 @@ def _build_set(item_def, slot):
     return [('char', item_bytes)]
 
 
-def _build_rare(item_def, slot):
+def _build_rare(item_def, slot, *, is_merc=False):
     """Build a rare item (quality=6)."""
     props = resolve_properties(item_def.get('properties', {}))
 
@@ -283,7 +286,7 @@ def _build_rare(item_def, slot):
 
     item_bytes = build_item(
         type_code=base_code,
-        col=0, row=0, storage=0,
+        col=slot['bodyloc'] if is_merc else 0, row=0, storage=0,
         location=1, bodyloc=slot['bodyloc'],
         quality=6,
         ilvl=item_def.get('ilvl', 99),
@@ -298,7 +301,7 @@ def _build_rare(item_def, slot):
     return [('char', item_bytes)]
 
 
-def _build_magic(item_def, slot):
+def _build_magic(item_def, slot, *, is_merc=False):
     """Build a magic item (quality=4)."""
     props = resolve_properties(item_def.get('properties', {}))
 
@@ -319,7 +322,7 @@ def _build_magic(item_def, slot):
 
     item_bytes = build_item(
         type_code=base_code,
-        col=0, row=0, storage=0,
+        col=slot['bodyloc'] if is_merc else 0, row=0, storage=0,
         location=1, bodyloc=slot['bodyloc'],
         quality=4,
         ilvl=item_def.get('ilvl', 99),
@@ -334,7 +337,7 @@ def _build_magic(item_def, slot):
     return [('char', item_bytes)]
 
 
-def _build_crafted(item_def, slot):
+def _build_crafted(item_def, slot, *, is_merc=False):
     """Build a crafted item (quality=8)."""
     props = resolve_properties(item_def.get('properties', {}))
 
@@ -355,7 +358,7 @@ def _build_crafted(item_def, slot):
 
     item_bytes = build_item(
         type_code=base_code,
-        col=0, row=0, storage=0,
+        col=slot['bodyloc'] if is_merc else 0, row=0, storage=0,
         location=1, bodyloc=slot['bodyloc'],
         quality=8,
         ilvl=item_def.get('ilvl', 99),

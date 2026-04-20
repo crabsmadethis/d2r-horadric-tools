@@ -632,7 +632,14 @@ def rebuild_items(filepath, char_items_bytes, merc_items_bytes):
     # Always construct a clean end section to avoid stale merc items (Rule 6).
     # D2S structure after char items (verified against working Tempest save):
     #   JM[0] (corpse) | jf | [JM[n] merc_items] | kf | \x00 (golem) | \x01\x00 | lf[count]
-    lf_count = 1 if merc_items_bytes else 0
+    #
+    # lf_count: historically interpreted as "merc hired" (0=empty, 1=hired).
+    # Observation (2026-04-20, see merc-direct-mode-gap spec): D2R-written saves
+    # with merc gear in JM[merc] AND merc-hired-at-level-98 have lf_count=0.
+    # Writing lf_count=1 causes D2R to silently reject the save during game-enter
+    # validation — even when merc items in JM[merc] are byte-identical to a
+    # D2R-written reference. Always writing lf_count=0 matches D2R's own format.
+    lf_count = 0
     merc_jm = struct.pack('<2sH', b'JM', merc_count)
     merc_section = merc_jm + b''.join(merc_items_bytes)
     end_section = (
