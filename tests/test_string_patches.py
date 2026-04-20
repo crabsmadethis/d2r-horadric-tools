@@ -27,7 +27,11 @@ class TestStringPatches(unittest.TestCase):
         self.assertEqual(entries.get("vps"), "Wild Rice Cake")
         self.assertEqual(entries.get("yps"), "Manoomin Tea")
         self.assertEqual(entries.get("wms"), "Wild Rice Soup")
-        self.assertEqual(entries.get("Manoomin"), "Manoomin")
+        # "Manoomin" unique-name entry was removed from wild_rice.yaml;
+        # it is now auto-registered in expansionstring.tbl by Step 5d.
+        self.assertNotIn("Manoomin", entries,
+                         "Manoomin unique-name should NOT be in patchstring.tbl "
+                         "(it is auto-registered in expansionstring.tbl now)")
 
     def test_unmodified_strings_preserved(self):
         from d2r_mod.assets.tbl import parse_tbl

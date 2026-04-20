@@ -42,7 +42,7 @@ except ImportError:
 
 
 def _require_data():
-    \"\"\"Raise RuntimeError if generated game data is not available.\"\"\"
+    '''Raise RuntimeError if generated game data is not available.'''
     if not _HAS_DATA:
         raise RuntimeError(
             "Game data not available. Run 'd2r-mod extract' first."

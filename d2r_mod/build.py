@@ -221,6 +221,37 @@ def build_mod(
                 f"({len(tbl_paths)} files) ({basename})"
             )
 
+    # Step 5d: Auto-register custom unique display names in expansionstring.tbl
+    # Any UniqueItems.txt index that is absent from the vanilla key corpus is
+    # added as a name→name entry so D2R can resolve the display string.
+    # See d2r_mod/build_steps/register_custom_uniques.py for the DR-1 hypothesis
+    # note about target tbl selection.
+    from d2r_mod.build_steps.register_custom_uniques import (
+        run as _register_custom_uniques,
+        load_vanilla_keys as _load_vanilla_keys,
+        DEFAULT_TARGET_TBL as _CUSTOM_UNIQUES_TBL,
+    )
+    _unique_items_build_path = os.path.join(
+        build_dir, "data", "global", "excel", "UniqueItems.txt"
+    )
+    if os.path.exists(_unique_items_build_path):
+        _vanilla_keys = _load_vanilla_keys()
+        # Register into eng only (English); multi-lang extension is a future concern.
+        _target_tbl_path = os.path.join(
+            build_dir, "data", "local", "lng", "eng",
+            f"{_CUSTOM_UNIQUES_TBL}.tbl"
+        )
+        _reg_result = _register_custom_uniques(
+            _unique_items_build_path, _target_tbl_path, _vanilla_keys
+        )
+        warnings.append(
+            f"CustomUniques: registered {_reg_result['added']} new name(s) in "
+            f"eng/{_CUSTOM_UNIQUES_TBL}.tbl "
+            f"(skipped {_reg_result['skipped']} vanilla/existing)"
+        )
+    else:
+        warnings.append("CustomUniques: UniqueItems.txt not found in build — skipping")
+
     # Step 6: Write modinfo.json (required for D2R to load mod .txt files)
     import json
     modinfo_path = os.path.join(build_dir, "modinfo.json")

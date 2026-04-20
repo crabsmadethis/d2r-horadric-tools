@@ -459,6 +459,81 @@ def set_difficulty_hell(data):
 
 
 # ============================================================
+# Mercenary header
+# ============================================================
+
+# Mapping of merc template `type:` strings to Hireling.txt Id column values.
+# The Id column encodes (class, element, difficulty) — see
+# docs/superpowers/specs/2026-04-19-merc-disk-encoding.md for derivation.
+# Hell-tier is the default since chargen builds are Hell-capable; NM/Normal
+# variants are explicit via the _nm_/_normal_ suffix.
+MERC_HIRELING_ID: dict = {
+    # Act 1 Rogue
+    'act1_fire':             4,   # Fire-Hell
+    'act1_cold':             5,   # Ice-Hell
+    'act1_fire_nm':          2,   # Fire-Nightmare
+    'act1_cold_nm':          3,   # Ice-Nightmare
+    # Act 2 Desert (classic auras)
+    'act2_combat':          12,   # Comb-Hell (Prayer/Thorns in Hell)
+    'act2_defensive':       13,   # Def-Hell (Defiance/HolyFreeze in Hell)
+    'act2_offensive':       14,   # Off-Hell (BlessedAim/Might in Hell)
+    'act2_nm_combat':        9,   # Comb-NM
+    'act2_nm_defensive':    10,   # Def-NM
+    'act2_nm_offensive':    11,   # Off-NM (Might)
+    # Act 2 Desert (expansion aura overrides — Hell tier)
+    'act2_thorns':          33,   # Thorns-Hell
+    'act2_holyfreeze':      34,   # HolyFreeze-Hell
+    'act2_might':           35,   # Might-Hell
+    # Act 3 Iron Wolf
+    'act3_fire':            21,   # Fire-Hell
+    'act3_cold':            22,   # Cold-Hell
+    'act3_ltng':            23,   # Ltng-Hell
+    'act3_fire_nm':         18,
+    'act3_cold_nm':         19,
+    'act3_ltng_nm':         20,
+    # Act 5 Barbarian
+    'act5_2hs':             28,   # 2H-Hell
+    'act5_2hs_alt':         29,   # 2H-Hell (alt name pool)
+    'act5_1hs':             38,   # 1H-Hell (mod-added)
+    # Act 4 Holy Warrior (mod-added)
+    'act4_smite':           41,   # Smite-Hell
+    'act4_smite_nm':        40,   # Smite-NM
+}
+
+
+def set_merc_header(data, hireling_id: int, seed: int | None = None,
+                    xp: int = 0, field_a7: int = 0):
+    """Write the merc header fields at offsets 0xa3-0xae.
+
+    Fields (all little-endian):
+      0xa3  u32  name seed (RNG for Hireling.NameFirst/NameLast picks)
+      0xa7  u16  unknown (kept zero/default; semantics TBD)
+      0xa9  u16  Hireling.txt Id column (class+element+difficulty)
+      0xab  u32  merc XP
+
+    Args:
+        data: bytearray of the .d2s file (modified in place)
+        hireling_id: Hireling.txt Id column value (0-41 in rebalance mod)
+        seed: u32 name seed (None → random)
+        xp: initial merc XP (default 0 — D2R will accrue on kills)
+        field_a7: u16 at 0xa7 (default 0; live values seen: 10 for Geshef, 13 for Elexa)
+
+    Returns: modified bytearray
+    """
+    import random
+    if seed is None:
+        seed = random.getrandbits(32)
+    if not (0 <= hireling_id < 0x10000):
+        raise ValueError(f"hireling_id {hireling_id} outside u16 range")
+
+    struct.pack_into('<I', data, 0xa3, seed & 0xFFFFFFFF)
+    struct.pack_into('<H', data, 0xa7, field_a7 & 0xFFFF)
+    struct.pack_into('<H', data, 0xa9, hireling_id & 0xFFFF)
+    struct.pack_into('<I', data, 0xab, xp & 0xFFFFFFFF)
+    return data
+
+
+# ============================================================
 # Character Creation
 # ============================================================
 

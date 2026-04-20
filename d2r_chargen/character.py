@@ -6,6 +6,7 @@ creates/updates the .d2s file, and deploys items in phases.
 import os
 import shutil
 import struct
+import sys
 
 import yaml
 from d2r_chargen.config import (
@@ -262,6 +263,175 @@ def _validate_item_def(item_def, errors):
                     resolve_property_name(prop_name)
                 except ValueError:
                     errors.append(f"Unknown property: '{prop_name}'")
+
+    # Warn if properties: exactly matches canonical on a unique item
+    _warn_redundant_unique_properties(item_def)
+
+
+def _warn_redundant_unique_properties(item_def):
+    """Check if a unique item's properties: block redundantly duplicates canonical stats.
+
+    If a unique item specifies 'properties:' and every key/value pair exactly matches
+    the canonical stats from unique_item_stats, the block is likely redundant.
+    Emit a warning to stderr suggesting 'extra_properties:' or removal instead.
+    """
+    # Only check unique items with 'properties:' block
+    if 'unique' not in item_def or 'properties' not in item_def:
+        return
+
+    try:
+        unique_name = item_def['unique']
+        user_props = item_def.get('properties', {})
+        if not isinstance(user_props, dict) or not user_props:
+            return
+
+        # Resolve the unique item to get canonical properties
+        canonical_data = resolve_unique(unique_name)
+        canonical_props = canonical_data.get('properties', [])
+
+        # Convert canonical props (list of [stat_id, value]) to a dict for comparison
+        # Canonical props can be grouped (e.g., [stat_id, [val1, val2]])
+        canonical_dict = _build_canonical_props_dict(canonical_props)
+
+        # Convert user properties to canonical stat format
+        user_stat_dict = _build_user_props_dict(user_props)
+
+        # Check if user properties exactly match canonical
+        if _props_match_exactly(user_stat_dict, canonical_dict):
+            item_name = unique_name
+            slot = item_def.get('slot', '?')
+            sys.stderr.write(
+                f"WARNING: {item_name} (slot: {slot}): "
+                f"'properties:' block duplicates canonical stats exactly. "
+                f"Consider removing it or using 'extra_properties:' for overrides.\n"
+            )
+    except Exception:
+        # Silently ignore errors during warning logic; don't fail validation
+        pass
+
+
+def _build_canonical_props_dict(canonical_props):
+    """Convert canonical props list format to dict for comparison.
+
+    Canonical format: [[stat_id, value], [stat_id, [v1, v2]], ...]
+    Returns dict mapping stat_id -> value (or [value_list] for grouped stats)
+    """
+    result = {}
+    for entry in canonical_props:
+        if len(entry) >= 2:
+            stat_id = entry[0]
+            value = entry[1]
+            result[stat_id] = value
+    return result
+
+
+def _build_user_props_dict(user_props):
+    """Convert user properties dict to canonical stat format.
+
+    User properties use aliases (e.g., 'fcr', 'fire_min', 'fire_max')
+    Returns dict mapping stat_id -> value (or [value_list] for grouped stats)
+    """
+    result = {}
+
+    for alias, user_value in user_props.items():
+        try:
+            # Resolve alias to canonical stat name
+            canonical_stat_name = resolve_property_name(alias)
+            stat_id = STAT_BY_NAME.get(canonical_stat_name)
+            if stat_id is None:
+                continue
+
+            # Handle special case: elemental damage grouped stats
+            # fire_min/fire_max, light_min/light_max, etc. combine into grouped format
+            if alias in ('fire_min', 'fire_max', 'light_min', 'light_max',
+                        'cold_min', 'cold_max', 'poison_min', 'poison_max',
+                        'magic_min', 'magic_max'):
+                # These will be accumulated in a second pass
+                continue
+
+            # For most properties, just map directly
+            if stat_id not in result:
+                result[stat_id] = user_value
+        except Exception:
+            # Unknown alias or resolution error — skip silently
+            continue
+
+    # Handle grouped damage stats (fire_min/fire_max, etc.)
+    _accumulate_grouped_damage_stats(user_props, result)
+
+    return result
+
+
+def _accumulate_grouped_damage_stats(user_props, result_dict):
+    """Accumulate grouped damage stat pairs (min/max, duration) into result dict.
+
+    E.g., fire_min=1, fire_max=6 become stat_id 48 -> [1, 6]
+    """
+    # Map of damage types to (stat_id, (min_alias, max_alias, [duration_alias]))
+    damage_groups = {
+        'fire': (48, ('fire_min', 'fire_max'), None),
+        'light': (50, ('light_min', 'light_max'), None),
+        'magic': (52, ('magic_min', 'magic_max'), None),  # stat 52 is magicmindam
+        'cold': (54, ('cold_min', 'cold_max'), ('cold_len',)),
+        'poison': (57, ('poison_min', 'poison_max'), ('poison_len',)),
+    }
+
+    for damage_type, (stat_id, (min_alias, max_alias), duration_info) in damage_groups.items():
+        min_val = user_props.get(min_alias)
+        max_val = user_props.get(max_alias)
+
+        if min_val is not None or max_val is not None:
+            # Build grouped value
+            values = []
+            if min_val is not None:
+                values.append(min_val)
+            if max_val is not None:
+                values.append(max_val)
+
+            if duration_info:
+                dur_alias = duration_info[0]
+                dur_val = user_props.get(dur_alias)
+                if dur_val is not None:
+                    values.append(dur_val)
+
+            if values:
+                result_dict[stat_id] = values if len(values) > 1 else values[0]
+
+
+def _props_match_exactly(user_dict, canonical_dict):
+    """Check if user properties dict exactly matches canonical dict.
+
+    Handles both simple values and grouped (list) values.
+    Returns True only if every canonical key/value exists in user dict with same value.
+    """
+    # User dict must contain all canonical keys with exact same values
+    for stat_id, canonical_value in canonical_dict.items():
+        if stat_id not in user_dict:
+            return False
+
+        user_value = user_dict[stat_id]
+
+        # Compare values (handle both single values and grouped lists)
+        if isinstance(canonical_value, list) and isinstance(user_value, list):
+            # Grouped stat — must match exactly (same length and values)
+            if len(canonical_value) != len(user_value):
+                return False
+            if canonical_value != user_value:
+                return False
+        elif isinstance(canonical_value, list) or isinstance(user_value, list):
+            # One is grouped, one is not — mismatch
+            return False
+        else:
+            # Both are simple values
+            if canonical_value != user_value:
+                return False
+
+    # All canonical properties matched; now check no extra user properties
+    for stat_id in user_dict:
+        if stat_id not in canonical_dict:
+            return False
+
+    return True
 
 
 def _validate_charm_properties(charm_def, errors):
@@ -587,17 +757,29 @@ def build_all_items(char_def):
                 items = build_charm(charm_def, col=col, row=row)
                 all_items.extend(items)
 
-        # 3. Build merc items (placed in stash)
+        # 3. Build merc items: either injected into JM[merc] (experimental,
+        # merc: inject: true) or placed in character stash for manual equip.
         merc = char_def.get('merc', {})
         merc_equipment = []
+        inject_merc = False
         if isinstance(merc, dict):
             merc_equipment = merc.get('equipment', [])
+            inject_merc = bool(merc.get('inject', False))
         if merc_equipment:
-            stash_positions = _calculate_merc_stash_positions(merc_equipment)
-            for i, item_def in enumerate(merc_equipment):
-                col, row = stash_positions[i]
-                items = build_merc_item(item_def, stash_col=col, stash_row=row)
-                all_items.extend(items)
+            if inject_merc:
+                # Build as equipped-on-merc (same encoding as char-equipped,
+                # but tagged section='merc' so the rebuild pipeline routes
+                # them into JM[merc]).
+                for item_def in merc_equipment:
+                    built = build_equipment_item(item_def)
+                    for _section, item_bytes in built:
+                        all_items.append(('merc', item_bytes))
+            else:
+                stash_positions = _calculate_merc_stash_positions(merc_equipment)
+                for i, item_def in enumerate(merc_equipment):
+                    col, row = stash_positions[i]
+                    items = build_merc_item(item_def, stash_col=col, stash_row=row)
+                    all_items.extend(items)
 
         return all_items
     finally:
@@ -629,6 +811,7 @@ def deploy_character(char_name, phase=4, force=False):
         set_waypoints, set_quests, set_difficulty,
         set_waypoints_granular, set_quests_granular,
         rebuild_items, calc_checksum,
+        set_merc_header, MERC_HIRELING_ID,
     )
     from d2r_chargen.scanner import decode_item_header, bits_at
 
@@ -712,6 +895,20 @@ def deploy_character(char_name, phase=4, force=False):
     else:
         print(f"  Preserving existing WP/quest/difficulty progress")
 
+    # Write merc header (type/seed/XP) if merc is specified
+    merc = char_def.get('merc')
+    if merc and isinstance(merc, dict):
+        merc_type = merc.get('type')
+        if merc_type:
+            if merc_type not in MERC_HIRELING_ID:
+                raise ValueError(
+                    f"Unknown merc type '{merc_type}'. Known types: "
+                    f"{sorted(MERC_HIRELING_ID.keys())}"
+                )
+            hireling_id = MERC_HIRELING_ID[merc_type]
+            data = set_merc_header(data, hireling_id)
+            print(f"  Merc header: type={merc_type!r} hireling_id={hireling_id}")
+
     # Write updated base data
     struct.pack_into('<I', data, 8, len(data))
     data[12:16] = b'\x00\x00\x00\x00'
@@ -732,13 +929,23 @@ def deploy_character(char_name, phase=4, force=False):
     # Phase 4: + merc stash items (storage=5)
 
     def get_phase_items(all_items, phase_num):
-        result = []
-        parent_included = False
+        """Returns (char_items, merc_items) — two separate lists for rebuild_items.
+
+        Routes by section tag: 'char' items into char JM, 'merc' items into merc JM.
+        """
+        char_result = []
+        merc_result = []
+        char_parent_included = False
+        merc_parent_included = False
         for section, item_bytes in all_items:
             is_filler = bits_at(item_bytes, 21, 1) if len(item_bytes) > 3 else 0
             if is_filler:
-                if parent_included:
-                    result.append(item_bytes)
+                # Filler rides along with its parent into whichever list the
+                # parent landed in. Track per-section parent state.
+                if section == 'merc' and merc_parent_included:
+                    merc_result.append(item_bytes)
+                elif section != 'merc' and char_parent_included:
+                    char_result.append(item_bytes)
                 continue
             hdr = decode_item_header(item_bytes, 0)
             itype, ilvl, quality, uid, storage, col, row, bodyloc, location, ext = hdr
@@ -750,14 +957,19 @@ def deploy_character(char_name, phase=4, force=False):
             if storage == 1 and phase_num >= 3:
                 include = True  # inventory
             if storage == 5 and phase_num >= 4:
-                include = True  # merc stash
-            parent_included = include
-            if include:
-                result.append(item_bytes)
-        return result
+                include = True  # stash (includes merc-gear stash)
+            if section == 'merc':
+                merc_parent_included = include
+                if include:
+                    merc_result.append(item_bytes)
+            else:
+                char_parent_included = include
+                if include:
+                    char_result.append(item_bytes)
+        return char_result, merc_result
 
     for p in range(1, phase + 1):
-        phase_items = get_phase_items(all_items, p)
+        char_phase_items, merc_phase_items = get_phase_items(all_items, p)
 
         # Backup before each phase (Rule 3)
         bak = f"{char_path}.pre_phase{p}_bak"
@@ -768,8 +980,11 @@ def deploy_character(char_name, phase=4, force=False):
         try:
             shutil.copy2(char_path, temp_path)
 
-            # CRITICAL: All items go as char_items, empty merc list (Rule 6)
-            result = rebuild_items(temp_path, phase_items, [])
+            # Section-routed items: 'char' → JM[char], 'merc' → JM[merc].
+            # Historically merc list was always empty (Rule 6); with the new
+            # merc header now setting a valid Hireling.Id, pre-injection
+            # should work when the YAML opts in via `merc: inject: true`.
+            result = rebuild_items(temp_path, char_phase_items, merc_phase_items)
 
             with open(temp_path, 'wb') as f:
                 f.write(result)
@@ -785,7 +1000,7 @@ def deploy_character(char_name, phase=4, force=False):
         finally:
             if os.path.exists(temp_path):
                 os.unlink(temp_path)
-        print(f"  Phase {p}: deployed {len(phase_items)} items, checksum OK")
+        print(f"  Phase {p}: deployed {len(char_phase_items)} char items + {len(merc_phase_items)} merc items, checksum OK")
 
         # Run d2rdoctor scanner after each phase (Rule 4)
         try:

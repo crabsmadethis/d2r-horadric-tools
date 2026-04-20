@@ -255,11 +255,17 @@ def _resolve_stat_entry(stat_entry, use_max=True):
                 encoded_param = (level << 10) | skill_id
                 return [(stat_id, value, encoded_param)]
 
-            # Format 3: plain skill name (e.g. "Confuse", "Decrepify")
-            # Look up skill ID directly — level comes from min/max fields
+            # Format 3: plain skill name (e.g. "Venom", "Confuse", "Decrepify")
+            # Same encoding as Format 2: min=chance, max=level, param=skill_id.
+            # Previously returned skill_id alone in the param field, which
+            # rendered in-game as "level 0 <Skill> on striking" because the
+            # level bits were missing.
             try:
                 skill_id = _lookup_skill_id(param_raw)
-                return [(stat_id, value, skill_id)]
+                chance = stat_entry['min']
+                level = stat_entry['max']
+                encoded_param = (level << 10) | skill_id
+                return [(stat_id, chance, encoded_param)]
             except ValueError:
                 pass  # Fall through to the error below
 

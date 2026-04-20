@@ -155,15 +155,19 @@ def build_equipment_item(item_def):
         )
 
 
-def _resolve_final_properties(item_def, auto_props):
+def _resolve_final_properties(item_def, auto_props, *, has_canonical=False):
     """Determine final properties list for an item.
 
-    If item_def has 'properties', those REPLACE auto-resolved stats entirely.
-    If item_def has 'extra_properties', those are merged onto auto-resolved stats.
-    Otherwise, auto_props are used as-is.
+    - has_canonical=True  (unique, set, runeword): `properties` merges on
+                          top of auto_props; `extra_properties` same.
+    - has_canonical=False (rare, magic, crafted):  `properties` replaces,
+                          as there's nothing to merge against.
     """
     if 'properties' in item_def:
-        return resolve_properties(item_def['properties'])
+        user_props = resolve_properties(item_def['properties'])
+        if has_canonical:
+            return _merge_properties(auto_props, user_props)
+        return user_props
     elif 'extra_properties' in item_def:
         extra = resolve_properties(item_def['extra_properties'])
         return _merge_properties(auto_props, extra)
@@ -176,7 +180,7 @@ def _build_runeword(item_def, slot):
     base_code = item_def['base']
     resolved = resolve_runeword(name, base_code)
 
-    props = _resolve_final_properties(item_def, resolved['properties'])
+    props = _resolve_final_properties(item_def, resolved['properties'], has_canonical=True)
 
     parent_bytes = build_item(
         type_code=base_code,
@@ -209,7 +213,7 @@ def _build_unique(item_def, slot):
     name = item_def['unique']
     resolved = resolve_unique(name)
 
-    props = _resolve_final_properties(item_def, resolved['properties'])
+    props = _resolve_final_properties(item_def, resolved['properties'], has_canonical=True)
 
     item_bytes = build_item(
         type_code=resolved['type_code'],
@@ -382,7 +386,7 @@ def build_charm(charm_def, col, row):
     """
     if 'unique' in charm_def:
         resolved = resolve_unique(charm_def['unique'])
-        props = _resolve_final_properties(charm_def, resolved['properties'])
+        props = _resolve_final_properties(charm_def, resolved['properties'], has_canonical=True)
         charm_bytes = build_item(
             type_code=resolved['type_code'],
             col=col, row=row, storage=1,  # inventory
@@ -465,7 +469,7 @@ def _build_merc_runeword(item_def, col, row):
     base_code = item_def['base']
     resolved = resolve_runeword(name, base_code)
 
-    props = _resolve_final_properties(item_def, resolved['properties'])
+    props = _resolve_final_properties(item_def, resolved['properties'], has_canonical=True)
 
     parent_bytes = build_item(
         type_code=base_code,
@@ -498,7 +502,7 @@ def _build_merc_unique(item_def, col, row):
     name = item_def['unique']
     resolved = resolve_unique(name)
 
-    props = _resolve_final_properties(item_def, resolved['properties'])
+    props = _resolve_final_properties(item_def, resolved['properties'], has_canonical=True)
 
     item_bytes = build_item(
         type_code=resolved['type_code'],
