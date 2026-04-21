@@ -25,8 +25,8 @@ Do not stack multiple edits and test at the end. Edit one thing → scan → ver
 stored == calc_checksum(result)
 ```
 
-### 6. NEVER inject merc items directly into JM[merc]
-Pre-injected merc gear causes Error:8. Place merc gear in stash (storage=5) and equip in-game. The ONLY safe merc-related edit is setting lf_count.
+### 6. Merc gear requires canonical encoding in JM[merc]
+Direct merc injection works when items use D2R's canonical form: col=bodyloc (not 0), runeword ID biased (low12 = id+27, high4 = 5), and lf_count=0. Use `equipment_mode: direct` in YAML. The stash-and-equip workaround is no longer needed.
 
 ### 7. D2R caches saves at session startup
 The user MUST fully exit and relaunch D2R after file changes. Staying on character select does NOT reload files.
