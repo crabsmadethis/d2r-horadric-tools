@@ -157,22 +157,23 @@ def build_tbl(entries: dict[str, str]) -> bytes:
 
     All strings are encoded as Latin-1. The result round-trips through
     parse_tbl: ``parse_tbl(build_tbl(d)) == d``.
+
+    Matches D2R's vanilla .tbl format:
+      - HashTableSize = NumElements + 1 (vanilla uses ~1:1 ratio)
+      - Index table maps entry ordinal → hash table slot
+      - LoopCount = max probe distance + 1 (search iteration bound)
     """
     num_entries = len(entries)
 
-    # Hash table sizing
-    if num_entries == 0:
-        hash_table_size = 1
-    else:
-        hash_table_size = _next_prime(max(int(num_entries * 1.5), 1))
+    # Hash table sizing: vanilla uses NumElements + 1
+    hash_table_size = max(num_entries + 1, 1)
 
     # Compute layout offsets
     str_data_start = _HEADER_SIZE + num_entries * 2 + hash_table_size * _HASH_ENTRY_SIZE
 
     # Build string data blob and record offsets
     str_blob = bytearray()
-    # Each entry: (key_rel_offset, value_rel_offset, value_encoded_len_with_null)
-    entry_info: list[tuple[str, int, int, int]] = []  # (key, key_abs, val_abs, val_len_with_null)
+    entry_info: list[tuple[str, int, int, int]] = []
 
     for key, value in entries.items():
         key_bytes = key.encode("latin-1")
@@ -180,53 +181,53 @@ def build_tbl(entries: dict[str, str]) -> bytes:
 
         key_rel = len(str_blob)
         str_blob.extend(key_bytes)
-        str_blob.append(0)  # null terminator for key
+        str_blob.append(0)
 
         val_rel = len(str_blob)
         str_blob.extend(value_bytes)
-        str_blob.append(0)  # null terminator for value
+        str_blob.append(0)
 
         key_abs = str_data_start + key_rel
         val_abs = str_data_start + val_rel
-        val_len_with_null = len(value_bytes) + 1  # includes null
+        val_len_with_null = len(value_bytes) + 1
 
         entry_info.append((key, key_abs, val_abs, val_len_with_null))
 
-    # Build hash table (linear probing)
-    hash_table = bytearray(hash_table_size * _HASH_ENTRY_SIZE)  # all zeroes = all empty
+    # Build hash table (linear probing) and index table (idx → slot)
+    hash_table = bytearray(hash_table_size * _HASH_ENTRY_SIZE)
+    index_table = bytearray(num_entries * 2)
+    max_probe = 0
 
     for idx, (key, key_abs, val_abs, val_len) in enumerate(entry_info):
         bucket = _elf_hash(key) % hash_table_size
         slot = bucket
         while True:
             off = slot * _HASH_ENTRY_SIZE
-            if hash_table[off] == 0:  # empty slot
+            if hash_table[off] == 0:
                 break
             slot = (slot + 1) % hash_table_size
+        probe_dist = (slot - bucket) % hash_table_size
+        if probe_dist > max_probe:
+            max_probe = probe_dist
         off = slot * _HASH_ENTRY_SIZE
-        hash_table[off] = 1  # used
-        struct.pack_into("<H", hash_table, off + 1, idx)         # index
-        struct.pack_into("<I", hash_table, off + 3, bucket)      # hash_value (original bucket)
-        struct.pack_into("<I", hash_table, off + 7, key_abs)     # key_offset (ABSOLUTE)
-        struct.pack_into("<I", hash_table, off + 11, val_abs)    # string_offset (ABSOLUTE)
-        struct.pack_into("<H", hash_table, off + 15, val_len)    # string_length (incl null)
+        hash_table[off] = 1
+        struct.pack_into("<H", hash_table, off + 1, idx)
+        struct.pack_into("<I", hash_table, off + 3, bucket)
+        struct.pack_into("<I", hash_table, off + 7, key_abs)
+        struct.pack_into("<I", hash_table, off + 11, val_abs)
+        struct.pack_into("<H", hash_table, off + 15, val_len)
+        # Index table: entry idx → hash table slot
+        struct.pack_into("<H", index_table, idx * 2, slot)
 
-    # Build index table: sequential uint16 values (0, 1, 2, ...)
-    index_table = bytearray(num_entries * 2)
-    for i in range(num_entries):
-        struct.pack_into("<H", index_table, i * 2, i)
-
-    # Compute file size
     file_size = _HEADER_SIZE + len(index_table) + len(hash_table) + len(str_blob)
 
-    # Build header (21 bytes)
     header = bytearray(_HEADER_SIZE)
-    struct.pack_into("<H", header, 0x00, 0)                  # CRC = 0
+    struct.pack_into("<H", header, 0x00, 1)                   # CRC placeholder (non-zero)
     struct.pack_into("<H", header, 0x02, num_entries)         # NumElements
     struct.pack_into("<I", header, 0x04, hash_table_size)     # HashTableSize
-    struct.pack_into("<B", header, 0x08, 1)                   # Version = 1
+    struct.pack_into("<B", header, 0x08, 1)                   # Version
     struct.pack_into("<I", header, 0x09, str_data_start)      # StringDataStart
-    struct.pack_into("<I", header, 0x0D, num_entries)         # LoopCount = NumElements
+    struct.pack_into("<I", header, 0x0D, max_probe + 1)       # LoopCount
     struct.pack_into("<I", header, 0x11, file_size)           # FileSize
 
     return bytes(header + index_table + hash_table + str_blob)

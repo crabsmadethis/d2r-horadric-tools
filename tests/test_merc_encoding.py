@@ -259,17 +259,32 @@ _SIMPLE_MERC_EQUIPMENT = [
 class TestEquipmentMode:
     """Verify merc.equipment_mode routing logic in build_all_items()."""
 
-    def test_default_mode_is_stash(self):
-        """YAML with merc but no equipment_mode/inject → items routed to stash
-        (section='char', storage=5)."""
+    def test_default_mode_is_direct_when_type_set(self):
+        """YAML with merc.type but no equipment_mode/inject → direct mode,
+        items routed to merc (section='merc', injected into JM[merc])."""
+        from d2r_chargen.character import build_all_items
+        char_def = _minimal_char_def(merc={
+            "type": "act2_might",
+            "equipment": _SIMPLE_MERC_EQUIPMENT,
+        })
+        items = build_all_items(char_def)
+        assert items, "Expected at least one item"
+        # All items must be section='merc' (direct default when type is set)
+        sections = [s for s, _ in items]
+        assert all(s == "merc" for s in sections), (
+            f"Expected all section='merc', got: {sections}"
+        )
+
+    def test_default_mode_is_stash_when_no_type(self):
+        """YAML with merc but no type → stash mode (merc section used as
+        stash overflow for manual-equip workflows)."""
         from d2r_chargen.character import build_all_items
         char_def = _minimal_char_def(merc={"equipment": _SIMPLE_MERC_EQUIPMENT})
         items = build_all_items(char_def)
         assert items, "Expected at least one item"
-        # All items must be section='char' (stash default)
         sections = [s for s, _ in items]
         assert all(s == "char" for s in sections), (
-            f"Expected all section='char', got: {sections}"
+            f"Expected all section='char' (stash), got: {sections}"
         )
 
     def test_equipment_mode_stash_explicit(self):

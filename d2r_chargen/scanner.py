@@ -542,9 +542,18 @@ def scan_characters(target, all_files, ghost_chars):
         for i in range(0x300,min(len(data)-4,0x500)):
             if data[i:i+2]==b'JM': jm=i; break
         item_count=struct.unpack_from('<H',data,jm+2)[0] if jm>=0 else -1
-        jf_marker=data.find(b'jf',jm+4) if jm>=0 else -1
-        merc_jm=data.find(b'JM',jf_marker+2) if jf_marker>=0 else -1
-        dead_body_jm=data.find(b'JM',jm+4) if jm>=0 else -1
+
+        # Anchor section markers from the end of the file. Pattern-matching
+        # `jf`/`JM` from after JM[char] can false-positive on item bitstream
+        # bytes (seen 2026-04-21 on a direct-merc Tempest save where `jf`
+        # matched at offset 966 inside an item). The tail layout is:
+        # ... JM[dead] dead_items jf JM[merc] merc_items kf golem \x01\x00 lf[count]
+        # lf/kf/last-JM/last-jf are unambiguous in that order from the end.
+        lf_anchor = data.rfind(b'lf')
+        kf_anchor = data.rfind(b'kf', 0, lf_anchor) if lf_anchor > 0 else -1
+        merc_jm = data.rfind(b'JM', 0, kf_anchor) if kf_anchor > 0 else -1
+        jf_marker = data.rfind(b'jf', 0, merc_jm) if merc_jm > 0 else -1
+        dead_body_jm = data.find(b'JM', jm+4, jf_marker) if (jm >= 0 and jf_marker > 0) else -1
         merc_count=struct.unpack_from('<H',data,merc_jm+2)[0] if merc_jm>=0 else -1
 
         # Section ordering validation
@@ -817,9 +826,6 @@ def scan_characters(target, all_files, ghost_chars):
                 print(f"  Merc items: {merc_count_val} parents + {merc_filler_count} socket fillers = {merc_item_count} total")
             merc_list=[f"{v[0]}({qname(v[1])})" for v in merc_slots.values()]
             print(f"  MERC: {', '.join(merc_list) if merc_list else '(none)'}")
-            if merc_item_count > 0:
-                print(f"  ! REMINDER: Pre-injected merc items can cause Error:8 even with correct lf_count.")
-                print(f"    Rule 6: Place merc gear in stash (storage=5) and equip in-game.")
 
         # Item property size check
         print()
@@ -867,15 +873,16 @@ def scan_characters(target, all_files, ghost_chars):
                     print(f"  \u2139 DUPLICATE UNIQUE: uid={uid} in slots {prev_str} and {bodyloc} (allowed if different slots)")
                 equipped_uids.setdefault(uid,[]).append(bodyloc)
 
-        # lf consistency
+        # lf marker: merc-hired flag (informational)
         kf_pos=data.find(b'kf')
         lf_pos=data.find(b'lf',kf_pos) if kf_pos>=0 else -1
         lf_count=0
         if lf_pos>=0:
             lf_count=struct.unpack_from('<H',data,lf_pos+2)[0]
             merc_count_val2=struct.unpack_from('<H',data,merc_jm+2)[0] if merc_jm>=0 else 0
-            consistent=(merc_count_val2==0 and lf_count==0) or (lf_count>=1)
-            status='\u2713 consistent' if consistent else f'\u2717 INCONSISTENT \u2014 "failed to join game"'
+            # D2R itself writes lf_count=0 even with merc items (2026-04-20
+            # spec). Only flag values outside the observed range {0, 1}.
+            status='\u26a0 unexpected (D2R writes 0 or 1)' if lf_count > 1 else '\u2713'
             print(f"  LF:   lf_count={lf_count}  merc_items={merc_count_val2}  {status}")
 
         # kf/lf structural validation
@@ -1006,8 +1013,10 @@ def scan_characters(target, all_files, ghost_chars):
 
         print()
         print("  MERC SLOTS:")
-        if lf_count==0:
-            print("    \u2717 Merc not hired (lf_count=0) \u2014 hire in-game before injecting merc gear")
+        # D2R writes lf_count=0 even with merc items (see 2026-04-20 spec),
+        # so we check merc item count directly rather than lf_count.
+        if merc_count_val == 0:
+            print("    \u2717 No merc items in JM[merc] \u2014 merc not hired or no gear")
             any_issue=True
         else:
             exp_count=3
@@ -1301,8 +1310,12 @@ def scan_character_data(filepath):
             break
     item_count = struct.unpack_from('<H', data, jm+2)[0] if jm >= 0 else -1
 
-    jf_marker = data.find(b'jf', jm+4) if jm >= 0 else -1
-    merc_jm = data.find(b'JM', jf_marker+2) if jf_marker >= 0 else -1
+    # Anchor from the end — see top-of-file note about jf/JM false positives
+    # inside item bitstreams.
+    lf_anchor = data.rfind(b'lf')
+    kf_anchor = data.rfind(b'kf', 0, lf_anchor) if lf_anchor > 0 else -1
+    merc_jm = data.rfind(b'JM', 0, kf_anchor) if kf_anchor > 0 else -1
+    jf_marker = data.rfind(b'jf', 0, merc_jm) if merc_jm > 0 else -1
     merc_count = struct.unpack_from('<H', data, merc_jm+2)[0] if merc_jm >= 0 else -1
 
     errors = []

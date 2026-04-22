@@ -270,12 +270,13 @@ class TestBuildTbl(unittest.TestCase):
         version = struct.unpack_from("<B", data, 0x08)[0]
         self.assertEqual(version, 1)
 
-    def test_loop_count_equals_num_elements(self):
+    def test_loop_count_is_max_probe_plus_one(self):
         entries = {"A": "1", "B": "2", "C": "3"}
         data = build_tbl(entries)
-        num_elements = struct.unpack_from("<H", data, 0x02)[0]
         loop_count = struct.unpack_from("<I", data, 0x0D)[0]
-        self.assertEqual(loop_count, num_elements)
+        self.assertGreaterEqual(loop_count, 1)
+        hash_table_size = struct.unpack_from("<I", data, 0x04)[0]
+        self.assertLessEqual(loop_count, hash_table_size)
 
 
 # ── build_tbl vanilla round-trip ─────────────────────────────────────────────

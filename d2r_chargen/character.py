@@ -21,11 +21,18 @@ from d2r_chargen.data.item_bases import ITEM_BASES
 from d2r_chargen.data.item_stat_cost import STAT_BY_NAME
 from d2r_chargen.data.skills import SKILLS
 
-# Known unique charm names -> (type_code, fixed_col, fixed_row)
+# Strict fixed positions — collision is a build error.
 _UNIQUE_CHARM_POSITIONS = {
     'annihilus':            ('cm1', 9, 2),
     'hellfire torch':      ('cm2', 9, 0),
     'gheed\'s fortune':    ('cm3', 8, 0),
+}
+
+# Preferred positions — placed at (col,row) when free, otherwise fall
+# through to generic same-size placement. Multiple sunders from this
+# triple can coexist because only the first claims col 8; the rest
+# overflow into cols 0-7.
+_PREFERRED_CHARM_POSITIONS = {
     'crack of the heavens': ('cm3', 8, 0),
     'black cleft':         ('cm3', 8, 0),
     'flame rift':          ('cm3', 8, 0),
@@ -104,6 +111,14 @@ def load_character_yaml(path):
     merc = char_def.get('merc')
     if merc and isinstance(merc, dict) and 'template' in merc:
         _resolve_merc_template(char_def)
+
+    # Default merc level to match character level when not specified
+    merc = char_def.get('merc')
+    if merc and isinstance(merc, dict):
+        if 'level' not in merc and 'xp' not in merc and merc.get('type'):
+            char_level = char_def.get('level', 1)
+            merc['level'] = max(1, min(char_level - 1, 98))
+            merc['_level_auto_defaulted'] = True
 
     # Resolve merc.level to merc.xp via the closed-form curve
     if merc and isinstance(merc, dict) and 'level' in merc:
@@ -348,7 +363,10 @@ def validate_char_def(char_def):
     if isinstance(inventory, dict):
         _warn_level_reqs(inventory.get('charms', []), char_level, 'inventory')
     if isinstance(merc, dict):
-        _warn_level_reqs(merc.get('equipment', []), char_level, 'merc/stash')
+        # Use merc's own level for merc item levelreq checks.
+        merc_level = merc.get('level', char_level)
+        _warn_level_reqs(merc.get('equipment', []), merc_level, 'merc')
+        _validate_merc_equipment(merc)
 
 
 def _warn_level_reqs(items, char_level, section):
@@ -373,8 +391,102 @@ def _warn_level_reqs(items, char_level, section):
             if levelreq > char_level:
                 name = item_def.get('unique', item_def.get('runeword',
                        item_def.get('base', '?')))
+                who = 'merc' if section == 'merc' else 'character'
                 print(f"  WARNING: {section} item '{name}' (base {base_code}, "
-                      f"levelreq={levelreq}) exceeds character level {char_level}")
+                      f"levelreq={levelreq}) exceeds {who} level {char_level}")
+
+
+# Merc class → allowed equipment slots and weapon categories.
+# Keyed by Hireling.txt Id ranges (MERC_HIRELING_ID values).
+#
+# Slots: Act 3 Iron Wolves can wear shield; others cannot.
+# Weapons: each merc class has a narrow weapon type restriction.
+_MERC_CLASS_RULES = {
+    'act1_rogue': {
+        'ids': range(0, 6),
+        'slots': {'weapon', 'helm', 'body'},
+        'weapon_categories': {'Bow', 'Crossbow'},
+    },
+    'act2_desert': {
+        'ids': set(range(6, 15)) | {33, 34, 35},
+        'slots': {'weapon', 'helm', 'body'},
+        'weapon_categories': {'Spear', 'Polearm'},
+    },
+    'act3_ironwolf': {
+        'ids': range(15, 24),
+        'slots': {'weapon', 'shield', 'helm', 'body'},
+        'weapon_categories': {'Sword'},
+    },
+    'act4_smite': {
+        'ids': {41},
+        'slots': {'weapon', 'helm', 'body'},
+        'weapon_categories': {'Sword'},
+    },
+    'act5_barb': {
+        'ids': set(range(24, 30)) | {38},
+        'slots': {'weapon', 'helm', 'body'},
+        'weapon_categories': {'Sword', 'Axe', 'Mace', 'Hammer', 'Club'},
+    },
+}
+
+
+def _merc_class_for_hireling(hireling_id):
+    """Return the _MERC_CLASS_RULES key for a given hireling_id, or None."""
+    for cls, rules in _MERC_CLASS_RULES.items():
+        if hireling_id in rules['ids']:
+            return cls
+    return None
+
+
+def _validate_merc_equipment(merc):
+    """Warn on merc equipment that the merc class cannot use.
+
+    Checks: slot validity per merc class (e.g. shield only on Act 3),
+    weapon category per merc class (bows for Act 1, polearms for Act 2, etc.).
+
+    Non-fatal — prints WARNING lines. Game will refuse invalid gear,
+    but chargen should catch it before deploy to save a relaunch cycle.
+    """
+    from d2r_chargen.save import MERC_HIRELING_ID
+
+    merc_type = merc.get('type')
+    if not merc_type or merc_type not in MERC_HIRELING_ID:
+        return
+    hireling_id = MERC_HIRELING_ID[merc_type]
+    cls = _merc_class_for_hireling(hireling_id)
+    if cls is None:
+        return
+    rules = _MERC_CLASS_RULES[cls]
+
+    for item_def in merc.get('equipment', []):
+        slot = item_def.get('slot')
+        if slot and slot not in rules['slots']:
+            name = item_def.get('unique', item_def.get('runeword',
+                   item_def.get('base', '?')))
+            print(f"  WARNING: merc item '{name}' slot '{slot}' not usable by "
+                  f"{cls} merc (allowed: {sorted(rules['slots'])})")
+            continue
+
+        # Weapon category check — resolve item base code then look up categories.
+        if slot == 'weapon':
+            base_code = item_def.get('base', '')
+            if not base_code and 'unique' in item_def:
+                try:
+                    base_code = resolve_unique(item_def['unique'])['type_code']
+                except ValueError:
+                    continue
+            if not base_code:
+                continue
+            base_info = ITEM_BASES.get(base_code.strip())
+            if not base_info:
+                continue
+            categories = set(base_info.get('categories', []))
+            if not categories & rules['weapon_categories']:
+                name = item_def.get('unique', item_def.get('runeword',
+                       item_def.get('base', '?')))
+                print(f"  WARNING: merc weapon '{name}' ({base_code}, "
+                      f"{sorted(categories)}) not usable by {cls} merc "
+                      f"(allowed: {sorted(rules['weapon_categories'])})")
 
 
 def _validate_item_def(item_def, errors):
@@ -706,6 +818,18 @@ def _calculate_charm_positions(charms):
             _, fc, fr = _UNIQUE_CHARM_POSITIONS[name_lower]
             occupy(fc, fr, w, h)
             positions[idx] = (fc, fr)
+        elif name_lower in _PREFERRED_CHARM_POSITIONS:
+            _, fc, fr = _PREFERRED_CHARM_POSITIONS[name_lower]
+            if is_free(fc, fr, w, h):
+                occupy(fc, fr, w, h)
+                positions[idx] = (fc, fr)
+            else:
+                if tc == 'cm3':
+                    grand_charms.append((idx, charm_def, tc, w, h))
+                elif tc == 'cm2':
+                    large_charms.append((idx, charm_def, tc, w, h))
+                else:
+                    small_charms.append((idx, charm_def, tc, w, h))
         else:
             # Unknown unique charm -- treat as its size category
             if tc == 'cm3':
@@ -895,15 +1019,17 @@ def build_all_items(char_def):
                 all_items.extend(items)
 
         # 3. Build merc items: either injected into JM[merc] (direct mode) or
-        # placed in character stash for manual equip (stash mode, the default).
+        # placed in character stash for manual equip (stash mode).
         #
         # equipment_mode resolution priority:
         #   1. Explicit merc.equipment_mode field ('stash' | 'direct')
         #   2. Legacy merc.inject bool (inject: true → 'direct', false → 'stash')
-        #   3. Default: 'stash'
+        #   3. Default: 'direct' when merc.type is set (merc is hired/being
+        #      hired); 'stash' otherwise (merc section used as stash overflow
+        #      for items without slots, no merc actually hired).
         merc = char_def.get('merc', {})
         merc_equipment = []
-        equipment_mode = 'stash'
+        equipment_mode = 'direct' if (isinstance(merc, dict) and merc.get('type')) else 'stash'
         if isinstance(merc, dict):
             merc_equipment = merc.get('equipment', [])
             explicit_mode = merc.get('equipment_mode')
@@ -1080,11 +1206,17 @@ def deploy_character(char_name, phase=4, force=False):
                     f"{sorted(MERC_HIRELING_ID.keys())}"
                 )
             hireling_id = MERC_HIRELING_ID[merc_type]
-            # merc.xp: raw XP value to write at disk offset 0xAB (u32).
-            # Chargen default is 0 (fresh hire). Setting this preserves
-            # level 98 mercs across rebuilds. Task 2.2 will add merc.level
-            # with auto-resolve via xp_for_level().
             merc_xp = int(merc.get('xp', 0))
+            # Preserve earned XP when the level was auto-defaulted (not
+            # explicit YAML). User hires in-game, plays, rebuilds — we
+            # shouldn't reset their merc's progress.
+            if merc.get('_level_auto_defaulted'):
+                existing_xp = struct.unpack_from('<I', data, 0xab)[0]
+                existing_hireling_id = struct.unpack_from('<H', data, 0xa9)[0]
+                if existing_hireling_id == hireling_id and existing_xp > merc_xp:
+                    print(f"  Preserving existing merc XP {existing_xp} "
+                          f"(> auto-default {merc_xp})")
+                    merc_xp = existing_xp
             data = set_merc_header(data, hireling_id, xp=merc_xp)
             print(f"  Merc header: type={merc_type!r} hireling_id={hireling_id} xp={merc_xp}")
 
