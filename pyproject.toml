@@ -23,6 +23,7 @@ d2r_chargen = ["data/template.d2s"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 markers = [
     "integration: tests requiring real D2R binaries on SD card",
     "slow: tests involving engine disasm, host patching, or CASC I/O",
