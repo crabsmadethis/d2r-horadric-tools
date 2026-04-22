@@ -540,38 +540,33 @@ def inject_files(
     game_dir: str,
     file_map: dict[str, bytes],
 ) -> dict:
-    """Inject files into D2R's CASC archive.
+    """Inject files into D2R's CASC archive via per-file ekey hijacking.
 
-    This is the main orchestrator. For each virtual_path -> raw_content:
-    1. BLTE-encode the content
-    2. Append to a data.NNN archive
-    3. Record .idx entries
-    4. Patch TVFS CFT entries
+    For each virtual_path -> raw_content:
+    1. Look up the vanilla ekey from the TVFS CFT entry
+    2. BLTE-encode our custom content
+    3. Create an archive entry using the VANILLA ekey (so the CASC client
+       header check passes) but containing our custom BLTE payload
+    4. Add an idx entry: vanilla_ekey -> our archive location
 
-    Then:
-    5. Re-encode the modified TVFS and append
-    6. Write new .idx files
-    7. Update the build config with the new vfs-2 EKey
-    8. Update .build.info with the new Build Key
+    The TVFS and build config are NOT modified. D2R follows its normal
+    resolution chain (vfs-1 -> vfs-2 -> file ekeys) and the idx redirect
+    delivers our custom content transparently.
 
     Args:
         game_dir: D2R installation directory.
-        file_map: {virtual_path: raw_file_bytes} — paths like
-                  "data/global/ui/layouts/hudpanelhd.json"
+        file_map: {virtual_path: raw_file_bytes}
 
     Returns:
-        dict with injection results:
-            - injected: list of {path, ekey, archive_idx, offset, enc_size}
-            - idx_files: list of created .idx file paths
-            - new_build_key: the updated Build Key
-            - tvfs_ekey: new TVFS EKey
+        dict with injection results.
     """
     from d2r_mod.casc import (
         _parse_build_config,
         _build_index,
         _read_blte,
+        _parse_tvfs,
     )
-    from d2r_mod.casc_tvfs import locate_cft_entries, patch_cft_entry
+    from d2r_mod.casc_tvfs import locate_cft_entries
 
     data_dir = os.path.join(game_dir, "data", "data")
 
@@ -579,14 +574,19 @@ def inject_files(
     config = _parse_build_config(game_dir)
     index = _build_index(data_dir)
 
-    vfs2_ckey_hex = config["vfs-2"][0]
-    vfs2_ekey_hex = config["vfs-2"][1]
-    vfs2_ekey9 = bytes.fromhex(vfs2_ekey_hex)[:9]
+    # Follow vfs-1 -> "data" -> vanilla vfs-2 ekey to find the TVFS
+    # that D2R actually uses (not the build config, which may be stale)
+    vfs1_ekey9 = bytes.fromhex(config["vfs-1"][1])[:9]
+    vfs1_data = _read_blte(data_dir, *index[vfs1_ekey9])
+    vfs1_entries = _parse_tvfs(vfs1_data)
+    vanilla_vfs2_ekey9 = vfs1_entries.get("data")
+    if vanilla_vfs2_ekey9 is None:
+        raise CASCWriteError("'data' entry not found in vfs-1")
 
-    # Load TVFS manifest
-    tvfs_data = _read_blte(data_dir, *index[vfs2_ekey9])
+    # Load vanilla TVFS manifest (read-only — we don't modify it)
+    tvfs_data = _read_blte(data_dir, *index[vanilla_vfs2_ekey9])
 
-    # --- Step 1: Locate all target CFT entries ---
+    # --- Step 1: Locate CFT entries to read vanilla ekeys ---
     target_paths = list(file_map.keys())
     cft_offsets = locate_cft_entries(tvfs_data, target_paths)
 
@@ -599,63 +599,37 @@ def inject_files(
     # --- Step 2: Find writable archive ---
     archive_path, archive_idx = _find_writable_archive(data_dir)
 
-    # --- Step 3: Encode and append each file ---
-    tvfs_mut = bytearray(tvfs_data)
+    # --- Step 3: For each file, hijack the vanilla ekey ---
     idx_entries = []
     results = []
 
     for vpath, raw_content in file_map.items():
+        # Read vanilla ekey from CFT entry (bytes 0-8)
+        cft_off = cft_offsets[vpath.lower()]
+        vanilla_ekey9 = bytes(tvfs_data[cft_off:cft_off + 9])
+
+        # BLTE-encode our custom content
         blte = blte_encode(raw_content)
-        ekey_9 = hashlib.md5(blte).digest()[:9]
-        entry = make_archive_entry(blte, ekey_9)
 
+        # Create archive entry with VANILLA ekey but OUR blte payload
+        entry = make_archive_entry(blte, vanilla_ekey9)
         offset = append_to_archive(archive_path, entry)
-        enc_size = len(entry)  # 30 + len(blte) — this is the .idx enc_size
+        enc_size = len(entry)
 
-        idx_entries.append((ekey_9, archive_idx, offset, enc_size))
+        # idx maps vanilla ekey -> our archive location
+        idx_entries.append((vanilla_ekey9, archive_idx, offset, enc_size))
         results.append({
             "path": vpath,
-            "ekey": ekey_9.hex(),
+            "ekey": vanilla_ekey9.hex(),
             "archive_idx": archive_idx,
             "offset": offset,
             "enc_size": enc_size,
         })
 
-        # Patch CFT: EKey, EncodedSize, ContentSize, and CKey
-        cft_off = cft_offsets[vpath.lower()]
-        ckey = hashlib.md5(raw_content).digest()
-        patch_cft_entry(
-            tvfs_mut, cft_off, ekey_9, len(blte),
-            content_size=len(raw_content), new_ckey=ckey,
-        )
-
-    # --- Step 4: Re-encode modified TVFS ---
-    new_tvfs_blte = blte_encode(bytes(tvfs_mut))
-    new_tvfs_ekey9 = hashlib.md5(new_tvfs_blte).digest()[:9]
-    new_tvfs_entry = make_archive_entry(new_tvfs_blte, new_tvfs_ekey9)
-
-    tvfs_offset = append_to_archive(archive_path, new_tvfs_entry)
-    tvfs_enc_size = len(new_tvfs_entry)
-
-    idx_entries.append((new_tvfs_ekey9, archive_idx, tvfs_offset, tvfs_enc_size))
-
-    # --- Step 5: Write new .idx files ---
+    # --- Step 4: Write new .idx files ---
     idx_files = write_new_idx_files(data_dir, idx_entries)
-
-    # --- Step 6: Update build config with new vfs-2 and vfs-2-size ---
-    tvfs_bytes = bytes(tvfs_mut)
-    new_tvfs_ckey_hex = hashlib.md5(tvfs_bytes).hexdigest()
-    new_tvfs_ekey_hex = hashlib.md5(new_tvfs_blte).hexdigest()
-
-    new_vfs2 = [new_tvfs_ckey_hex, new_tvfs_ekey_hex]
-    _update_build_config(game_dir, "vfs-2", new_vfs2)
-
-    new_vfs2_size = [str(len(tvfs_bytes)), str(len(new_tvfs_blte))]
-    new_build_key = _update_build_config(game_dir, "vfs-2-size", new_vfs2_size)
 
     return {
         "injected": results,
         "idx_files": idx_files,
-        "new_build_key": new_build_key,
-        "tvfs_ekey": new_tvfs_ekey9.hex(),
     }

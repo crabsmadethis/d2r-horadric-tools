@@ -334,7 +334,9 @@ def deploy_casc(build_dir: str, vanilla_dir: str,
 
     for dirpath, _, filenames in os.walk(build_dir):
         for fname in filenames:
-            if not fname.endswith(".json") or fname == "modinfo.json":
+            if fname == "modinfo.json":
+                continue
+            if not fname.endswith((".json", ".tbl")):
                 continue
 
             build_path = os.path.join(dirpath, fname)
@@ -343,7 +345,7 @@ def deploy_casc(build_dir: str, vanilla_dir: str,
 
             # Only inject files that differ from vanilla
             if not os.path.exists(vanilla_path):
-                continue  # new JSON files not in TVFS can't be injected
+                continue  # files not in TVFS can't be injected
 
             with open(build_path, "rb") as f:
                 build_content = f.read()
@@ -358,12 +360,12 @@ def deploy_casc(build_dir: str, vanilla_dir: str,
             file_map[vpath] = build_content
 
     if not file_map:
-        print("No modified JSON files to inject into CASC.")
+        print("No modified files to inject into CASC.")
         return None
 
     from d2r_mod.casc_write import inject_files
 
-    print(f"Injecting {len(file_map)} modified JSON file(s) into CASC...")
+    print(f"Injecting {len(file_map)} modified file(s) into CASC...")
     for vpath in sorted(file_map):
         print(f"  {vpath} ({len(file_map[vpath])} bytes)")
 
@@ -372,7 +374,8 @@ def deploy_casc(build_dir: str, vanilla_dir: str,
     for item in result["injected"]:
         print(f"  Injected: {item['path']} (ekey={item['ekey'][:18]}...)")
     print(f"Created {len(result['idx_files'])} .idx file(s)")
-    print(f"New Build Key: {result['new_build_key']}")
+    if "new_build_key" in result:
+        print(f"New Build Key: {result['new_build_key']}")
 
     return result
 

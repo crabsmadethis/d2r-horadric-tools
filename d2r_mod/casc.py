@@ -328,9 +328,11 @@ def extract_vanilla(
     extensions: set[str] | None = {".txt", ".tbl", ".json"},
     prefix_filter: set[str] | None = {
         "data/global/excel/", "data/global/string/", "data/global/ui/",
+        "data/local/lng/strings/",
     },
     extra_files: set[str] | None = {
         "data/global/dataversionbuild.txt",
+        "data/local/lng/next_string_id.txt",
     },
     verbose: bool = True,
 ) -> dict[str, str]:
