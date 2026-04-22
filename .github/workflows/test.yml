@@ -28,6 +28,7 @@ jobs:
           pip install -e ".[test]"
 
       - name: Run tests (Tier 1 — no game data required)
+        shell: bash
         run: |
           pytest tests/ -v --timeout=60 \
             -m "not integration and not slow and not e2e and not smoke" \
