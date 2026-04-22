@@ -6,6 +6,7 @@ D2R modding toolkit for Linux, Steam Deck, and Windows. YAML-driven character bu
 
 - **YAML character builder** - declare characters in YAML, build `.d2s` save files
 - **Data mod pipeline** - YAML overlays applied to game tables, built and deployed
+- **JSON string patches** - rename or add item / UI strings via YAML, no string-table surgery
 - **CASC read/write** - pure Python, no external tools needed
 - **Integrated validation** - scanner catches structural problems before loading the game
 - **Reign of the Warlock** expansion support (8 classes including Warlock)
@@ -209,6 +210,27 @@ changes:
 
 Each overlay targets a specific game table (TSV file) and specifies row matches and column changes. See `examples/sample_overlay.yaml` for a complete example.
 
+## JSON String Patches
+
+D2R reads item names, mercenary names, and most UI strings from JSON files in `data/local/lng/strings/` (not from the older `.tbl` files). To add a new string or override a vanilla one, drop a YAML spec into `patches/json_strings/` and rebuild.
+
+```yaml
+# patches/json_strings/my_renames.yaml
+description: "Rename a few potions"
+target: item-names.json
+entries:
+  - key: "vps"                # vanilla string key (super healing potion)
+    value: "Wild Rice Cake"   # what D2R should display instead
+  - key: "MyCustomItem"       # new key — auto-allocated string ID
+    value: "Heart of the Mountain"
+```
+
+If the key already exists in the target JSON, its `enUS` value is overridden. If it doesn't, a new entry is appended with the next free string ID (read from `data/local/lng/next_string_id.txt`). Targets currently used: `item-names.json`, `mercenaries.json`, `ui.json`.
+
+After `d2r-mod build`, the patched JSONs land in `build/data/local/lng/strings/`; `d2r-mod deploy` injects them into CASC. D2R caches strings at startup, so fully exit and relaunch to see changes.
+
+If no `patches/json_strings/` directory exists, the build skips this step.
+
 ## Architecture
 
 ```
@@ -221,12 +243,19 @@ d2r_chargen/          YAML character builder
   data/               Game data (generated via extract, not distributed)
 
 d2r_mod/              Data modding pipeline
-  casc.py             Pure Python CASC reader
-  casc_write.py       CASC archive builder
+  casc.py             Pure Python CASC reader (TBL, TXT, JSON)
+  casc_write.py       CASC archive builder + ekey-hijack injection
   overlay.py          YAML overlay loader and applier
   build.py            Build orchestrator (vanilla + overlays -> build/)
+  build_steps/        Specialized build steps:
+    register_custom_uniques.py  Auto-register custom unique names in TBL
+    build_string_registry.py    Diff built TBLs vs vanilla into a registry
+    patch_json_strings.py       Apply patches/json_strings/*.yaml to JSON
   deploy.py           Deploy/undeploy mod files
   regen.py            Generate chargen data from extracted tables
+
+tools/                Standalone diagnostics
+  audit_string_registry.py  Categorize string_registry entries vs JSON
 ```
 
 ## Platform Support
