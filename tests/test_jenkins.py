@@ -142,7 +142,7 @@ IDX_DIR = os.path.join(DEFAULT_GAME_DIR, "data", "data") if DEFAULT_GAME_DIR els
 
 def _idx_available():
     """Check if D2R .idx files are accessible."""
-    return os.path.isdir(IDX_DIR) and len(glob.glob(os.path.join(IDX_DIR, "*.idx"))) > 0
+    return IDX_DIR is not None and os.path.isdir(IDX_DIR) and len(glob.glob(os.path.join(IDX_DIR, "*.idx"))) > 0
 
 
 @pytest.mark.skipif(not _idx_available(), reason="D2R .idx files not accessible")
