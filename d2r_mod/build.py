@@ -337,7 +337,7 @@ def build_mod(
     if os.path.exists(dvb_vanilla):
         os.makedirs(os.path.dirname(dvb_out), exist_ok=True)
         shutil.copy2(dvb_vanilla, dvb_out)
-    elif game_dir is not None:
+    else:
         # Generate from .build.info
         from d2r_mod.casc import _parse_build_info
         build_info_path = os.path.join(game_dir, ".build.info")

@@ -114,6 +114,26 @@ def calc_checksum(data):
     return cs
 
 
+# Hireling.Id ranges per reference_merc_d2s_offsets — describe a merc Id
+# as <class> <element> <difficulty> for human-readable scanner output.
+_MERC_ID_RANGES = [
+    (0,  5,  'Rogue Scout (Act 1)'),
+    (6,  14, 'Desert Mercenary (Act 2)'),
+    (15, 23, 'Iron Wolf (Act 3)'),
+    (24, 29, 'Barbarian 2H (Act 5)'),
+    (30, 35, 'Desert Merc expansion auras'),
+    (36, 38, 'Barbarian 1H (mod)'),
+    (39, 41, 'Holy Warrior (mod, Act 4)'),
+]
+
+
+def _describe_merc_id(merc_id):
+    for lo, hi, label in _MERC_ID_RANGES:
+        if lo <= merc_id <= hi:
+            return label
+    return 'unknown'
+
+
 # ============================================================
 # Core Validation
 # ============================================================
@@ -657,17 +677,12 @@ def scan_characters(target, all_files, ghost_chars):
         if char_name != expected_name:
             print(f"  \u26a0 NAME MISMATCH: file={expected_name} but internal name={char_name}")
 
-        if len(data) > 0xA9:
-            diff_act = data[0xA9]
-            if diff_act > 14:
-                print(f"  \u26a0 DIFFICULTY BYTE: 0xA9={diff_act} out of range (valid 0-14)")
-            else:
-                prog_byte = data[0x15] if len(data) > 0x15 else 0
-                diff_tier = diff_act // 5
-                prog_tier = {0:0, 5:1, 0x0F:2}.get(prog_byte, -1)
-                if prog_tier >= 0 and diff_tier > prog_tier:
-                    diff_names = ['Normal','NM','Hell']
-                    print(f"  \u26a0 DIFFICULTY/PROGRESSION: active={diff_names[diff_tier]} (0xA9={diff_act}) but progression only unlocks up to {diff_names[prog_tier]} (0x15=0x{prog_byte:02x})")
+        # Merc Hireling.Id readout at 0xA9-0xAA (u16 LE). Was previously
+        # mis-decoded as a difficulty byte with a bogus "valid 0-14" range.
+        if len(data) > 0xAA:
+            merc_id = struct.unpack_from('<H', data, 0xA9)[0]
+            if merc_id != 0:
+                print(f"  Merc:      Hireling.Id={merc_id} ({_describe_merc_id(merc_id)})")
 
         prog = data[0x15] if len(data) > 0x15 else 0
         prog_label = {0:'Normal',5:'NM unlocked',0x0F:'Hell unlocked'}.get(prog, f'prog=0x{prog:02x}')
@@ -1198,12 +1213,16 @@ def check_progression_consistency(data, yaml_progression=None):
     is_hc = bool(data[0x14] & 0x04) if len(data) > 0x14 else False
     lvl_byte = data[0x1B] if len(data) > 0x1B else 1
 
-    # HC act byte check
-    if is_hc and len(data) > 0xA9 and data[0xA9] != 0:
-        warnings.append(
-            f"HC character has act byte 0xA9={data[0xA9]} set — "
-            f"game validates act vs quest state for HC; should be 0"
-        )
+    # Merc Hireling.Id at 0xA9-0xAA (u16 LE) — see reference_merc_d2s_offsets.
+    # The legacy 'HC act byte' heuristic that fired on any nonzero 0xA9 was
+    # superseded 2026-04-19; HC chars can validly hire mercs.
+    if len(data) > 0xAA:
+        merc_id = struct.unpack_from('<H', data, 0xA9)[0]
+        if merc_id > 41:
+            warnings.append(
+                f"merc Hireling.Id 0xA9-0xAA={merc_id} exceeds known ceiling (41) — "
+                f"possible save corruption or unhandled mod data"
+            )
 
     # Check waypoints for lower difficulties
     ws = data.find(b'WS')

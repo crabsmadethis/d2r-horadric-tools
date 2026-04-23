@@ -204,11 +204,11 @@ class TestBuildConsistency(unittest.TestCase):
                              f"Item [{i}] not deterministic")
 
     def test_tempest_item_count(self):
-        """Tempest should produce 49 items (10 equipped + 7 fillers + 21 charms + 3 stash + 8 stash fillers)."""
+        """Tempest should produce 50 items (10 equipped + 7 fillers + 21 charms + 3 stash + 8 stash fillers + 1 Harlequin Crest stash)."""
         char_def = load_character_yaml(_char('Tempest'))
         items = build_all_items(char_def)
-        self.assertEqual(len(items), 49,
-                         f"Expected 49 items, got {len(items)}")
+        self.assertEqual(len(items), 50,
+                         f"Expected 50 items, got {len(items)}")
 
     def test_tempest_belt_uses_stat_16(self):
         """Regression: Arachnid Mesh belt ed must encode as stat 16 via auto-resolve."""
