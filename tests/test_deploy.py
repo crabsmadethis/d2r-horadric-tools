@@ -1,3 +1,4 @@
+import importlib.util
 import json
 import unittest
 import tempfile
@@ -7,6 +8,8 @@ from d2r_mod.deploy import (
     _build_launch_options, _LIBPATCH_SO,
 )
 from d2r_mod.version import write_vanilla_version
+
+HAS_HOST = importlib.util.find_spec("d2r_mod.host") is not None
 
 
 class TestDeploy(unittest.TestCase):
@@ -200,6 +203,7 @@ class TestLaunchOptions(unittest.TestCase):
         self.assertIn("-mod rebalance", opts)
 
 
+@unittest.skipUnless(HAS_HOST, "d2r_mod.host not available (private-repo only)")
 class TestDeployPatchesJson(unittest.TestCase):
 
     def test_deploy_creates_patches_json(self):
