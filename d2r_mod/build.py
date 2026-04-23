@@ -2,6 +2,7 @@
 
 import importlib.util
 import os
+import sys
 import glob
 import shutil
 
@@ -11,6 +12,15 @@ from d2r_mod.tsv import read_tsv_file, write_tsv_file
 from d2r_mod.overlay import load_overlay_file, apply_overlay
 from d2r_mod.scripts import run_script
 from d2r_mod.version import check_stale
+
+# tools/ lives at the project root alongside d2r_mod/ but isn't an
+# installed package, so `from tools.* import ...` below only resolves
+# when cwd is the project root. Put the project root on sys.path so
+# build_mod works regardless of caller cwd (CLI run from elsewhere,
+# MCP server, etc).
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
 
 
 

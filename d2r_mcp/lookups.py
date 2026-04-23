@@ -2,18 +2,45 @@
 
 Builds reverse indices at import time for fast name-based lookups.
 All functions return JSON strings suitable for MCP tool responses.
+
+Game data lives in d2r_chargen/data/*.py and is populated by running
+`python3 -m d2r_mod extract` against a local D2R installation. When that
+data is absent (fresh clone before extract), imports here fall back to
+empty dicts so the MCP server still starts; each lookup returns a typed
+"data not extracted" message instead of crashing.
 """
 import json
 
-from d2r_chargen.data.unique_items import UNIQUE_ITEMS
-from d2r_chargen.data.unique_item_stats import UNIQUE_ITEM_STATS
-from d2r_chargen.data.set_items import SET_ITEMS
-from d2r_chargen.data.item_bases import ITEM_BASES
-from d2r_chargen.data.runewords import RUNEWORDS, RUNE_CODE_TO_NAME
-from d2r_chargen.data.runeword_stats import RUNEWORD_STATS
-from d2r_chargen.data.item_stat_cost import ITEM_STAT_COST, STAT_BY_NAME
-from d2r_chargen.data.skills import SKILLS
-from d2r_chargen.config import PROPERTY_ALIASES
+try:
+    from d2r_chargen.data.unique_items import UNIQUE_ITEMS
+    from d2r_chargen.data.unique_item_stats import UNIQUE_ITEM_STATS
+    from d2r_chargen.data.set_items import SET_ITEMS
+    from d2r_chargen.data.item_bases import ITEM_BASES
+    from d2r_chargen.data.runewords import RUNEWORDS, RUNE_CODE_TO_NAME
+    from d2r_chargen.data.runeword_stats import RUNEWORD_STATS
+    from d2r_chargen.data.item_stat_cost import ITEM_STAT_COST, STAT_BY_NAME
+    from d2r_chargen.data.skills import SKILLS
+    from d2r_chargen.config import PROPERTY_ALIASES
+    _HAS_DATA = True
+except ImportError:
+    _HAS_DATA = False
+    UNIQUE_ITEMS = {}
+    UNIQUE_ITEM_STATS = {}
+    SET_ITEMS = {}
+    ITEM_BASES = {}
+    RUNEWORDS = {}
+    RUNE_CODE_TO_NAME = {}
+    RUNEWORD_STATS = {}
+    ITEM_STAT_COST = {}
+    STAT_BY_NAME = {}
+    SKILLS = {}
+    PROPERTY_ALIASES = {}
+
+_NO_DATA_MSG = (
+    "Game data not extracted. Run `python3 -m d2r_mod extract` against a "
+    "local D2R installation to populate d2r_chargen/data/*.py, then restart "
+    "the MCP server."
+)
 
 # --- Reverse indices (built once at import time) ---
 
@@ -56,6 +83,8 @@ def lookup_unique(query):
 
     Returns JSON with: uid, name, code, qlvl, base_name, stats.
     """
+    if not _HAS_DATA:
+        return _NO_DATA_MSG
     # Try numeric ID
     try:
         uid = int(query)
@@ -99,6 +128,8 @@ def lookup_set_item(query):
 
     Returns JSON with: set_id, name, code, set_name, qlvl.
     """
+    if not _HAS_DATA:
+        return _NO_DATA_MSG
     try:
         sid = int(query)
         if sid in SET_ITEMS:
@@ -138,6 +169,8 @@ def lookup_item_base(query):
 
     Returns JSON with: code, name, width, height, class, max_sockets, etc.
     """
+    if not _HAS_DATA:
+        return _NO_DATA_MSG
     # Try exact code match
     if query in ITEM_BASES:
         item = ITEM_BASES[query]
@@ -185,6 +218,8 @@ def lookup_runeword(query):
 
     Returns JSON with: rw_id, name, runes, rune_names, sockets, bases, stats.
     """
+    if not _HAS_DATA:
+        return _NO_DATA_MSG
     try:
         rwid = int(query)
         if rwid in RUNEWORDS:
@@ -227,6 +262,8 @@ def lookup_stat(query):
     Returns JSON with: stat_id, name, save_bits, save_add, save_param_bits,
     value_shift, aliases.
     """
+    if not _HAS_DATA:
+        return _NO_DATA_MSG
     stat_id = None
 
     # Try numeric ID
@@ -278,6 +315,8 @@ def lookup_skill(query):
 
     Returns JSON with: skill_id, name, char_class (if class-specific).
     """
+    if not _HAS_DATA:
+        return _NO_DATA_MSG
     try:
         sid = int(query)
         if sid in SKILLS:
@@ -315,6 +354,8 @@ def search_all(query, limit=20):
 
     Returns JSON with results tagged by type, capped at limit.
     """
+    if not _HAS_DATA:
+        return _NO_DATA_MSG
     q = query.lower()
     results = []
 

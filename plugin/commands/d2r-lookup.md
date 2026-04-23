@@ -30,7 +30,7 @@ Use the MCP data tools (d2r-data server). These query the extracted game data in
 
 ## Data File Locations
 
-All in `/home/deck/d2r-editor/d2r_chargen/data/`:
+All in `d2r_chargen/data/` (relative to the repo root):
 - `unique_items.py` + `unique_item_stats.py` — unique item definitions and stats
 - `set_items.py` — set item definitions
 - `item_bases.py` — base item types (dimensions, requirements, sockets)

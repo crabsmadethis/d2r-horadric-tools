@@ -101,7 +101,7 @@ When dispatching D2R agents, include:
 
 Example:
 ```
-"Run `python3 -m d2r_chargen validate Tempest` in /home/deck/d2r-editor.
+"Run `python3 -m d2r_chargen validate Tempest` from the repo root.
 Report: pass/fail and any validation errors.
 Do NOT attempt to fix anything — report only.
 If validation passes, also run the d2rdoctor scanner and include its output."
