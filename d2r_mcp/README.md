@@ -69,9 +69,11 @@ Every tool returns a dict:
 
 ## Registering with MCP Clients
 
-### Claude Code (project-scoped)
+Install the MCP SDK alongside d2r-tools first:
 
-This repo has a `.mcp.json` at the project root registering the server under the name `d2r-tools`. Open the project in Claude Code; the workspace trust prompt surfaces the server.
+```bash
+pip install -e ".[mcp]"
+```
 
 ### Claude Code (user-scoped)
 
@@ -79,9 +81,24 @@ This repo has a `.mcp.json` at the project root registering the server under the
 claude mcp add d2r-tools --transport stdio --scope user -- python3 -m d2r_mcp
 ```
 
-Requires the package on your Python path (`pip install -e .` from the repo root).
+### Claude Code (project-scoped)
 
-### Other clients (Codex, Cursor)
+Drop a `.mcp.json` at the project root:
+
+```json
+{
+  "mcpServers": {
+    "d2r-tools": {
+      "command": "python3",
+      "args": ["-m", "d2r_mcp"]
+    }
+  }
+}
+```
+
+Claude Code's workspace trust prompt will surface the server.
+
+### Other clients (Codex, Cursor, …)
 
 Add to the client's MCP config:
 
@@ -116,7 +133,3 @@ python3 -m pytest tests/test_mcp_envelope.py tests/test_mcp_lookups.py \
 ```
 
 The integration test (`test_mcp_server_integration.py`) spawns the real server over stdio and verifies tool registration + invocation end-to-end.
-
-## Design
-
-See `docs/superpowers/specs/2026-04-22-d2r-mcp-design.md` for the full design and `docs/superpowers/plans/2026-04-22-d2r-mcp.md` for the implementation plan.

@@ -7,7 +7,7 @@ name = "d2r-tools"
 version = "1.0.0"
 description = "D2R modding toolkit — YAML character builder and data pipeline"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = "MIT"
 dependencies = ["pyyaml>=6.0"]
 
@@ -33,3 +33,4 @@ asyncio_mode = "auto"
 
 [project.optional-dependencies]
 test = ["pytest", "pytest-timeout"]
+mcp = ["mcp>=1.0"]

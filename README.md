@@ -1,6 +1,6 @@
 # d2r-tools
 
-D2R modding toolkit for Linux, Steam Deck, and Windows. YAML-driven character builder and data modding pipeline for Diablo II: Resurrected (including Reign of the Warlock expansion).
+D2R modding toolkit for Linux and Steam Deck (Proton). YAML-driven character builder, data modding pipeline, and an MCP server that exposes the tools to agentic clients (Claude Code, Codex, Cursor, etc.).
 
 ## Features
 
@@ -268,30 +268,68 @@ tools/                Standalone diagnostics
 
 ## Requirements
 
-- Python 3.9+
+- Python 3.10+
 - PyYAML
 - Diablo II: Resurrected (for data extraction)
+- `mcp` (optional, only for the MCP server — `pip install -e ".[mcp]"`)
 
 ## License
 
 MIT
 
-## Claude Code Integration
+## MCP Server (Claude Code, Codex, Cursor, …)
 
-d2r-tools includes optional [Claude Code](https://claude.ai/code) integration
-for natural-language character building, safe save editing, and mod development.
+d2r-tools ships an [MCP](https://modelcontextprotocol.io) server that exposes
+game-data lookups, save inspection, the chargen pipeline, and the mod pipeline
+as typed tools to any MCP-compatible agent. See `d2r_mcp/README.md` for the
+full tool catalog (23 tools across lookup / save / chargen / mod).
 
-### Setup
+### Install
 
 ```bash
-pip install mcp                   # required for data lookup server
-d2r-mod claude-setup              # registers MCP server + installs hooks
+pip install -e ".[mcp]"           # installs the `mcp` SDK alongside d2r-tools
 ```
 
-Open a new Claude Code session in the repo directory. Claude automatically
-picks up the slash commands and skills.
+### Launch
 
-### Slash Commands
+```bash
+python3 -m d2r_mcp                # stdio transport
+```
+
+### Client configuration
+
+**Claude Code (user-scoped):**
+
+```bash
+claude mcp add d2r-tools --transport stdio --scope user -- python3 -m d2r_mcp
+```
+
+**Codex / Cursor / any other MCP client** — add to the client's MCP config:
+
+```json
+{
+  "mcpServers": {
+    "d2r-tools": {
+      "command": "python3",
+      "args": ["-m", "d2r_mcp"],
+      "env": {}
+    }
+  }
+}
+```
+
+Mutation tools (`d2r_chargen_build`, `d2r_mod_deploy`) enforce the project's
+safety rules structurally: they back up the live save, build to a staging
+file, run the scanner on the staging, and only promote to the live save if
+the scanner passes.
+
+## Claude Code Plugin (optional)
+
+The `plugin/` directory is a Claude Code plugin that adds slash commands and
+skills on top of the MCP server. Point Claude Code at the repo or symlink
+`plugin/` into your Claude Code plugins directory.
+
+### Slash commands
 
 | Command | Description |
 |---------|-------------|
@@ -299,18 +337,8 @@ picks up the slash commands and skills.
 | `/d2r-validate <name>` | Validate character YAML without building |
 | `/d2r-scan <name>` | Run diagnostic scanner |
 | `/d2r-lookup <query>` | Look up items, stats, skills from game data |
-| `/d2r-deploy` | Build and deploy mod to game |
-| `/d2r-undeploy` | Remove mod from game |
 
-### Skills (activate automatically)
+### Skills
 
 - **d2r-safe-edit** — enforces backup→edit→scan→verify on every save file change
-- **d2r-character-design** — guides new character creation with verified game data
-- **d2r-mod-overlay** — guides game balance changes via overlay YAMLs
-- **d2r-troubleshoot** — systematic diagnosis for crashes and load errors
-
-### Uninstall
-
-```bash
-d2r-mod claude-teardown           # removes hooks + MCP registration
-```
+- **d2r-parallel-agents** — guides parallel-agent dispatch for multi-character work
