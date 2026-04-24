@@ -16,7 +16,7 @@ mcp = FastMCP("d2r-tools")
 
 
 @mcp.tool()
-async def d2r_lookup_unique(query: str) -> str:
+async def d2r_lookup_unique(query: str | int) -> str:
     """Look up a D2R unique item by name or numeric UID.
 
     Searches unique_items.py data. Returns item info + stats.
@@ -29,7 +29,7 @@ async def d2r_lookup_unique(query: str) -> str:
 
 
 @mcp.tool()
-async def d2r_lookup_set_item(query: str) -> str:
+async def d2r_lookup_set_item(query: str | int) -> str:
     """Look up a D2R set item by name or numeric ID.
 
     Searches set_items.py data. Returns item info + set membership.
@@ -55,7 +55,7 @@ async def d2r_lookup_item_base(query: str) -> str:
 
 
 @mcp.tool()
-async def d2r_lookup_runeword(query: str) -> str:
+async def d2r_lookup_runeword(query: str | int) -> str:
     """Look up a D2R runeword by name or numeric ID.
 
     Searches runewords.py data. Returns runes, valid bases, stats.
@@ -68,7 +68,7 @@ async def d2r_lookup_runeword(query: str) -> str:
 
 
 @mcp.tool()
-async def d2r_lookup_stat(query: str) -> str:
+async def d2r_lookup_stat(query: str | int) -> str:
     """Look up a D2R stat by ID, canonical name, or YAML alias.
 
     Searches item_stat_cost.py data. Returns encoding info (save bits,
@@ -81,7 +81,7 @@ async def d2r_lookup_stat(query: str) -> str:
 
 
 @mcp.tool()
-async def d2r_lookup_skill(query: str) -> str:
+async def d2r_lookup_skill(query: str | int) -> str:
     """Look up a D2R skill by name or numeric ID.
 
     Searches skills.py data. Returns skill ID and class.
