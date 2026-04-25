@@ -1,5 +1,10 @@
 # d2r-tools
 
+[![Tests](https://github.com/crabsmadethis/d2r-horadric-tools/actions/workflows/test.yml/badge.svg)](https://github.com/crabsmadethis/d2r-horadric-tools/actions/workflows/test.yml)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Platform: Linux](https://img.shields.io/badge/platform-Linux%20%7C%20Steam%20Deck-orange.svg)](#platform-support)
+
 D2R modding toolkit for Linux and Steam Deck (Proton). YAML-driven character builder, data modding pipeline, and an MCP server that exposes the tools to agentic clients (Claude Code, Codex, Cursor, etc.).
 
 ## Features

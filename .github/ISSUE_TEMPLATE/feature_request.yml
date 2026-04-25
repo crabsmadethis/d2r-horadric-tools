@@ -1,0 +1,44 @@
+name: Feature request
+description: Suggest a new feature, tool, CLI flag, or MCP capability.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What can't you do today, or what's painful about doing it?
+      placeholder: "I want to build a character with custom socketed runes per equipment slot, but the YAML schema only takes a runeword name."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Sketch the API or YAML you'd like to write. Concrete examples beat abstract descriptions.
+      render: yaml
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other approaches you've thought about and why you didn't pick them.
+
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Which surface?
+      multiple: true
+      options:
+        - YAML schema (chargen)
+        - CLI (d2r-chargen / d2r-mod)
+        - MCP server
+        - Mod overlays
+        - Scanner / validation
+        - Docs
+        - Other
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else?
