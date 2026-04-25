@@ -18,6 +18,14 @@ from d2r_chargen.data.item_stat_cost import ITEM_STAT_COST
 from d2r_chargen.scanner import bits_at
 
 
+def _sign_extend(raw, bits):
+    """Sign-extend a two's-complement value stored in `bits` unsigned bits."""
+    sign_bit = 1 << (bits - 1)
+    if raw & sign_bit:
+        return raw - (1 << bits)
+    return raw
+
+
 def decode_item_properties(data, bit_offset, num_terminators=1):
     """Decode property bitstream starting at bit_offset.
 
@@ -58,6 +66,7 @@ def decode_item_properties(data, bit_offset, num_terminators=1):
         sB = info.get('sB', 0)
         sP = info.get('sP', 0)
         sA = info.get('sA', 0)
+        sS = info.get('sS', 0)
         e = info.get('e', 0)
         np_count = info.get('np', 1) or 1
 
@@ -71,13 +80,15 @@ def decode_item_properties(data, bit_offset, num_terminators=1):
             # First member uses this stat's sB/sA
             raw = bits_at(data, br, sB)
             br += sB
-            values.append(raw - sA)
+            decoded = _sign_extend(raw, sB) - sA if sS else raw - sA
+            values.append(decoded)
 
             # Remaining members: peek to detect individual vs compact encoding
             for k in range(1, np_count):
                 sibling = ITEM_STAT_COST.get(stat_id + k)
                 sibling_sB = sibling.get('sB', sB) if sibling else sB
                 sibling_sA = sibling.get('sA', 0) if sibling else 0
+                sibling_sS = sibling.get('sS', 0) if sibling else 0
 
                 # Peek: does next 9-bit value equal stat_id + k?
                 if br + 9 <= total_bits:
@@ -88,7 +99,8 @@ def decode_item_properties(data, bit_offset, num_terminators=1):
 
                 raw = bits_at(data, br, sibling_sB)
                 br += sibling_sB
-                values.append(raw - sibling_sA)
+                decoded = _sign_extend(raw, sibling_sB) - sibling_sA if sibling_sS else raw - sibling_sA
+                values.append(decoded)
 
             properties.append((stat_id, values))
             continue
@@ -119,17 +131,17 @@ def decode_item_properties(data, bit_offset, num_terminators=1):
             skill_level = param_val & 0x3F
             skill_id = (param_val >> 6) & 0x3FF
             internal_param = skill_id | (skill_level << 10)
-            decoded_val = raw_val - sA
+            decoded_val = (_sign_extend(raw_val, sB) if sS else raw_val) - sA
             properties.append((stat_id, decoded_val, internal_param))
 
         elif sP > 0:
             # e=0 or e=1 with param (skills, auras, etc.)
-            decoded_val = raw_val - sA
+            decoded_val = (_sign_extend(raw_val, sB) if sS else raw_val) - sA
             properties.append((stat_id, decoded_val, param_val))
 
         else:
             # e=0 simple scalar
-            decoded_val = raw_val - sA
+            decoded_val = (_sign_extend(raw_val, sB) if sS else raw_val) - sA
             properties.append((stat_id, decoded_val))
 
     return properties, br
