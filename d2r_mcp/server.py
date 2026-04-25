@@ -250,7 +250,16 @@ async def d2r_mod_deploy(force: bool = False, no_casc: bool = False,
 @mcp.tool()
 async def d2r_mod_undeploy(keep_mod: bool = False,
                            game_dir: str | None = None) -> dict:
-    """Remove mod from the game."""
+    """Revert the deployed D2R mod, restoring the vanilla game state.
+
+    Removes the mod directory from the D2R install (or keeps it on disk with
+    keep_mod=True) and unregisters the launch options. Use this to roll back
+    a deploy without rebuilding, or before switching to a different mod.
+
+    Args:
+        keep_mod: If True, leave the built mod directory in place on disk.
+        game_dir: Override the auto-detected D2R install path.
+    """
     return _mod_undeploy(keep_mod=keep_mod, game_dir=game_dir)
 
 
@@ -268,7 +277,12 @@ async def d2r_mod_extract(game_dir: str | None = None) -> dict:
 
 @mcp.tool()
 async def d2r_mod_clean() -> dict:
-    """Remove build/ and reset chargen data."""
+    """Wipe the local mod build artifacts to start from a clean slate.
+
+    Deletes the build/ directory and resets generated chargen data files.
+    Does NOT touch the deployed D2R install; run d2r_mod_undeploy first
+    if you also want to revert the running game.
+    """
     return _mod_clean()
 
 

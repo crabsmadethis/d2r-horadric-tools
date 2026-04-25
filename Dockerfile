@@ -16,6 +16,6 @@ COPY d2r_chargen ./d2r_chargen
 COPY d2r_mod ./d2r_mod
 COPY d2r_mcp ./d2r_mcp
 
-RUN pip install --no-cache-dir -e ".[mcp]"
+RUN pip install --no-cache-dir -e .
 
 CMD ["python3", "-m", "d2r_mcp"]

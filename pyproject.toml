@@ -9,7 +9,7 @@ description = "D2R modding toolkit — YAML character builder and data pipeline"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
-dependencies = ["pyyaml>=6.0"]
+dependencies = ["pyyaml>=6.0", "mcp>=1.0"]
 
 [project.scripts]
 d2r-chargen = "d2r_chargen.cli:main"
@@ -35,4 +35,3 @@ asyncio_mode = "auto"
 
 [project.optional-dependencies]
 test = ["pytest", "pytest-timeout"]
-mcp = ["mcp>=1.0"]

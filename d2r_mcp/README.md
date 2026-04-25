@@ -69,10 +69,10 @@ Every tool returns a dict:
 
 ## Registering with MCP Clients
 
-Install the MCP SDK alongside d2r-tools first:
+Install d2r-tools first (the `mcp` SDK is pulled in automatically):
 
 ```bash
-pip install -e ".[mcp]"
+pip install -e .
 ```
 
 ### Claude Code (user-scoped)

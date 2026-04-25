@@ -271,7 +271,7 @@ tools/                Standalone diagnostics
 - Python 3.10+
 - PyYAML
 - Diablo II: Resurrected (for data extraction)
-- `mcp` (optional, only for the MCP server — `pip install -e ".[mcp]"`)
+- `mcp` SDK (installed automatically with the package)
 
 ## License
 
@@ -287,7 +287,7 @@ full tool catalog (23 tools across lookup / save / chargen / mod).
 ### Install
 
 ```bash
-pip install -e ".[mcp]"           # installs the `mcp` SDK alongside d2r-tools
+pip install -e .                  # `mcp` SDK is included as a base dependency
 ```
 
 ### Launch
