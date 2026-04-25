@@ -5,7 +5,7 @@ Thanks for considering a contribution. This project is small and Linux-first; th
 ## Project shape
 
 - **Linux / Steam Deck (Proton) only.** Windows path detection exists but is untested — bug reports welcome, PRs more so.
-- **Python 3.10+** (CI runs 3.11 and 3.12).
+- **Python 3.11+** (CI runs 3.11 and 3.12).
 - **AI-agent-first.** Most users drive the toolkit through Claude Code, Codex, Cursor, etc. via the bundled MCP server. Please keep that workflow in mind when changing CLI flags, error envelopes, or tool descriptions.
 - **Game data is never committed.** `d2r_chargen/data/*.py` (other than `template.d2s`) is generated locally from a D2R install and `.gitignore`d. Don't commit extracted data.
 
@@ -34,8 +34,16 @@ The CI-equivalent set (no game data required):
 
 ```bash
 pytest tests/ -v --timeout=60 \
-  -m "not integration and not slow and not e2e and not smoke"
+  -m "not integration and not slow and not e2e and not smoke" \
+  --ignore=tests/fixtures/ \
+  --ignore=tests/test_chargen.py \
+  --ignore=tests/test_decoder.py \
+  --ignore=tests/test_fixtures.py \
+  --ignore=tests/test_importer.py \
+  --ignore=tests/test_d2s_diff.py
 ```
+
+The `--ignore` flags drop tests that need extracted game data or `.d2s` fixtures (neither is checked in). Run them locally after `d2r-mod extract` with the matching marker.
 
 Test markers (defined in `pyproject.toml`):
 
