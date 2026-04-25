@@ -27,6 +27,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[test]"
 
+      # Tier 1: no extracted D2R game data, no .d2s fixtures.
+      # The --ignore'd modules require either generated data modules
+      # (d2r_chargen/data/*.py from `d2r-mod extract`) or .d2s fixtures that
+      # aren't checked in. Run them locally with the matching marker
+      # (smoke / slow / integration / e2e) — see CONTRIBUTING.md.
       - name: Run tests (Tier 1 — no game data required)
         shell: bash
         run: |

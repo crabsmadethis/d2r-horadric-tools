@@ -1,0 +1,91 @@
+name: Bug report
+description: Something is broken or behaves unexpectedly.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug. The more concrete the repro, the faster the fix.
+        If a save file is involved, attach the scanner output (`d2r-chargen scan <name>`).
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: One or two sentences — what went wrong?
+      placeholder: "d2r-chargen build crashes with KeyError when class is warlock"
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: Exact commands or MCP tool calls. Include the YAML if you have a minimal one that triggers it.
+      placeholder: |
+        1. `d2r-chargen validate MyChar` — passes
+        2. `d2r-chargen build MyChar` — crashes
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected vs actual
+      placeholder: |
+        Expected: build succeeds, scanner passes
+        Actual: traceback ends with KeyError: 'warlock_skills'
+    validations:
+      required: true
+
+  - type: textarea
+    id: scanner
+    attributes:
+      label: Scanner output
+      description: If a `.d2s` is involved, paste the result of `d2r-chargen scan <name>`.
+      render: shell
+
+  - type: input
+    id: python-version
+    attributes:
+      label: Python version
+      placeholder: "3.12.3"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - Linux (desktop)
+        - Steam Deck (Proton)
+        - Windows
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: d2r-version
+    attributes:
+      label: D2R version (if known)
+      placeholder: "1.6.81878"
+
+  - type: dropdown
+    id: client
+    attributes:
+      label: How were you driving the toolkit?
+      options:
+        - CLI directly
+        - Claude Code (MCP)
+        - Codex (MCP)
+        - Cursor (MCP)
+        - Other MCP client
+        - Library / Python import
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else?
+      description: Logs, screenshots, links to related issues, AI agent transcript if useful.
