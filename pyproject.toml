@@ -35,3 +35,17 @@ asyncio_mode = "auto"
 
 [project.optional-dependencies]
 test = ["pytest", "pytest-timeout"]
+dev = ["pytest", "pytest-timeout", "ruff>=0.5"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+exclude = ["d2r_chargen/data", "build", "vanilla", ".venv"]
+
+[tool.ruff.lint]
+# Conservative starter set: real bug catchers, not style.
+# - E9:  syntax errors
+# - F63: invalid `is` / `not in` / membership tests
+# - F7:  syntax errors detected by pyflakes
+# - F82: undefined names, unused imports in __init__ files
+select = ["E9", "F63", "F7", "F82"]
