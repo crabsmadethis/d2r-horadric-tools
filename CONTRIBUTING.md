@@ -43,7 +43,7 @@ Test markers (defined in `pyproject.toml`):
 |--------|---------------|
 | (unmarked) | Nothing — pure Python, runs in CI |
 | `smoke` | Lightweight checks that may touch generated data |
-| `slow` | CASC I/O, host patching, engine disasm |
+| `slow` | CASC I/O |
 | `integration` | Real D2R binaries on disk |
 | `e2e` | D2R running |
 
