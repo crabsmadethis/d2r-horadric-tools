@@ -25,7 +25,10 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[test]"
+          pip install -e ".[dev]"
+
+      - name: Lint (ruff)
+        run: ruff check .
 
       # Tier 1: no extracted D2R game data, no .d2s fixtures.
       # The --ignore'd modules require either generated data modules

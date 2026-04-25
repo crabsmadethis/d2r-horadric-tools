@@ -15,7 +15,7 @@ Thanks for considering a contribution. This project is small and Linux-first; th
 git clone https://github.com/crabsmadethis/d2r-horadric-tools.git
 cd d2r-horadric-tools
 python3 -m venv .venv && source .venv/bin/activate
-pip install -e ".[test]"
+pip install -e ".[dev]"   # includes pytest + ruff
 ```
 
 If you have D2R installed, generate the local data modules:
@@ -60,6 +60,14 @@ Run a single tier locally with `-m smoke`, `-m slow`, etc.
 ## Code style
 
 No formatter is enforced. Match the surrounding code: 4-space indents, type hints where the existing code has them, no comments on obvious code (see `CLAUDE.md` rule on comments). Keep functions small.
+
+**Linting** — `ruff` runs in CI with a conservative bug-catcher rule set (`E9`, `F63`, `F7`, `F82`). Run locally before pushing:
+
+```bash
+ruff check .
+```
+
+The rule selection is in `pyproject.toml` under `[tool.ruff.lint]`. It's deliberately narrow to avoid noisy style enforcement on existing code; tightening it is welcome but should be its own PR.
 
 If you add a dependency, add it to `pyproject.toml` and explain why in the PR description.
 
@@ -112,6 +120,18 @@ Open an issue using the bug-report template. The most useful reports include:
 - Scanner output if a save was involved (`d2r-chargen scan <name>`).
 - Python version, distro, whether you're on Steam Deck.
 - The character YAML that triggers it, if applicable.
+
+## Releases (maintainers)
+
+Release flow:
+
+1. Bump `version` in `pyproject.toml` (semver — `MAJOR.MINOR.PATCH`).
+2. Commit: `chore(release): vX.Y.Z`.
+3. Tag: `git tag vX.Y.Z && git push --tags`.
+4. On GitHub: **Releases** → **Draft a new release** → pick the tag → **Generate release notes** (categorizes via `.github/release.yml`) → **Publish release**.
+5. Publishing the release triggers `.github/workflows/publish.yml`, which builds and uploads to PyPI via trusted publishing.
+
+The publish workflow refuses to run if the tag and `pyproject.toml` version disagree.
 
 ## License
 
