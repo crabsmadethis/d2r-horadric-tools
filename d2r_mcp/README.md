@@ -116,7 +116,3 @@ python3 -m pytest tests/test_mcp_envelope.py tests/test_mcp_lookups.py \
 ```
 
 The integration test (`test_mcp_server_integration.py`) spawns the real server over stdio and verifies tool registration + invocation end-to-end.
-
-## Design
-
-See `docs/superpowers/specs/2026-04-22-d2r-mcp-design.md` for the full design and `docs/superpowers/plans/2026-04-22-d2r-mcp.md` for the implementation plan.
