@@ -24,8 +24,8 @@ pytest.importorskip(
 
 FIXTURE = os.path.join(os.path.dirname(__file__), "fixtures", "hexshade_lv98_haseen.d2s")
 
-# The golden-reference fixture is a real .d2s file (gitignored in the public
-# d2r-tools repo, present locally in d2r-editor). Tests that depend on it are
+# The golden-reference fixture is a real .d2s file (gitignored — kept locally
+# by test maintainers; not shipped in the repo). Tests that depend on it are
 # skipped cleanly if the file is absent. XP-curve and equipment-mode tests
 # don't need the fixture — they run either way.
 _FIXTURE_AVAILABLE = os.path.exists(FIXTURE)

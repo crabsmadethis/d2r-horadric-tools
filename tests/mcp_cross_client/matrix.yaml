@@ -4,11 +4,11 @@
 # regardless of which MCP client (Claude Code vs Codex) consumes it. Each
 # row is called by both clients; results are diffed by diff.py.
 #
-# This public-repo matrix is the lookup-only subset — it runs without
-# any extracted game-data fixtures (Steam saves, vanilla/, build/) beyond
-# what `python3 -m d2r_mod extract` produces. The upstream d2r-editor
-# repo maintains an expanded 17-row variant that also exercises save_*,
-# mod_diff, mod_audit, mod_build.
+# This matrix is the lookup-only subset — it runs without any extracted
+# game-data fixtures (Steam saves, vanilla/, build/) beyond what
+# `python3 -m d2r_mod extract` produces. Tools that mutate state or
+# require the full game install (save_*, mod_diff, mod_audit, mod_build)
+# are exercised by an expanded matrix maintained out-of-tree.
 #
 # Parity semantics:
 #   must_contain — every substring listed MUST appear somewhere in the

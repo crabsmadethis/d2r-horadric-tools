@@ -3,7 +3,12 @@
 d2r_build_lib.py — Single authoritative item encoder for D2R save file editing.
 
 Consolidated item encoder for D2R save file editing.
-Key features:
+Replaces three competing build_item() implementations:
+  - internal item-injector spec line 171 (no runeword support, 12 BASES entries)
+  - build_characters.py line 208 (broken single terminator, ~200 BASES entries)
+  - fix_obsidian_rw.py line 132 (correct double terminator, ~25 BASES entries)
+
+Key fixes over predecessors:
   1. Dynamic BASES lookup from item_bases.py (659 entries) — no hardcoded dict
   2. Runeword double-terminator (from fix_obsidian_rw.py)
   3. Overflow protection on all property encoding
@@ -144,7 +149,7 @@ class BitWriter:
 
     def write_huff(self, code):
         """Write 4-char Huffman type code (3 chars + space terminator).
-        Uses HUFFMAN table from d2r-editor/item_injector.py lines 43-51."""
+        Uses HUFFMAN table from internal item-injector spec lines 43-51."""
         for ch in code:
             val, bits = HUFFMAN[ch]
             self.write_bits(val, bits)
@@ -491,7 +496,7 @@ def validate_runeword(type_code, runeword_id):
 # ---------------------------------------------------------------------------
 # F. build_item() — The Single Correct Implementation
 # Reference: fix_obsidian_rw.py lines 132-248 (the working version)
-# Reference: d2r-editor/item_injector.py lines 171-287 (ext bits, format docs)
+# Reference: internal item-injector spec lines 171-287 (ext bits, format docs)
 # Reference: d2rdoctor.md lines 105-225 (scanner field order = ground truth)
 # ---------------------------------------------------------------------------
 def build_item(type_code, col, row, storage,
@@ -678,7 +683,7 @@ def build_item(type_code, col, row, storage,
 
     # ==========================================================
     # FLAGS (32 bits)
-    # Reference: d2r-editor/item_injector.py lines 7-8
+    # Reference: internal item-injector spec lines 7-8
     # Reference: fix_obsidian_rw.py lines 154-164
     # ==========================================================
     flags = 0
@@ -694,7 +699,7 @@ def build_item(type_code, col, row, storage,
 
     # ==========================================================
     # D2R EXTENSION BITS (3 bits, value=5 → binary 101)
-    # Reference: d2r-editor/item_injector.py line 214 — w.write_bits(5, 3)
+    # Reference: internal item-injector spec line 214 — w.write_bits(5, 3)
     # Reference: d2rdoctor.md line 1333 — assert ((item[4]&7)==5)
     # Reference: d2rdoctor.md line 1555 — "Always verify ext bits"
     # Value 5 = bits (1,0,1) in LSB order = the D2R version marker
@@ -703,7 +708,7 @@ def build_item(type_code, col, row, storage,
 
     # ==========================================================
     # LOCATION FIELDS
-    # Reference: d2r-editor/item_injector.py lines 9-14
+    # Reference: internal item-injector spec lines 9-14
     # Reference: d2rdoctor.md lines 65-68
     # ==========================================================
     w.write_bits(location, 3)   # 3 bits: 0=stored, 1=equipped
@@ -721,7 +726,7 @@ def build_item(type_code, col, row, storage,
 
     # ==========================================================
     # NON-SIMPLE ITEM DATA
-    # Reference: d2r-editor/item_injector.py lines 17-33
+    # Reference: internal item-injector spec lines 17-33
     # Reference: d2rdoctor.md lines 132-135
     # ==========================================================
     nr_socketed = len(rune_codes) if rune_codes else 0
@@ -742,7 +747,7 @@ def build_item(type_code, col, row, storage,
     # ==========================================================
     # QUALITY-SPECIFIC DATA
     # Reference: d2rdoctor.md lines 144-156
-    # Reference: d2r-editor/item_injector.py lines 236-251
+    # Reference: internal item-injector spec lines 236-251
     # ==========================================================
     if quality == 1:
         # Inferior: 3 bits type
@@ -802,7 +807,7 @@ def build_item(type_code, col, row, storage,
     # ==========================================================
     # BOOK FIELD (5 bits if base & 8)
     # Reference: d2rdoctor.md lines 195-196 — "C4: book field BEFORE extended body"
-    # Reference: d2r-editor/item_injector.py line 26 — "[5 bits if base&8]"
+    # Reference: internal item-injector spec line 26 — "[5 bits if base&8]"
     # Items: tbk (Tome of Town Portal), ibk (Tome of Identify)
     # ==========================================================
     if base & 8:
@@ -835,7 +840,7 @@ def build_item(type_code, col, row, storage,
     # ==========================================================
     # QUANTITY (v105: 1-bit presence flag + conditional 9-bit value)
     # Reference: d2rdoctor.md lines 217-219
-    # Reference: d2r-editor/item_injector.py lines 268-273
+    # Reference: internal item-injector spec lines 268-273
     # ==========================================================
     if base & 1:
         # Stackable item: set presence flag and write quantity
@@ -855,7 +860,7 @@ def build_item(type_code, col, row, storage,
     # ==========================================================
     # SET FLAGS (5 bits if quality=5, BEFORE property lists)
     # Reference: d2rdoctor.md lines 224-225 — "C3: set item setflags"
-    # Reference: d2r-editor/item_injector.py line 32 — "[5 bits setflags if quality=5]"
+    # Reference: internal item-injector spec line 32 — "[5 bits setflags if quality=5]"
     # These flags indicate which set bonus property lists are present
     # ==========================================================
     if quality == 5:
@@ -961,7 +966,7 @@ def find_item_list(data, search_from=0x300):
 def calc_checksum(data):
     """Calculate D2S file checksum (rotate-left accumulate).
 
-    Reference: d2r-editor/item_injector.py lines 70-76
+    Reference: internal item-injector spec lines 70-76
     Reference: d2rdoctor.md lines 98-103
 
     The checksum field at bytes 12-15 is treated as zero during calculation.

@@ -14,8 +14,8 @@ actual tool name your MCP client surface shows.)
 ## What to do
 
 1. Read the test matrix at
-   `tests/mcp_cross_client/matrix.yaml` (relative to cwd
-   `/home/deck/d2r-editor`).
+   `tests/mcp_cross_client/matrix.yaml` (relative to the d2r-tools
+   project root).
 
 2. For each row, call the named d2r-tools MCP tool with exactly the
    `args` given. Do not modify the args. Do not call any other tools
