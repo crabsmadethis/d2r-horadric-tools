@@ -33,8 +33,8 @@ markers = [
 timeout = 300
 
 [project.optional-dependencies]
-test = ["pytest", "pytest-timeout"]
-dev = ["pytest", "pytest-timeout", "ruff>=0.5"]
+test = ["pytest", "pytest-timeout", "hypothesis>=6.100"]
+dev = ["pytest", "pytest-timeout", "hypothesis>=6.100", "ruff>=0.5"]
 
 [tool.ruff]
 line-length = 100
