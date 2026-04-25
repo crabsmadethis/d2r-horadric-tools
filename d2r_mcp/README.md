@@ -52,7 +52,7 @@ Wrappers for the `d2r-mod` CLI.
 - `d2r_mod_diff(file=None, summary=False)` — vanilla vs build table diff
 - `d2r_mod_extract(...)` — extract vanilla from CASC archive
 - `d2r_mod_clean()` — remove `build/` and reset chargen data
-- `d2r_mod_update(...)` — full recovery pipeline (extract → build → deploy)
+- `d2r_mod_recover(...)` — full recovery pipeline (extract → build → deploy)
 - `d2r_mod_audit(skills=False, items=False, all=False, ...)` — generate audit reports
 
 ## Return Envelope
@@ -69,11 +69,9 @@ Every tool returns a dict:
 
 ## Registering with MCP Clients
 
-Install d2r-tools first (the `mcp` SDK is pulled in automatically):
+### Claude Code (project-scoped)
 
-```bash
-pip install -e .
-```
+This repo has a `.mcp.json` at the project root registering the server under the name `d2r-tools`. Open the project in Claude Code; the workspace trust prompt surfaces the server.
 
 ### Claude Code (user-scoped)
 
@@ -81,24 +79,9 @@ pip install -e .
 claude mcp add d2r-tools --transport stdio --scope user -- python3 -m d2r_mcp
 ```
 
-### Claude Code (project-scoped)
+Requires the package on your Python path (`pip install -e .` from the repo root).
 
-Drop a `.mcp.json` at the project root:
-
-```json
-{
-  "mcpServers": {
-    "d2r-tools": {
-      "command": "python3",
-      "args": ["-m", "d2r_mcp"]
-    }
-  }
-}
-```
-
-Claude Code's workspace trust prompt will surface the server.
-
-### Other clients (Codex, Cursor, …)
+### Other clients (Codex, Cursor)
 
 Add to the client's MCP config:
 
@@ -133,3 +116,7 @@ python3 -m pytest tests/test_mcp_envelope.py tests/test_mcp_lookups.py \
 ```
 
 The integration test (`test_mcp_server_integration.py`) spawns the real server over stdio and verifies tool registration + invocation end-to-end.
+
+## Design
+
+See `docs/superpowers/specs/2026-04-22-d2r-mcp-design.md` for the full design and `docs/superpowers/plans/2026-04-22-d2r-mcp.md` for the implementation plan.
