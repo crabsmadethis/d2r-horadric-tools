@@ -4,6 +4,10 @@ import shutil
 import struct
 import pytest
 
+# Marked integration: requires the hexshade_lv98_haseen.d2s fixture which is
+# gitignored in the public d2r-tools mirror (.d2s files are local-only there).
+pytestmark = pytest.mark.integration
+
 FIXTURE = os.path.join(
     os.path.dirname(__file__), "fixtures", "hexshade_lv98_haseen.d2s"
 )

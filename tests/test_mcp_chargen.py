@@ -3,6 +3,10 @@ import os
 import shutil
 import pytest
 
+# Marked integration: requires extracted game data (d2r_chargen.data.item_stat_cost
+# is excluded from the public d2r-tools mirror until `d2r-mod extract` is run).
+pytestmark = pytest.mark.integration
+
 
 @pytest.fixture
 def chars_dir(tmp_path, monkeypatch):

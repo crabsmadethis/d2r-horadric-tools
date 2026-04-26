@@ -1,10 +1,15 @@
 import unittest
 import tempfile
 import os
+import pytest
 from d2r_mod.build import build_mod
 from d2r_mod.tsv import read_tsv_file, write_tsv_file
 
 
+# Marked integration: requires DEFAULT_GAME_DIR resolved (a real D2R install).
+# On the public CI runner DEFAULT_GAME_DIR is None and build_mod's .build.info
+# lookup blows up. Locally, both pass.
+@pytest.mark.integration
 class TestBuildMod(unittest.TestCase):
     def _setup_vanilla(self, tmpdir):
         vanilla = os.path.join(tmpdir, "vanilla", "data", "global", "excel")

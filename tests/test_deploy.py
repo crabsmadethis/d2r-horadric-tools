@@ -2,6 +2,7 @@ import json
 import unittest
 import tempfile
 import os
+import pytest
 from d2r_mod.deploy import (
     deploy_mod, undeploy_mod, StaleVanillaError, MOD_NAME,
     _build_launch_options, _LIBPATCH_SO,
@@ -200,6 +201,10 @@ class TestLaunchOptions(unittest.TestCase):
         self.assertIn("-mod rebalance", opts)
 
 
+# Marked integration: requires d2r_mod.host (excluded from public mirror).
+# Without host, deploy_mod warns "patches.json generation failed" and the
+# artifacts these tests assert on are not created — by design.
+@pytest.mark.integration
 class TestDeployPatchesJson(unittest.TestCase):
 
     def test_deploy_creates_patches_json(self):

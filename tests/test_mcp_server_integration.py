@@ -8,6 +8,10 @@ import os
 import sys
 import pytest
 
+# Marked integration: requires pytest-asyncio (not in the bare CI dev extras)
+# plus the mcp client library plus extracted game data.
+pytestmark = pytest.mark.integration
+
 
 @pytest.mark.asyncio
 async def test_server_lists_all_tool_categories():
