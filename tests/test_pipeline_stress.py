@@ -226,7 +226,7 @@ def test_property_alias_coverage():
 
     char_def = _make_char_def(
         equipment=[{"slot": "weapon", "unique": "The Oculus"}],
-        merc={"type": "act1_cold", "equipment": merc_equipment},
+        merc={"type": "act1_cold", "equipment_mode": "stash", "equipment": merc_equipment},
     )
     result = _build_and_scan(char_def)
     assert result["errors"] == [], f"Scanner errors: {result['errors']}"
@@ -283,7 +283,7 @@ def test_stash_81pct():
 
     char_def = _make_char_def(
         equipment=[{"slot": "weapon", "unique": "The Oculus"}],
-        merc={"type": "act1_cold", "equipment": merc_equipment},
+        merc={"type": "act1_cold", "equipment_mode": "stash", "equipment": merc_equipment},
     )
     result = _build_and_scan(char_def)
     assert result["errors"] == [], f"Scanner errors: {result['errors']}"
