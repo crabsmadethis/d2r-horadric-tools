@@ -158,8 +158,8 @@ def clean() -> dict:
     return ok(actions=actions)
 
 
-def recover(warn_conflicts: bool = False, no_regen: bool = False,
-            game_dir: str | None = None) -> dict:
+def update(warn_conflicts: bool = False, no_regen: bool = False,
+           game_dir: str | None = None) -> dict:
     """Run the full extract+build+deploy recovery pipeline."""
     r = extract(game_dir=game_dir)
     if r["status"] != "ok":

@@ -38,7 +38,12 @@ If the build fails, stop and diagnose. Do NOT proceed to scanning.
 ### 3. Run d2rdoctor scanner
 
 ```bash
-python3 -m d2r_chargen scan "$CHAR_NAME"
+python3 << 'PYEOF'
+import sys
+sys.path.insert(0, '<parent-of-d2r-tools>')
+from d2r_scanner import run_scanner
+run_scanner('$ARGUMENTS'.split()[0].lower())
+PYEOF
 ```
 
 ### 4. Check scanner output

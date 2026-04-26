@@ -29,6 +29,8 @@ except ImportError:
     ITEM_BASES_FULL = None
     RUNEWORDS = None
     _HAS_DATA = False
+from d2r_chargen.data.monumod_affixes import affix_name
+from d2r_chargen.follower_block import decode_follower_block
 
 # ============================================================
 # Constants
@@ -112,24 +114,6 @@ def calc_checksum(data):
         if 0x0c<=i<=0x0f: b=0
         cs=(((cs<<1)|(cs>>31))+b)&0xFFFFFFFF
     return cs
-
-
-# Hireling.Id ranges per reference_merc_d2s_offsets — describe a merc Id
-# as <class> <element> <difficulty> for human-readable scanner output.
-_MERC_ID_RANGES = [
-    (0,  5,  'Rogue Scout (Act 1)'),
-    (6,  14, 'Desert Mercenary (Act 2)'),
-    (15, 23, 'Iron Wolf (Act 3)'),
-    (24, 29, 'Barbarian 2H (Act 5)'),
-    (30, 35, 'Desert Merc expansion auras'),
-]
-
-
-def _describe_merc_id(merc_id):
-    for lo, hi, label in _MERC_ID_RANGES:
-        if lo <= merc_id <= hi:
-            return label
-    return 'unknown'
 
 
 # ============================================================
@@ -560,18 +544,9 @@ def scan_characters(target, all_files, ghost_chars):
         for i in range(0x300,min(len(data)-4,0x500)):
             if data[i:i+2]==b'JM': jm=i; break
         item_count=struct.unpack_from('<H',data,jm+2)[0] if jm>=0 else -1
-
-        # Anchor section markers from the end of the file. Pattern-matching
-        # `jf`/`JM` from after JM[char] can false-positive on item bitstream
-        # bytes (seen 2026-04-21 on a direct-merc Tempest save where `jf`
-        # matched at offset 966 inside an item). The tail layout is:
-        # ... JM[dead] dead_items jf JM[merc] merc_items kf golem \x01\x00 lf[count]
-        # lf/kf/last-JM/last-jf are unambiguous in that order from the end.
-        lf_anchor = data.rfind(b'lf')
-        kf_anchor = data.rfind(b'kf', 0, lf_anchor) if lf_anchor > 0 else -1
-        merc_jm = data.rfind(b'JM', 0, kf_anchor) if kf_anchor > 0 else -1
-        jf_marker = data.rfind(b'jf', 0, merc_jm) if merc_jm > 0 else -1
-        dead_body_jm = data.find(b'JM', jm+4, jf_marker) if (jm >= 0 and jf_marker > 0) else -1
+        jf_marker=data.find(b'jf',jm+4) if jm>=0 else -1
+        merc_jm=data.find(b'JM',jf_marker+2) if jf_marker>=0 else -1
+        dead_body_jm=data.find(b'JM',jm+4) if jm>=0 else -1
         merc_count=struct.unpack_from('<H',data,merc_jm+2)[0] if merc_jm>=0 else -1
 
         # Section ordering validation
@@ -675,12 +650,17 @@ def scan_characters(target, all_files, ghost_chars):
         if char_name != expected_name:
             print(f"  \u26a0 NAME MISMATCH: file={expected_name} but internal name={char_name}")
 
-        # Merc Hireling.Id readout at 0xA9-0xAA (u16 LE). Was previously
-        # mis-decoded as a difficulty byte with a bogus "valid 0-14" range.
-        if len(data) > 0xAA:
-            merc_id = struct.unpack_from('<H', data, 0xA9)[0]
-            if merc_id != 0:
-                print(f"  Merc:      Hireling.Id={merc_id} ({_describe_merc_id(merc_id)})")
+        if len(data) > 0xA9:
+            diff_act = data[0xA9]
+            if diff_act > 14:
+                print(f"  \u26a0 DIFFICULTY BYTE: 0xA9={diff_act} out of range (valid 0-14)")
+            else:
+                prog_byte = data[0x15] if len(data) > 0x15 else 0
+                diff_tier = diff_act // 5
+                prog_tier = {0:0, 5:1, 0x0F:2}.get(prog_byte, -1)
+                if prog_tier >= 0 and diff_tier > prog_tier:
+                    diff_names = ['Normal','NM','Hell']
+                    print(f"  \u26a0 DIFFICULTY/PROGRESSION: active={diff_names[diff_tier]} (0xA9={diff_act}) but progression only unlocks up to {diff_names[prog_tier]} (0x15=0x{prog_byte:02x})")
 
         prog = data[0x15] if len(data) > 0x15 else 0
         prog_label = {0:'Normal',5:'NM unlocked',0x0F:'Hell unlocked'}.get(prog, f'prog=0x{prog:02x}')
@@ -839,6 +819,9 @@ def scan_characters(target, all_files, ghost_chars):
                 print(f"  Merc items: {merc_count_val} parents + {merc_filler_count} socket fillers = {merc_item_count} total")
             merc_list=[f"{v[0]}({qname(v[1])})" for v in merc_slots.values()]
             print(f"  MERC: {', '.join(merc_list) if merc_list else '(none)'}")
+            if merc_item_count > 0:
+                print(f"  ! REMINDER: Pre-injected merc items can cause Error:8 even with correct follower_count.")
+                print(f"    Rule 6: Place merc gear in stash (storage=5) and equip in-game.")
 
         # Item property size check
         print()
@@ -886,25 +869,42 @@ def scan_characters(target, all_files, ghost_chars):
                     print(f"  \u2139 DUPLICATE UNIQUE: uid={uid} in slots {prev_str} and {bodyloc} (allowed if different slots)")
                 equipped_uids.setdefault(uid,[]).append(bodyloc)
 
-        # lf marker: merc-hired flag (informational)
+        # follower-section sanity
         kf_pos=data.find(b'kf')
         lf_pos=data.find(b'lf',kf_pos) if kf_pos>=0 else -1
-        lf_count=0
+        # follower_count: live followers attached to char (warlock bound demon, etc.). Was lf_count \u2014 see CLAUDE.md rule 21 + Task 0.4 findings.
+        follower_count=0
         if lf_pos>=0:
-            lf_count=struct.unpack_from('<H',data,lf_pos+2)[0]
+            follower_count=struct.unpack_from('<H',data,lf_pos+2)[0]
             merc_count_val2=struct.unpack_from('<H',data,merc_jm+2)[0] if merc_jm>=0 else 0
-            # D2R itself writes lf_count=0 even with merc items (2026-04-20
-            # spec). Only flag values outside the observed range {0, 1}.
-            status='\u26a0 unexpected (D2R writes 0 or 1)' if lf_count > 1 else '\u2713'
-            print(f"  LF:   lf_count={lf_count}  merc_items={merc_count_val2}  {status}")
+            # Phase 0.4 finding: D2R rejects the save IFF count and payload mismatch.
+            # count==0 must have 0 trailing bytes; count==1 must have exactly 116 (the
+            # warlock bound-demon payload \u2014 the only currently-known follower kind).
+            payload_bytes=len(data)-(lf_pos+4)
+            if follower_count==0 and payload_bytes==0:
+                status='\u2713 ok (no follower)'
+            elif follower_count==1 and payload_bytes==116:
+                status='\u2713 ok (1 follower, 116B payload)'
+            else:
+                status=f'\u2717 INVALID \u2014 count={follower_count} but payload={payload_bytes}B (will FAIL TO JOIN GAME)'
+            print(f"  LF:   follower_count={follower_count}  merc_items={merc_count_val2}  {status}")
 
-        # kf/lf structural validation
-        if kf_pos >= 0:
-            golem_flag = data[kf_pos + 2] if kf_pos + 2 < len(data) else 255
-            if golem_flag not in (0, 1):
-                print(f"  !! IRON GOLEM FLAG: kf+2 = {golem_flag} (expected 0 or 1) -- corrupt tail section")
-            if lf_pos >= 0 and lf_pos - kf_pos > 200:
-                print(f"  !! kf-lf GAP: {lf_pos - kf_pos} bytes between kf and lf (expected ~5-10)")
+        # kf/lf structural validation: gap must be exactly 5 (kf + 00 01 00 + lf)
+        # \u2014 verified across all 19 saves on disk. Larger gaps indicate corruption.
+        if kf_pos >= 0 and lf_pos >= 0:
+            gap = lf_pos - kf_pos
+            if gap != 5:
+                print(f"  !! kf-lf GAP: {gap} bytes (expected exactly 5: kf + 00 01 00 + lf)")
+
+        # Bound-demon (warlock follower) block \u2014 Task 2.1
+        fb = decode_follower_block(bytes(data))
+        if fb.has_follower:
+            print(f"  BOUND DEMON:")
+            print(f"    monster_hcidx = {fb.monster_hcidx}")
+            print(f"    monster_seed  = 0x{fb.monster_seed:08X}")
+            print(f"    bind_demon_lv = {fb.bind_demon_level}")
+            affix_names = [affix_name(b) for b in fb.affix_indices]
+            print(f"    affixes       = {', '.join(affix_names)}")
 
         # Encoding issues
         if wrong_ext:
@@ -1026,10 +1026,10 @@ def scan_characters(target, all_files, ghost_chars):
 
         print()
         print("  MERC SLOTS:")
-        # D2R writes lf_count=0 even with merc items (see 2026-04-20 spec),
-        # so we check merc item count directly rather than lf_count.
-        if merc_count_val == 0:
-            print("    \u2717 No merc items in JM[merc] \u2014 merc not hired or no gear")
+        # Merc-hired signal is the JM[merc] item count, not follower_count.
+        # follower_count tracks warlock pets, not mercs \u2014 see CLAUDE.md rule 21.
+        if merc_count_val==0:
+            print("    \u2717 Merc not hired (no items in JM[merc]) \u2014 hire in-game before injecting merc gear")
             any_issue=True
         else:
             exp_count=3
@@ -1211,16 +1211,12 @@ def check_progression_consistency(data, yaml_progression=None):
     is_hc = bool(data[0x14] & 0x04) if len(data) > 0x14 else False
     lvl_byte = data[0x1B] if len(data) > 0x1B else 1
 
-    # Merc Hireling.Id at 0xA9-0xAA (u16 LE) — see reference_merc_d2s_offsets.
-    # The legacy 'HC act byte' heuristic that fired on any nonzero 0xA9 was
-    # superseded 2026-04-19; HC chars can validly hire mercs.
-    if len(data) > 0xAA:
-        merc_id = struct.unpack_from('<H', data, 0xA9)[0]
-        if merc_id > 35:
-            warnings.append(
-                f"merc Hireling.Id 0xA9-0xAA={merc_id} exceeds known ceiling (35) — "
-                f"possible save corruption or unhandled mod data"
-            )
+    # HC act byte check
+    if is_hc and len(data) > 0xA9 and data[0xA9] != 0:
+        warnings.append(
+            f"HC character has act byte 0xA9={data[0xA9]} set — "
+            f"game validates act vs quest state for HC; should be 0"
+        )
 
     # Check waypoints for lower difficulties
     ws = data.find(b'WS')
@@ -1327,12 +1323,8 @@ def scan_character_data(filepath):
             break
     item_count = struct.unpack_from('<H', data, jm+2)[0] if jm >= 0 else -1
 
-    # Anchor from the end — see top-of-file note about jf/JM false positives
-    # inside item bitstreams.
-    lf_anchor = data.rfind(b'lf')
-    kf_anchor = data.rfind(b'kf', 0, lf_anchor) if lf_anchor > 0 else -1
-    merc_jm = data.rfind(b'JM', 0, kf_anchor) if kf_anchor > 0 else -1
-    jf_marker = data.rfind(b'jf', 0, merc_jm) if merc_jm > 0 else -1
+    jf_marker = data.find(b'jf', jm+4) if jm >= 0 else -1
+    merc_jm = data.find(b'JM', jf_marker+2) if jf_marker >= 0 else -1
     merc_count = struct.unpack_from('<H', data, merc_jm+2)[0] if merc_jm >= 0 else -1
 
     errors = []

@@ -208,7 +208,7 @@ class TestArchiveEntryMatchesReal:
         # Verify: header stores EKey padded to 16 bytes, reversed.
         header_reversed = real_header[:16][::-1]
         assert header_reversed[:9] == real_ekey, (
-            f"EKey mismatch: header first 9={header_reversed[:9].hex()}, "
+            f"EKey mismatch: header first 9={header_md5[:9].hex()}, "
             f"expected={real_ekey.hex()}"
         )
 

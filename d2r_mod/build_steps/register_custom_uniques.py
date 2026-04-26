@@ -75,29 +75,24 @@ def run(
     unique_items_path: str | os.PathLike,
     target_tbl_path: str | os.PathLike,
     vanilla_keys: set[str],
-    json_served_names: set[str] | None = None,
 ) -> dict[str, int]:
     """Register custom unique display names in the target .tbl file.
 
     For each row in UniqueItems.txt:
       - Skip rows with empty/blank index column.
       - Skip rows whose index is in ``vanilla_keys`` (already known to game).
-      - Skip rows whose index is in ``json_served_names`` (D2R reads names from
-        JSON not TBL — feedback_strings_json_vs_tbl.md — so any TBL write for
-        a JSON-served key is dead weight).
       - Skip rows whose index is already present in target_tbl (idempotent).
       - Otherwise, add ``name → name`` entry to the target tbl.
 
     The target_tbl is created from scratch if it does not exist.
 
     Returns:
-        {'added': int, 'skipped': int, 'skipped_json': int}
+        {'added': int, 'skipped': int}
     """
     from d2r_mod.assets.tbl import parse_tbl, build_tbl
 
     unique_items_path = str(unique_items_path)
     target_tbl_path = str(target_tbl_path)
-    json_served_names = json_served_names or set()
 
     # Parse existing target tbl (or start empty)
     if os.path.exists(target_tbl_path):
@@ -113,13 +108,9 @@ def run(
 
     added = 0
     skipped = 0
-    skipped_json = 0
     for name in names:
         if name in vanilla_keys:
             skipped += 1
-            continue
-        if name in json_served_names:
-            skipped_json += 1
             continue
         if name in entries:
             # Already registered (idempotent: second run hits this branch)
@@ -133,4 +124,4 @@ def run(
     with open(target_tbl_path, "wb") as f:
         f.write(new_data)
 
-    return {"added": added, "skipped": skipped, "skipped_json": skipped_json}
+    return {"added": added, "skipped": skipped}

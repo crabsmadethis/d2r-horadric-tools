@@ -523,69 +523,6 @@ _RUNE_CODE_TO_NAME = {
 }
 
 
-# Elemental damage stats that the D2S encoder + chargen resolver expect in
-# grouped form: a single Xmindam entry whose min/max are the damage range
-# (and, for cold/poison, whose param is the freeze/poison duration).
-# UniqueItems.txt and Runes.txt encode these as 2 or 3 separate prop columns
-# (e.g. ltng-min + ltng-max, or cold-min + cold-max + cold-len), so without
-# this merge the second/third entries either get silently dropped (light/fire/
-# magic max) or end up with the wrong duration (cold/poison) at encode time.
-# Pattern: mindam_stat -> (maxdam_stat, length_stat_or_None)
-_DAMAGE_PAIR_MERGE = {
-    "firemindam": ("firemaxdam", None),
-    "lightmindam": ("lightmaxdam", None),
-    "magicmindam": ("magicmaxdam", None),
-    "coldmindam": ("coldmaxdam", "coldlength"),
-    "poisonmindam": ("poisonmaxdam", "poisonlength"),
-}
-
-
-def _merge_damage_pairs(stats: list[dict]) -> list[dict]:
-    """Collapse (Xmindam, Xmaxdam[, Xlength]) entries into one grouped entry.
-
-    Pairs do not need to be adjacent — vanilla SoJ (UID 122) has prop3=ltng-min,
-    prop4=allskills, prop5=ltng-max. Scan forward from each Xmindam for the
-    matching Xmaxdam (and Xlength) anywhere later in the list and remove them
-    once consumed. The grouped entry stays at the Xmindam's original position
-    so unrelated stats keep their order.
-    """
-    merged = []
-    consumed = set()
-    for idx, cur in enumerate(stats):
-        if idx in consumed:
-            continue
-        pair = _DAMAGE_PAIR_MERGE.get(cur["stat"])
-        if pair is None or "param_type" in cur:
-            merged.append(cur)
-            continue
-        max_stat, len_stat = pair
-        max_idx = next(
-            (j for j in range(idx + 1, len(stats))
-             if j not in consumed and stats[j]["stat"] == max_stat),
-            None,
-        )
-        if max_idx is None:
-            merged.append(cur)
-            continue
-        grouped = {
-            "stat": cur["stat"],
-            "min": cur["min"],
-            "max": stats[max_idx]["max"],
-        }
-        consumed.add(max_idx)
-        if len_stat:
-            len_idx = next(
-                (j for j in range(idx + 1, len(stats))
-                 if j not in consumed and stats[j]["stat"] == len_stat),
-                None,
-            )
-            if len_idx is not None:
-                grouped["param"] = str(stats[len_idx]["max"])
-                consumed.add(len_idx)
-        merged.append(grouped)
-    return merged
-
-
 def _parse_props(row: dict, prefix: str, max_props: int) -> list[dict]:
     """Parse propN/parN/minN/maxN or T1CodeN/T1ParamN/T1MinN/T1MaxN columns into stat entries."""
     stats = []
@@ -656,7 +593,7 @@ def _parse_props(row: dict, prefix: str, max_props: int) -> list[dict]:
                 entry["param"] = param
 
         stats.append(entry)
-    return _merge_damage_pairs(stats)
+    return stats
 
 
 def regen_unique_item_stats(rows: list[dict]) -> dict:

@@ -256,15 +256,10 @@ class TestAutoRegisterIntegration(unittest.TestCase):
     (BUILD_ENG_DIR / "expansionstring.tbl").exists(),
     "build/ not populated — run d2r-mod build first",
 )
-class TestBuiltExpansionstringSkipsJsonServed(unittest.TestCase):
-    """After a full build, expansionstring.tbl must NOT contain custom uniques
-    that are served by patches/json_strings/custom_items.yaml. D2R reads item
-    names from JSON not TBL, so any TBL write for a JSON-served key is dead
-    weight (feedback_strings_json_vs_tbl.md). The 2026-04-22 expansionstring
-    audit removed those redundant writes.
-    """
+class TestBuiltExpansionstringHasCustomUniques(unittest.TestCase):
+    """After a full build, expansionstring.tbl must contain the 6 custom uniques."""
 
-    JSON_SERVED_NAMES = [
+    CUSTOM_NAMES = [
         "Flamekeeper's Antlers",
         "Thunderhurler's Grip",
         "Hawkeye's Sight",
@@ -273,13 +268,13 @@ class TestBuiltExpansionstringSkipsJsonServed(unittest.TestCase):
         "Manoomin",
     ]
 
-    def test_json_served_names_absent_from_built_expansionstring(self):
+    def test_custom_uniques_in_built_expansionstring(self):
         from d2r_mod.assets.tbl import parse_tbl
 
         tbl_path = BUILD_ENG_DIR / "expansionstring.tbl"
         entries = parse_tbl(tbl_path.read_bytes())
 
-        for name in self.JSON_SERVED_NAMES:
-            self.assertNotIn(name, entries,
-                             f"{name!r} should be absent — served by JSON patch, "
-                             f"not TBL")
+        for name in self.CUSTOM_NAMES:
+            self.assertIn(name, entries,
+                          f"{name!r} missing from built expansionstring.tbl")
+            self.assertEqual(entries[name], name)

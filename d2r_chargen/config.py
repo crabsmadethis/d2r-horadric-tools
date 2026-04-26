@@ -40,8 +40,24 @@ def _detect_chars_dir():
     return os.path.join(pkg_dir, 'chars')
 
 
+def _detect_fixtures_dir():
+    """Test/template fixtures directory. Override with D2R_FIXTURES env var.
+
+    Used by `bound_demon: {template: NAME}` resolution to locate the
+    NAME.d2s fixture whose 116-byte demon payload is copied into the
+    rebuilt save. Default location is `<repo_root>/tests/fixtures`.
+    """
+    if 'D2R_FIXTURES' in os.environ:
+        return os.environ['D2R_FIXTURES']
+
+    # Default: tests/fixtures/ directory at repo root
+    pkg_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(pkg_dir, 'tests', 'fixtures')
+
+
 SAVES = _detect_saves_dir()
 CHARS_DIR = _detect_chars_dir()
+FIXTURES_DIR = _detect_fixtures_dir()
 
 # Equipment slot name -> (bodyloc, storage, location) for equipped items
 SLOT_MAP = {

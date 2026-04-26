@@ -443,6 +443,55 @@ def resolve_unique(name):
     }
 
 
+def resolve_bound_demon(spec, fixtures_dir):
+    """Resolve a YAML `bound_demon:` block to its 116-byte demon payload.
+
+    v1 only supports `template: NAME` mode — extracts the demon payload
+    verbatim from `<fixtures_dir>/NAME.d2s` via decode_follower_block.
+    Future versions may add monster/affix synthesis once more fields in
+    the 116-byte block are decoded.
+
+    Args:
+        spec: The dict under `bound_demon:` in the char YAML.
+            Must include a `template` key naming a fixture (without .d2s).
+        fixtures_dir: Path to the directory holding template .d2s files.
+
+    Returns:
+        The 116-byte demon payload bytes from the named template.
+
+    Raises:
+        ValueError: spec is missing `template`, or the template fixture
+            has no follower block to copy from.
+        FileNotFoundError: Template file not found in fixtures_dir.
+    """
+    from pathlib import Path
+
+    template = spec.get('template') if isinstance(spec, dict) else None
+    if not template:
+        raise ValueError(
+            "bound_demon must specify 'template' (fixture name without .d2s)"
+        )
+
+    fixture_path = Path(fixtures_dir) / f'{template}.d2s'
+    if not fixture_path.exists():
+        raise FileNotFoundError(
+            f'Bound demon template not found: {fixture_path}'
+        )
+
+    # Imported here (not at module top) to avoid a circular dep risk and
+    # keep import time light when bound_demon isn't used.
+    from d2r_chargen.follower_block import decode_follower_block
+
+    fixture_data = fixture_path.read_bytes()
+    block = decode_follower_block(fixture_data)
+    if not block.has_follower:
+        raise ValueError(
+            f'Template {template!r} has no follower block — '
+            f'pick a fixture with an active demon'
+        )
+    return block.payload
+
+
 def resolve_skills(class_name, skill_dict):
     """Resolve a dict of skill names and levels into a 30-element skill array.
 

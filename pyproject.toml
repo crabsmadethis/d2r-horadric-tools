@@ -7,9 +7,9 @@ name = "d2r-tools"
 version = "1.0.0"
 description = "D2R modding toolkit — YAML character builder and data pipeline"
 readme = "README.md"
-requires-python = ">=3.11"
-license = {file = "LICENSE"}
-dependencies = ["pyyaml>=6.0", "mcp>=1.0"]
+requires-python = ">=3.9"
+license = "MIT"
+dependencies = ["pyyaml>=6.0"]
 
 [project.scripts]
 d2r-chargen = "d2r_chargen.cli:main"
@@ -23,28 +23,13 @@ d2r_chargen = ["data/template.d2s"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["."]
 markers = [
     "integration: tests requiring real D2R binaries on SD card",
-    "slow: tests involving CASC I/O",
+    "slow: tests involving engine disasm, host patching, or CASC I/O",
     "e2e: end-to-end tests requiring D2R running",
-    "smoke: lightweight smoke tests",
 ]
 timeout = 300
+asyncio_mode = "auto"
 
 [project.optional-dependencies]
-test = ["pytest", "pytest-timeout", "hypothesis>=6.100"]
-dev = ["pytest", "pytest-timeout", "hypothesis>=6.100", "ruff>=0.5"]
-
-[tool.ruff]
-line-length = 100
-target-version = "py310"
-exclude = ["d2r_chargen/data", "build", "vanilla", ".venv"]
-
-[tool.ruff.lint]
-# Conservative starter set: real bug catchers, not style.
-# - E9:  syntax errors
-# - F63: invalid `is` / `not in` / membership tests
-# - F7:  syntax errors detected by pyflakes
-# - F82: undefined names, unused imports in __init__ files
-select = ["E9", "F63", "F7", "F82"]
+test = ["pytest", "pytest-timeout"]

@@ -360,7 +360,7 @@ def cmd_inject(args: argparse.Namespace) -> None:
 
 
 def cmd_host(args: argparse.Namespace) -> None:
-    from d2r_mod.host.cli import cmd_dump, cmd_scan, cmd_patch, cmd_guards, cmd_status, cmd_analyze, cmd_inject_strings
+    from d2r_mod.host.cli import cmd_dump, cmd_scan, cmd_patch, cmd_guards, cmd_status, cmd_analyze
     handlers = {
         "dump": cmd_dump,
         "scan": cmd_scan,
@@ -368,7 +368,6 @@ def cmd_host(args: argparse.Namespace) -> None:
         "guards": cmd_guards,
         "analyze": cmd_analyze,
         "status": cmd_status,
-        "inject-strings": cmd_inject_strings,
     }
     handlers[args.host_command](args)
 

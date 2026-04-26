@@ -52,7 +52,7 @@ Wrappers for the `d2r-mod` CLI.
 - `d2r_mod_diff(file=None, summary=False)` — vanilla vs build table diff
 - `d2r_mod_extract(...)` — extract vanilla from CASC archive
 - `d2r_mod_clean()` — remove `build/` and reset chargen data
-- `d2r_mod_recover(...)` — full recovery pipeline (extract → build → deploy)
+- `d2r_mod_update(...)` — full recovery pipeline (extract → build → deploy)
 - `d2r_mod_audit(skills=False, items=False, all=False, ...)` — generate audit reports
 
 ## Return Envelope
@@ -79,7 +79,7 @@ This repo has a `.mcp.json` at the project root registering the server under the
 claude mcp add d2r-tools --transport stdio --scope user -- python3 -m d2r_mcp
 ```
 
-Requires the package on your Python path (`pip install -e .` from the repo root).
+Requires the package on your Python path (`pip install -e .`).
 
 ### Other clients (Codex, Cursor)
 
@@ -116,3 +116,7 @@ python3 -m pytest tests/test_mcp_envelope.py tests/test_mcp_lookups.py \
 ```
 
 The integration test (`test_mcp_server_integration.py`) spawns the real server over stdio and verifies tool registration + invocation end-to-end.
+
+## Design
+
+See `docs/superpowers/specs/2026-04-22-d2r-mcp-design.md` for the full design and `docs/superpowers/plans/2026-04-22-d2r-mcp.md` for the implementation plan.

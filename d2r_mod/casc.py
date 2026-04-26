@@ -2,7 +2,6 @@
 
 import glob
 import os
-import re
 import struct
 import sys
 import zlib
@@ -122,37 +121,11 @@ def _parse_build_config(game_dir: str) -> dict[str, list[str]]:
     return result
 
 
-_IDX_NAME_RE = re.compile(r"^([0-9a-fA-F]{2})([0-9a-fA-F]{8})\.idx$")
-
-
-def _select_idx_files(data_dir: str) -> list[str]:
-    """Pick the highest-version `.idx` per bucket — mirrors how D2R reads CASC.
-
-    Filenames look like `XXYYYYYYYY.idx` where XX is the bucket (00..0f) and
-    YYYYYYYY is the version (hex). Multiple idx files can exist per bucket
-    after CASC injection; D2R always reads the highest version. The previous
-    'first seen wins' lexicographic-sort approach picked the OLDEST entry per
-    ekey, so verify tooling returned stale content after repeated deploys.
-    """
-    chosen: dict[int, tuple[int, str]] = {}
-    for path in glob.glob(os.path.join(data_dir, "*.idx")):
-        m = _IDX_NAME_RE.match(os.path.basename(path))
-        if not m:
-            continue
-        bucket = int(m.group(1), 16)
-        version = int(m.group(2), 16)
-        existing = chosen.get(bucket)
-        if existing is None or version > existing[0]:
-            chosen[bucket] = (version, path)
-    # Sort by bucket so callers see entries in stable bucket order
-    # (downstream tests rely on iteration order of the resulting index).
-    return [chosen[b][1] for b in sorted(chosen)]
-
-
 def _build_index(data_dir: str) -> dict[bytes, tuple[int, int, int]]:
-    """Parse selected .idx files. Returns {ekey_9: (archive_idx, offset, enc_size)}."""
+    """Parse all .idx files. Returns {ekey_9: (archive_idx, offset, enc_size)}."""
     index = {}
-    for idx_path in _select_idx_files(data_dir):
+    idx_files = sorted(glob.glob(os.path.join(data_dir, "*.idx")))
+    for idx_path in idx_files:
         with open(idx_path, "rb") as f:
             data = f.read()
         if len(data) < 0x28:
@@ -171,7 +144,9 @@ def _build_index(data_dir: str) -> dict[bytes, tuple[int, int, int]]:
             enc_size = struct.unpack_from("<I", data, off + 14)[0]
             archive_idx = storage_offset >> 30
             archive_offset = storage_offset & 0x3FFFFFFF
-            index[ekey] = (archive_idx, archive_offset, enc_size)
+            # Only keep if not already present (first seen wins)
+            if ekey not in index:
+                index[ekey] = (archive_idx, archive_offset, enc_size)
     return index
 
 
@@ -353,11 +328,9 @@ def extract_vanilla(
     extensions: set[str] | None = {".txt", ".tbl", ".json"},
     prefix_filter: set[str] | None = {
         "data/global/excel/", "data/global/string/", "data/global/ui/",
-        "data/local/lng/strings/",
     },
     extra_files: set[str] | None = {
         "data/global/dataversionbuild.txt",
-        "data/local/lng/next_string_id.txt",
     },
     verbose: bool = True,
 ) -> dict[str, str]:

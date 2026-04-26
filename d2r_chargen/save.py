@@ -576,8 +576,27 @@ def create_new_character(template_path, new_name, class_id):
 # Item Rebuilding
 # ============================================================
 
-def rebuild_items(filepath, char_items_bytes, merc_items_bytes):
-    """Replace all items in a save file."""
+def rebuild_items(filepath, char_items_bytes, merc_items_bytes,
+                  preserve_followers=True, follower_payload=None):
+    """Replace all items in a save file.
+
+    Args:
+        filepath: path to the source .d2s.
+        char_items_bytes: list of encoded JM-item byte strings for the character.
+        merc_items_bytes: list of encoded JM-item byte strings for the merc.
+        preserve_followers: when True (default), an existing follower block
+            in the input save is copied verbatim into the rebuilt output.
+            When False, the follower block is stripped (count=0, no payload).
+            Default True is the safe behavior — stripping silently kills a
+            warlock's bound demon. Ignored when follower_payload is given.
+        follower_payload: optional 116-byte bound-demon payload to inject.
+            When provided, the rebuilt save emits follower_count=1 followed
+            by these bytes regardless of `preserve_followers` or the input's
+            existing follower state. Used by `bound_demon:` YAML resolution.
+
+    Raises:
+        ValueError: follower_payload is not exactly 116 bytes.
+    """
     data = bytearray(open(filepath, 'rb').read())
 
     # Find first JM (character items)
@@ -627,15 +646,47 @@ def rebuild_items(filepath, char_items_bytes, merc_items_bytes):
 
     # Always construct a clean end section to avoid stale merc items (Rule 6).
     # D2S structure after char items (verified against working Tempest save):
-    #   JM[0] (corpse) | jf | [JM[n] merc_items] | kf | \x00 (golem) | \x01\x00 | lf[count]
+    #   JM[0] (corpse) | jf | [JM[n] merc_items] | kf | \x00 (golem) | \x01\x00 | lf[count] [payload?]
     #
-    # lf_count: historically interpreted as "merc hired" (0=empty, 1=hired).
-    # Observation (2026-04-20, see merc-direct-mode-gap spec): D2R-written saves
-    # with merc gear in JM[merc] AND merc-hired-at-level-98 have lf_count=0.
-    # Writing lf_count=1 causes D2R to silently reject the save during game-enter
-    # validation — even when merc items in JM[merc] are byte-identical to a
-    # D2R-written reference. Always writing lf_count=0 matches D2R's own format.
-    lf_count = 0
+    # follower_count: live followers attached to char (warlock bound demon, etc.).
+    # Was lf_count — see CLAUDE.md rule 21 + Task 0.4 findings.
+    #
+    # follower_count (post-kf 'lf' u16): live followers attached to the char.
+    # Currently this is just the warlock's bound demon (Bind Demon skill).
+    # When count >= 1, a 116-byte payload follows — see d2r_chargen/follower_block.py.
+    #
+    # Phase 0.4 confirmed: D2R rejects the save IFF follower_count and
+    # payload-size mismatch (count>=1 with no payload, or count=0 with bytes
+    # past `lf 00 00`). Preserving requires count and payload stay in sync —
+    # this function reads both from the same input via decode_follower_block.
+    #
+    # When `preserve_followers=True` (default), an existing follower block in
+    # the input is copied verbatim into the output. This is required for
+    # warlocks with a bound demon — stripping it on rebuild silently kills the
+    # pet. When False, the block is stripped (count=0, no payload) regardless
+    # of input state — useful for tests and deliberate-strip use cases.
+    # See docs/superpowers/plans/2026-04-25-bound-demon-save-block.md.
+    from d2r_chargen.follower_block import decode_follower_block
+    # Override > preserve > strip. When YAML supplies a `bound_demon:` block,
+    # its 116-byte payload wins regardless of the input save's state.
+    if follower_payload is not None:
+        if len(follower_payload) != 116:
+            raise ValueError(
+                f'follower_payload must be 116 bytes, got {len(follower_payload)}'
+            )
+        follower_count = 1
+        # follower_payload already set by caller; reuse as-is.
+    elif preserve_followers:
+        existing_followers = decode_follower_block(bytes(data))
+        if existing_followers.has_follower:
+            follower_count = existing_followers.follower_count
+            follower_payload = existing_followers.payload
+        else:
+            follower_count = 0
+            follower_payload = b''
+    else:
+        follower_count = 0
+        follower_payload = b''
     merc_jm = struct.pack('<2sH', b'JM', merc_count)
     merc_section = merc_jm + b''.join(merc_items_bytes)
     end_section = (
@@ -645,7 +696,8 @@ def rebuild_items(filepath, char_items_bytes, merc_items_bytes):
         b'kf' +                              # iron golem marker
         b'\x00' +                            # no iron golem
         b'\x01\x00' +                        # constant
-        struct.pack('<2sH', b'lf', lf_count)  # merc: 0=not hired, 1=hired
+        struct.pack('<2sH', b'lf', follower_count) +  # follower count (0 = no live followers attached)
+        follower_payload                     # follower payload (e.g., 116B bound-demon block) when count >= 1
     )
 
     # Rebuild

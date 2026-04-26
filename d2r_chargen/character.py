@@ -10,11 +10,12 @@ import sys
 
 import yaml
 from d2r_chargen.config import (
-    SAVES, CHARS_DIR, SLOT_MAP, CLASS_DEFS, PROPERTY_ALIASES, CHARM_DIMS,
+    SAVES, CHARS_DIR, FIXTURES_DIR, SLOT_MAP, CLASS_DEFS, PROPERTY_ALIASES,
+    CHARM_DIMS,
 )
 from d2r_chargen.resolve import (
     resolve_property_name, resolve_skills, resolve_runeword, resolve_unique,
-    resolve_progression,
+    resolve_progression, resolve_bound_demon,
 )
 from d2r_chargen.items import build_equipment_item, build_charm, build_merc_item
 from d2r_chargen.data.item_bases import ITEM_BASES
@@ -1215,17 +1216,32 @@ def deploy_character(char_name, phase=4, force=False):
             data = set_merc_header(data, hireling_id, xp=merc_xp)
             print(f"  Merc header: type={merc_type!r} hireling_id={hireling_id} xp={merc_xp}")
 
-    # Write updated base data
+    # Finalize stats/checksum in memory.
     struct.pack_into('<I', data, 8, len(data))
     data[12:16] = b'\x00\x00\x00\x00'
     cs = calc_checksum(data)
     struct.pack_into('<I', data, 12, cs)
 
-    # Backup (Rule 3)
+    # Rule #3: backup the live save BEFORE any write. On OSError (full
+    # disk, permission denied), refuse to proceed — the live save is still
+    # untouched at this point.
     bak = f"{char_path}.pre_chargen_bak"
-    shutil.copy2(char_path, bak)
+    try:
+        shutil.copy2(char_path, bak)
+    except OSError as ex:
+        print(f"  BACKUP FAILED: {type(ex).__name__}: {ex}")
+        print(f"  Refusing to proceed. Live save untouched at {char_path}")
+        return False
 
-    with open(char_path, 'wb') as f:
+    # Rules #10 + #17: write the stats-updated file to a staging temp,
+    # not directly to the live save.  The phase loop reads from this
+    # staging temp and updates it in-place as each phase succeeds.
+    # The live save (char_path) is only written once ALL scanner checks pass.
+    staging_path = f"/tmp/{char_def['name']}_staging.d2s"
+    # keep_staging: retain staging file on failure paths for post-mortem
+    # inspection; set to False so the finally always cleans up on success.
+    keep_staging = False
+    with open(staging_path, 'wb') as f:
         f.write(data)
 
     # Deploy items in phases
@@ -1274,59 +1290,109 @@ def deploy_character(char_name, phase=4, force=False):
                     char_result.append(item_bytes)
         return char_result, merc_result
 
-    for p in range(1, phase + 1):
-        char_phase_items, merc_phase_items = get_phase_items(all_items, p)
+    # Resolve bound_demon block (if any) once outside the phase loop —
+    # the payload is identical across phases, no need to re-read the
+    # fixture on each iteration. None means "fall back to preserve".
+    bound_demon_spec = char_def.get('bound_demon')
+    follower_payload = None
+    if bound_demon_spec is not None:
+        # Validate prerequisites before reading the fixture.
+        # 1. Class must be Warlock — D2R loads cross-class follower blocks
+        #    (Phase 0.4 finding) but only Warlocks can interact with Bind
+        #    Demon, and shipping a non-warlock with a borrowed demon block
+        #    is almost certainly a YAML mistake.
+        if char_def['class'] != 'warlock':
+            raise ValueError(
+                f"bound_demon: requires class=warlock, got {char_def['class']!r}"
+            )
+        # 2. Bind Demon skill level must be >= 1. YAML uses the canonical
+        #    skill name 'Bind Demon' (matching _SKILL_NAME_TO_ID); accept
+        #    common case variants for friendliness. A character without
+        #    the skill can't bind a demon in-game, so pre-loading one is
+        #    meaningless (and probably a copy-paste bug).
+        skills = char_def.get('skills', {})
+        bind_demon_lvl = 0
+        for k, v in skills.items():
+            if k.lower().replace('_', ' ') == 'bind demon':
+                bind_demon_lvl = v
+                break
+        if bind_demon_lvl < 1:
+            raise ValueError(
+                f"bound_demon: requires Bind Demon skill >= 1, got {bind_demon_lvl}"
+            )
+        follower_payload = resolve_bound_demon(bound_demon_spec, FIXTURES_DIR)
 
-        # Backup before each phase (Rule 3)
-        bak = f"{char_path}.pre_phase{p}_bak"
-        shutil.copy2(char_path, bak)
+    try:
+        for p in range(1, phase + 1):
+            char_phase_items, merc_phase_items = get_phase_items(all_items, p)
 
-        # Write to temp, verify, then overwrite (Rule 10)
-        temp_path = f"/tmp/{char_def['name']}_phase{p}.d2s"
-        try:
-            shutil.copy2(char_path, temp_path)
+            # Rules #10 + #17: read from staging_path, write to a per-phase
+            # temp, scan the temp, and ONLY update staging_path if the scanner
+            # passes.  The live save (char_path) is never touched during this
+            # loop — it is promoted from staging_path only after all phases pass.
+            temp_path = f"/tmp/{char_def['name']}_phase{p}.d2s"
+            # keep_temp: retain temp on failure paths for post-mortem inspection.
+            keep_temp = False
+            try:
+                shutil.copy2(staging_path, temp_path)
 
-            # Section-routed items: 'char' → JM[char], 'merc' → JM[merc].
-            # Historically merc list was always empty (Rule 6); with the new
-            # merc header now setting a valid Hireling.Id, pre-injection
-            # should work when the YAML opts in via `merc: inject: true`.
-            result = rebuild_items(temp_path, char_phase_items, merc_phase_items)
+                # Section-routed items: 'char' → JM[char], 'merc' → JM[merc].
+                # Historically merc list was always empty (Rule 6); with the new
+                # merc header now setting a valid Hireling.Id, pre-injection
+                # should work when the YAML opts in via `merc: inject: true`.
+                result = rebuild_items(
+                    temp_path, char_phase_items, merc_phase_items,
+                    follower_payload=follower_payload,
+                )
 
-            with open(temp_path, 'wb') as f:
-                f.write(result)
+                with open(temp_path, 'wb') as f:
+                    f.write(result)
 
-            # Verify checksum (Rule 5)
-            cs_stored = struct.unpack_from('<I', result, 12)[0]
-            cs_calc = calc_checksum(result)
-            if cs_stored != cs_calc:
-                print(f"  CHECKSUM MISMATCH in phase {p}")
-                return False
+                # Rule #5: verify checksum on the temp before anything else.
+                cs_stored = struct.unpack_from('<I', result, 12)[0]
+                cs_calc = calc_checksum(result)
+                if cs_stored != cs_calc:
+                    print(f"  CHECKSUM MISMATCH in phase {p} (temp)")
+                    keep_temp = True    # retain for inspection
+                    keep_staging = True  # retain staging too
+                    return False
 
-            shutil.copy2(temp_path, char_path)
-        finally:
-            if os.path.exists(temp_path):
-                os.unlink(temp_path)
-        print(f"  Phase {p}: deployed {len(char_phase_items)} char items + {len(merc_phase_items)} merc items, checksum OK")
-
-        # Run d2rdoctor scanner after each phase (Rule 4)
-        try:
-            from d2r_chargen.scanner import scan_character_data
-            result = scan_character_data(char_path)
-            scan_errors = result.get('errors', [])
-            scan_warnings = result.get('warnings', [])
-            if scan_errors:
-                print(f"  SCANNER ERRORS in phase {p}:")
-                for err in scan_errors:
-                    print(f"    {err}")
-                print(f"  Restoring from backup: {bak}")
-                shutil.copy2(bak, char_path)
-                return False
-            if scan_warnings:
+                # Rule #4 / #17: scan the TEMP, not the live save.
+                from d2r_chargen.scanner import scan_character_data
+                scan_result = scan_character_data(temp_path)
+                scan_errors = scan_result.get('errors', [])
+                scan_warnings = scan_result.get('warnings', [])
+                if scan_errors:
+                    print(f"  SCANNER ERRORS in phase {p} (temp not promoted):")
+                    for err in scan_errors:
+                        print(f"    {err}")
+                    print(f"  Live save untouched. Temp retained at {temp_path}")
+                    keep_temp = True    # retain for inspection
+                    keep_staging = True  # retain staging too
+                    return False
                 for w in scan_warnings:
                     print(f"  WARNING: {w}")
-            print(f"  Phase {p}: scanner passed ({result['item_count']} items, checksum {'OK' if result['checksum_ok'] else 'FAIL'})")
-        except ImportError:
-            print(f"  WARNING: d2r_scanner not available, skipping scan")
+
+                # Scan passed — advance staging to this phase's output.
+                shutil.copy2(temp_path, staging_path)
+                print(
+                    f"  Phase {p}: deployed {len(char_phase_items)} char items "
+                    f"+ {len(merc_phase_items)} merc items, "
+                    f"scanner passed ({scan_result['item_count']} items, "
+                    f"checksum {'OK' if scan_result['checksum_ok'] else 'FAIL'})"
+                )
+            finally:
+                # Keep temp on failure for inspection; remove on success.
+                if os.path.exists(temp_path) and not keep_temp:
+                    os.unlink(temp_path)
+
+        # All phases passed — promote staging to live in a single atomic copy.
+        # This is the only moment char_path is modified.
+        shutil.copy2(staging_path, char_path)
+    finally:
+        # Keep staging on failure for inspection; remove on success.
+        if os.path.exists(staging_path) and not keep_staging:
+            os.unlink(staging_path)
 
     print(f"\n  {char_def['name']} deployed successfully!")
     print(f"  ** Fully restart D2R to test (Rule 7) **")

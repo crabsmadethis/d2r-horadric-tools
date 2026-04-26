@@ -458,7 +458,7 @@ IDX_DIR = os.path.join(DEFAULT_GAME_DIR, "data", "data") if DEFAULT_GAME_DIR els
 
 
 def _idx_available():
-    return IDX_DIR is not None and os.path.isdir(IDX_DIR) and len(glob.glob(os.path.join(IDX_DIR, "*.idx"))) > 0
+    return os.path.isdir(IDX_DIR) and len(glob.glob(os.path.join(IDX_DIR, "*.idx"))) > 0
 
 
 @pytest.mark.skipif(not _idx_available(), reason="D2R .idx files not accessible")
@@ -516,82 +516,3 @@ class TestBuildIdxFileMatchesReal:
         idx = build_idx_file(bucket=0, entries=SINGLE_ENTRY)
         our_hdr_size = struct.unpack_from("<I", idx, 0x00)[0]
         assert our_hdr_size == real_hdr_size
-
-
-class TestBuildIndexVersionPriority:
-    """_build_index must mirror CASC: highest-version idx wins per bucket.
-
-    Filename format: XXYYYYYYYY.idx where XX = bucket (00-0f), YYYYYYYY = version (hex).
-    The current 'first seen wins' lexicographic-sort approach picks the OLDEST
-    version per ekey, returning stale content after repeated CASC injections.
-    """
-
-    def test_higher_version_wins_for_same_ekey_in_same_bucket(self):
-        """When the same EKEY appears in two .idx files for the same bucket,
-        the higher-version idx's offset must be returned."""
-        ekey = b"\x11\x22\x33\x44\x55\x66\x77\x88\x99"
-        old_idx = build_idx_file(bucket=0x0f, entries=[(ekey, 0, 0x1000, 100)])
-        new_idx = build_idx_file(bucket=0x0f, entries=[(ekey, 5, 0xABCD, 999)])
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with open(os.path.join(tmpdir, "0f00000017.idx"), "wb") as f:
-                f.write(old_idx)
-            with open(os.path.join(tmpdir, "0f00000019.idx"), "wb") as f:
-                f.write(new_idx)
-
-            from d2r_mod.casc import _build_index
-            index = _build_index(tmpdir)
-
-        archive_idx, offset, enc_size = index[ekey]
-        assert archive_idx == 5, "should read from highest-version idx (0f00000019)"
-        assert offset == 0xABCD
-        assert enc_size == 999
-
-    def test_pre_inject_bak_files_ignored(self):
-        """`.idx.pre_inject_bak` backup files must not participate in version selection."""
-        ekey = b"\xAA\xBB\xCC\xDD\xEE\xFF\x00\x11\x22"
-        live = build_idx_file(bucket=0x0c, entries=[(ekey, 2, 0x5000, 250)])
-        bak = build_idx_file(bucket=0x0c, entries=[(ekey, 9, 0x9999, 9999)])
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with open(os.path.join(tmpdir, "0c00000010.idx"), "wb") as f:
-                f.write(live)
-            # Higher-versioned .pre_inject_bak that would win if considered
-            with open(os.path.join(tmpdir, "0c00000099.idx.pre_inject_bak"), "wb") as f:
-                f.write(bak)
-
-            from d2r_mod.casc import _build_index
-            index = _build_index(tmpdir)
-
-        archive_idx, offset, _enc = index[ekey]
-        assert archive_idx == 2, "must read live .idx, not .pre_inject_bak"
-        assert offset == 0x5000
-
-    def test_different_buckets_independent(self):
-        """Each bucket selects its own highest-version idx; buckets don't interfere."""
-        ekey_a = b"\x01" * 9   # routed to whichever bucket we declare via filename
-        ekey_b = b"\x02" * 9
-        # Bucket 0c has versions 10 (old) and 20 (new); bucket 0f only version 05.
-        old_0c = build_idx_file(bucket=0x0c, entries=[(ekey_a, 0, 0x1000, 100)])
-        new_0c = build_idx_file(bucket=0x0c, entries=[(ekey_a, 7, 0x7000, 700)])
-        only_0f = build_idx_file(bucket=0x0f, entries=[(ekey_b, 3, 0x3000, 300)])
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with open(os.path.join(tmpdir, "0c00000010.idx"), "wb") as f:
-                f.write(old_0c)
-            with open(os.path.join(tmpdir, "0c00000020.idx"), "wb") as f:
-                f.write(new_0c)
-            with open(os.path.join(tmpdir, "0f00000005.idx"), "wb") as f:
-                f.write(only_0f)
-
-            from d2r_mod.casc import _build_index
-            index = _build_index(tmpdir)
-
-        # Bucket 0c: highest version (20) wins
-        a_archive, a_offset, _ = index[ekey_a]
-        assert a_archive == 7
-        assert a_offset == 0x7000
-        # Bucket 0f: only version present is used
-        b_archive, b_offset, _ = index[ekey_b]
-        assert b_archive == 3
-        assert b_offset == 0x3000

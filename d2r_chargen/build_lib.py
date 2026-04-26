@@ -3,12 +3,7 @@
 d2r_build_lib.py — Single authoritative item encoder for D2R save file editing.
 
 Consolidated item encoder for D2R save file editing.
-Replaces three competing build_item() implementations:
-  - internal item-injector spec line 171 (no runeword support, 12 BASES entries)
-  - build_characters.py line 208 (broken single terminator, ~200 BASES entries)
-  - fix_obsidian_rw.py line 132 (correct double terminator, ~25 BASES entries)
-
-Key fixes over predecessors:
+Key features:
   1. Dynamic BASES lookup from item_bases.py (659 entries) — no hardcoded dict
   2. Runeword double-terminator (from fix_obsidian_rw.py)
   3. Overflow protection on all property encoding
@@ -149,7 +144,7 @@ class BitWriter:
 
     def write_huff(self, code):
         """Write 4-char Huffman type code (3 chars + space terminator).
-        Uses HUFFMAN table from internal item-injector spec lines 43-51."""
+        Uses HUFFMAN table from d2r-editor/item_injector.py lines 43-51."""
         for ch in code:
             val, bits = HUFFMAN[ch]
             self.write_bits(val, bits)
@@ -496,7 +491,7 @@ def validate_runeword(type_code, runeword_id):
 # ---------------------------------------------------------------------------
 # F. build_item() — The Single Correct Implementation
 # Reference: fix_obsidian_rw.py lines 132-248 (the working version)
-# Reference: internal item-injector spec lines 171-287 (ext bits, format docs)
+# Reference: d2r-editor/item_injector.py lines 171-287 (ext bits, format docs)
 # Reference: d2rdoctor.md lines 105-225 (scanner field order = ground truth)
 # ---------------------------------------------------------------------------
 def build_item(type_code, col, row, storage,
@@ -683,7 +678,7 @@ def build_item(type_code, col, row, storage,
 
     # ==========================================================
     # FLAGS (32 bits)
-    # Reference: internal item-injector spec lines 7-8
+    # Reference: d2r-editor/item_injector.py lines 7-8
     # Reference: fix_obsidian_rw.py lines 154-164
     # ==========================================================
     flags = 0
@@ -699,7 +694,7 @@ def build_item(type_code, col, row, storage,
 
     # ==========================================================
     # D2R EXTENSION BITS (3 bits, value=5 → binary 101)
-    # Reference: internal item-injector spec line 214 — w.write_bits(5, 3)
+    # Reference: d2r-editor/item_injector.py line 214 — w.write_bits(5, 3)
     # Reference: d2rdoctor.md line 1333 — assert ((item[4]&7)==5)
     # Reference: d2rdoctor.md line 1555 — "Always verify ext bits"
     # Value 5 = bits (1,0,1) in LSB order = the D2R version marker
@@ -708,7 +703,7 @@ def build_item(type_code, col, row, storage,
 
     # ==========================================================
     # LOCATION FIELDS
-    # Reference: internal item-injector spec lines 9-14
+    # Reference: d2r-editor/item_injector.py lines 9-14
     # Reference: d2rdoctor.md lines 65-68
     # ==========================================================
     w.write_bits(location, 3)   # 3 bits: 0=stored, 1=equipped
@@ -726,7 +721,7 @@ def build_item(type_code, col, row, storage,
 
     # ==========================================================
     # NON-SIMPLE ITEM DATA
-    # Reference: internal item-injector spec lines 17-33
+    # Reference: d2r-editor/item_injector.py lines 17-33
     # Reference: d2rdoctor.md lines 132-135
     # ==========================================================
     nr_socketed = len(rune_codes) if rune_codes else 0
@@ -747,7 +742,7 @@ def build_item(type_code, col, row, storage,
     # ==========================================================
     # QUALITY-SPECIFIC DATA
     # Reference: d2rdoctor.md lines 144-156
-    # Reference: internal item-injector spec lines 236-251
+    # Reference: d2r-editor/item_injector.py lines 236-251
     # ==========================================================
     if quality == 1:
         # Inferior: 3 bits type
@@ -807,7 +802,7 @@ def build_item(type_code, col, row, storage,
     # ==========================================================
     # BOOK FIELD (5 bits if base & 8)
     # Reference: d2rdoctor.md lines 195-196 — "C4: book field BEFORE extended body"
-    # Reference: internal item-injector spec line 26 — "[5 bits if base&8]"
+    # Reference: d2r-editor/item_injector.py line 26 — "[5 bits if base&8]"
     # Items: tbk (Tome of Town Portal), ibk (Tome of Identify)
     # ==========================================================
     if base & 8:
@@ -840,7 +835,7 @@ def build_item(type_code, col, row, storage,
     # ==========================================================
     # QUANTITY (v105: 1-bit presence flag + conditional 9-bit value)
     # Reference: d2rdoctor.md lines 217-219
-    # Reference: internal item-injector spec lines 268-273
+    # Reference: d2r-editor/item_injector.py lines 268-273
     # ==========================================================
     if base & 1:
         # Stackable item: set presence flag and write quantity
@@ -860,7 +855,7 @@ def build_item(type_code, col, row, storage,
     # ==========================================================
     # SET FLAGS (5 bits if quality=5, BEFORE property lists)
     # Reference: d2rdoctor.md lines 224-225 — "C3: set item setflags"
-    # Reference: internal item-injector spec line 32 — "[5 bits setflags if quality=5]"
+    # Reference: d2r-editor/item_injector.py line 32 — "[5 bits setflags if quality=5]"
     # These flags indicate which set bonus property lists are present
     # ==========================================================
     if quality == 5:
@@ -966,7 +961,7 @@ def find_item_list(data, search_from=0x300):
 def calc_checksum(data):
     """Calculate D2S file checksum (rotate-left accumulate).
 
-    Reference: internal item-injector spec lines 70-76
+    Reference: d2r-editor/item_injector.py lines 70-76
     Reference: d2rdoctor.md lines 98-103
 
     The checksum field at bytes 12-15 is treated as zero during calculation.
@@ -1014,40 +1009,31 @@ def write_d2s(path, data):
 # ---------------------------------------------------------------------------
 S = STAT_BY_NAME
 
-# Common stat IDs for item building. When game data hasn't been extracted,
-# STAT_BY_NAME is None — keep the module importable so the MCP server can
-# start (lookups module handles the data-absent case explicitly).
-if _HAS_DATA:
-    STRENGTH     = S['strength']              # 0  (sB=8,  sA=32)
-    ENERGY       = S['energy']                # 1  (sB=7,  sA=32)
-    DEXTERITY    = S['dexterity']             # 2  (sB=7,  sA=32)
-    VITALITY     = S['vitality']              # 3  (sB=7,  sA=32)
-    MAXHP        = S['maxhp']                 # 7  (sB=9,  sA=32)
-    MAXMANA      = S['maxmana']               # 9  (sB=8,  sA=32)
-    ED           = S['item_armor_percent']     # 16 (sB=9,  sA=0)
-    FLAT_DEF     = S['armorclass']             # 31 (sB=11, sA=10)
-    FIRE_RES     = S['fireresist']             # 39 (sB=9,  sA=200)
-    LIGHT_RES    = S['lightresist']            # 41 (sB=9,  sA=200)
-    COLD_RES     = S['coldresist']             # 43 (sB=9,  sA=200)
-    POISON_RES   = S['poisonresist']           # 45 (sB=9,  sA=200)
-    FCR          = S['item_fastercastrate']    # 105 (sB=9, sA=0)
-    FHR          = S['item_fastergethitrate']  # 99  (sB=7, sA=20)
-    FRW          = S['item_fastermovevelocity'] # 96  (sB=7, sA=20)
-    IAS          = S['item_fasterattackrate']  # 93  (sB=7, sA=0)
-    MF           = S['item_magicbonus']        # 80  (sB=7, sA=100)
-    ALL_SKILLS   = S['item_allskills']         # 127 (sB=3, sA=0)
-    MAGIC_ABSORB     = S['item_absorbmagic']       # 147 (sB=7, sA=0)
-    ABSORB_COLD_PCT  = S['item_absorbcold_percent'] # 148 (sB=7, sA=0) — NOT the same as MAGIC_ABSORB
-    REPLENISH        = S['hpregen']                # 74  (sB=6, sA=30)
-    SKILL_TAB        = S['item_addskill_tab']      # 188 (sB=3, sA=0, sP=16)
-    NON_CLASS_SKILL  = S['item_nonclassskill']     # 97  (sB=6, sA=0, sP=9) — oskills (Teleport, BO, etc.)
-    ITEM_AURA        = S['item_aura']              # 151 (sB=5, sA=0, sP=9) — aura when equipped
-else:
-    STRENGTH = ENERGY = DEXTERITY = VITALITY = MAXHP = MAXMANA = None
-    ED = FLAT_DEF = FIRE_RES = LIGHT_RES = COLD_RES = POISON_RES = None
-    FCR = FHR = FRW = IAS = MF = ALL_SKILLS = None
-    MAGIC_ABSORB = ABSORB_COLD_PCT = REPLENISH = None
-    SKILL_TAB = NON_CLASS_SKILL = ITEM_AURA = None
+# Common stat IDs for item building
+STRENGTH     = S['strength']              # 0  (sB=8,  sA=32)
+ENERGY       = S['energy']                # 1  (sB=7,  sA=32)
+DEXTERITY    = S['dexterity']             # 2  (sB=7,  sA=32)
+VITALITY     = S['vitality']              # 3  (sB=7,  sA=32)
+MAXHP        = S['maxhp']                 # 7  (sB=9,  sA=32)
+MAXMANA      = S['maxmana']               # 9  (sB=8,  sA=32)
+ED           = S['item_armor_percent']     # 16 (sB=9,  sA=0)
+FLAT_DEF     = S['armorclass']             # 31 (sB=11, sA=10)
+FIRE_RES     = S['fireresist']             # 39 (sB=9,  sA=200)
+LIGHT_RES    = S['lightresist']            # 41 (sB=9,  sA=200)
+COLD_RES     = S['coldresist']             # 43 (sB=9,  sA=200)
+POISON_RES   = S['poisonresist']           # 45 (sB=9,  sA=200)
+FCR          = S['item_fastercastrate']    # 105 (sB=9, sA=0)
+FHR          = S['item_fastergethitrate']  # 99  (sB=7, sA=20)
+FRW          = S['item_fastermovevelocity'] # 96  (sB=7, sA=20)
+IAS          = S['item_fasterattackrate']  # 93  (sB=7, sA=0)
+MF           = S['item_magicbonus']        # 80  (sB=7, sA=100)
+ALL_SKILLS   = S['item_allskills']         # 127 (sB=3, sA=0)
+MAGIC_ABSORB     = S['item_absorbmagic']       # 147 (sB=7, sA=0)
+ABSORB_COLD_PCT  = S['item_absorbcold_percent'] # 148 (sB=7, sA=0) — NOT the same as MAGIC_ABSORB
+REPLENISH        = S['hpregen']                # 74  (sB=6, sA=30)
+SKILL_TAB        = S['item_addskill_tab']      # 188 (sB=3, sA=0, sP=16)
+NON_CLASS_SKILL  = S['item_nonclassskill']     # 97  (sB=6, sA=0, sP=9) — oskills (Teleport, BO, etc.)
+ITEM_AURA        = S['item_aura']              # 151 (sB=5, sA=0, sP=9) — aura when equipped
 
 
 # ===========================================================================

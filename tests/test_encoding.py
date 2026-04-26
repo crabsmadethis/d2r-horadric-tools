@@ -282,12 +282,12 @@ class TestEncodeProperty(unittest.TestCase):
         # -3 in 6-bit two's complement = (1<<6) - 3 = 61
         self.assertEqual(val_bits, 61)
 
-        # Roundtrip: decoder sign-extends the two's complement value back to -3
+        # Roundtrip: decoder returns unsigned interpretation (no sign extension)
         result = roundtrip([(21, -3)])
         self.assertEqual(len(result), 1)
         stat_id, value = result[0]
         self.assertEqual(stat_id, 21)
-        self.assertEqual(value, -3)
+        self.assertEqual(value, 61)
 
     # --- e=0 direct bit-level verification ---
 

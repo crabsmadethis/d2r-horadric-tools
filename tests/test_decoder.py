@@ -115,18 +115,13 @@ class TestDecoderRoundTrip(unittest.TestCase):
         self.assertEqual(values, [100, 200, 75])
 
     def test_grouped_stat_enhanced_dmg(self):
-        """np=2: enhanced_dmg [200, 150] round-trips.
-
-        stat 17 (item_maxdamage_percent) and stat 18 (item_mindamage_percent)
-        have sB=9, sS=1, so valid positive range is 0..255. Using values
-        within that range ensures correct sign-extended round-trip.
-        """
-        props = [(17, [200, 150])]
+        """np=2: enhanced_dmg [300, 250] round-trips."""
+        props = [(17, [300, 250])]
         result = self._round_trip(props)
         self.assertEqual(len(result), 1)
         stat_id, values = result[0]
         self.assertEqual(stat_id, 17)
-        self.assertEqual(values, [200, 150])
+        self.assertEqual(values, [300, 250])
 
     def test_non_class_skill(self):
         """e=0 with param: non_class_skill [3, skill_id=54] round-trips."""

@@ -8,8 +8,13 @@ argument-hint: "Character name (e.g. Tempest) or 'all'"
 Run the d2rdoctor scanner on `$ARGUMENTS`.
 
 ```bash
-TARGET="${ARGUMENTS:-all}"
-python3 -m d2r_chargen scan "$TARGET"
+python3 << 'PYEOF'
+import sys
+sys.path.insert(0, '<parent-of-d2r-tools>')
+from d2r_scanner import run_scanner
+target = '$ARGUMENTS'.strip().lower() if '$ARGUMENTS'.strip() else 'all'
+run_scanner(target)
+PYEOF
 ```
 
 ## Interpreting Results

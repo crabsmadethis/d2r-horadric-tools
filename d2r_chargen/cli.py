@@ -64,7 +64,7 @@ def cmd_validate(args):
             'drive_c/users/steamuser/Saved Games/Diablo II Resurrected'
         )
         # Prefer existing .d2s as template (has correct status/expansion bits)
-        existing_d2s = os.path.join(saves, f"{char_def['name']}.d2s")
+        existing_d2s = os.path.join(SAVES, f"{char_def['name']}.d2s")
         if os.path.exists(existing_d2s):
             template_path = existing_d2s
 

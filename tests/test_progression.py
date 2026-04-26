@@ -272,24 +272,11 @@ class TestScannerProgressionChecks(unittest.TestCase):
         errors, warnings = check_progression_consistency(data)
         self.assertTrue(any('Normal' in e for e in errors))
 
-    def test_hc_with_valid_merc_id_no_act_byte_warning(self):
-        """0xA9-0xAA holds the merc Hireling.Id (per reference_merc_d2s_offsets);
-        the legacy 'HC act byte' warning was a stale heuristic that fired on
-        any HC char with a hired merc. Must NOT fire for a valid Id like 21
-        (Iron Wolf Fire-Hell)."""
-        data = self._make_scan_stub(prog_byte=0x0F, is_hc=True, act_byte=21)
+    def test_hc_with_act_byte_set_warns(self):
+        data = self._make_scan_stub(prog_byte=0x0F, is_hc=True, act_byte=10)
         errors, warnings = check_progression_consistency(data)
-        stale = [w for w in warnings if 'act byte' in w.lower()]
-        self.assertEqual(stale, [],
-                         f"Stale 'HC act byte' warning regressed: {stale}")
-
-    def test_hc_with_out_of_range_merc_id_warns(self):
-        """If 0xA9-0xAA holds a value outside the known Hireling.Id ceiling (~35),
-        the scanner should warn — likely save-corruption or unhandled mod data."""
-        data = self._make_scan_stub(prog_byte=0x0F, is_hc=True, act_byte=200)
-        errors, warnings = check_progression_consistency(data)
-        self.assertTrue(any('merc' in w.lower() or 'hireling' in w.lower() for w in warnings),
-                        f"Expected out-of-range merc Id warning, got: {warnings}")
+        self.assertTrue(any('HC' in w or 'act byte' in w.lower() for w in warnings),
+                        f"Expected HC act byte warning, got: {warnings}")
 
     def test_level_vs_progression_warning(self):
         data = self._make_scan_stub(prog_byte=0x00)

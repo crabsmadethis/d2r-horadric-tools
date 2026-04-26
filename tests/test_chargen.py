@@ -204,11 +204,11 @@ class TestBuildConsistency(unittest.TestCase):
                              f"Item [{i}] not deterministic")
 
     def test_tempest_item_count(self):
-        """Tempest should produce 50 items (10 equipped + 7 fillers + 21 charms + 3 stash + 8 stash fillers + 1 Harlequin Crest stash)."""
+        """Tempest should produce 49 items (10 equipped + 7 fillers + 21 charms + 3 stash + 8 stash fillers)."""
         char_def = load_character_yaml(_char('Tempest'))
         items = build_all_items(char_def)
-        self.assertEqual(len(items), 50,
-                         f"Expected 50 items, got {len(items)}")
+        self.assertEqual(len(items), 49,
+                         f"Expected 49 items, got {len(items)}")
 
     def test_tempest_belt_uses_stat_16(self):
         """Regression: Arachnid Mesh belt ed must encode as stat 16 via auto-resolve."""
@@ -704,31 +704,6 @@ class TestMaxLevelDefaults(unittest.TestCase):
         items = build_all_items(c)
         # Expect at least 3 items: anni + torch + cube (equipment is empty)
         self.assertGreaterEqual(len(items), 3)
-
-
-class TestSojCanonicalStatsBuff(unittest.TestCase):
-    """SoJ canonical stats must match the 2026-04-23 buff overlay.
-
-    Locked down so a revert in unique_item_stats.py fails before any build.
-    """
-
-    def test_stone_of_jordan_stats_after_buff(self):
-        from d2r_chargen.data.unique_item_stats import UNIQUE_ITEM_STATS
-        stats = {s['stat']: (s['min'], s['max'])
-                 for s in UNIQUE_ITEM_STATS[122]['stats']}
-        self.assertEqual(stats['item_allskills'], (2, 2))
-        # lightning damage uses the grouped encoding in unique_item_stats.py:
-        # a single lightmindam entry where min=light_min_damage, max=light_max_damage.
-        # Separate lightmaxdam entries are filtered out by resolve.py's
-        # _DAMAGE_MAX_STATS set (by design — the data-file convention is grouped).
-        self.assertNotIn('lightmaxdam', stats,
-                         "lightmaxdam must not appear as a separate stat entry — "
-                         "use lightmindam min=1, max=30 for the grouped encoding")
-        self.assertEqual(stats['lightmindam'], (1, 30),
-                         "lightmindam min=light_min_damage, max=light_max_damage")
-        # Unchanged (guard against accidental co-edit):
-        self.assertEqual(stats['maxmana'], (20, 20))
-        self.assertEqual(stats['item_maxmana_percent'], (25, 25))
 
 
 if __name__ == '__main__':

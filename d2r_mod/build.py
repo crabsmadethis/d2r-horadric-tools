@@ -2,7 +2,6 @@
 
 import importlib.util
 import os
-import sys
 import glob
 import shutil
 
@@ -12,15 +11,6 @@ from d2r_mod.tsv import read_tsv_file, write_tsv_file
 from d2r_mod.overlay import load_overlay_file, apply_overlay
 from d2r_mod.scripts import run_script
 from d2r_mod.version import check_stale
-
-# tools/ lives at the project root alongside d2r_mod/ but isn't an
-# installed package, so `from tools.* import ...` below only resolves
-# when cwd is the project root. Put the project root on sys.path so
-# build_mod works regardless of caller cwd (CLI run from elsewhere,
-# MCP server, etc).
-_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if _PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, _PROJECT_ROOT)
 
 
 
@@ -234,10 +224,8 @@ def build_mod(
     # Step 5d: Auto-register custom unique display names in expansionstring.tbl
     # Any UniqueItems.txt index that is absent from the vanilla key corpus is
     # added as a name→name entry so D2R can resolve the display string.
-    # Names already served by JSON (vanilla item-names.json or any
-    # patches/json_strings/ patch) are skipped — D2R reads item names from JSON
-    # not TBL, so a TBL write for a JSON-served key is dead weight
-    # (feedback_strings_json_vs_tbl.md).
+    # See d2r_mod/build_steps/register_custom_uniques.py for the DR-1 hypothesis
+    # note about target tbl selection.
     from d2r_mod.build_steps.register_custom_uniques import (
         run as _register_custom_uniques,
         load_vanilla_keys as _load_vanilla_keys,
@@ -248,80 +236,21 @@ def build_mod(
     )
     if os.path.exists(_unique_items_build_path):
         _vanilla_keys = _load_vanilla_keys()
-        from tools.audit_string_registry import (
-            _load_vanilla_index as _load_json_vanilla_index,
-            _load_patch_keys as _load_json_patch_keys,
-        )
-        _json_vanilla_keys = set(
-            _load_json_vanilla_index(
-                os.path.join(vanilla_dir, "data", "local", "lng", "strings")
-            )
-        )
-        _json_patch_keys = _load_json_patch_keys(
-            os.path.join(os.path.dirname(overlays_dir), "patches", "json_strings")
-        )
-        _json_served = _json_vanilla_keys | _json_patch_keys
         # Register into eng only (English); multi-lang extension is a future concern.
         _target_tbl_path = os.path.join(
             build_dir, "data", "local", "lng", "eng",
             f"{_CUSTOM_UNIQUES_TBL}.tbl"
         )
         _reg_result = _register_custom_uniques(
-            _unique_items_build_path, _target_tbl_path, _vanilla_keys,
-            json_served_names=_json_served,
+            _unique_items_build_path, _target_tbl_path, _vanilla_keys
         )
-        _msg = (
+        warnings.append(
             f"CustomUniques: registered {_reg_result['added']} new name(s) in "
             f"eng/{_CUSTOM_UNIQUES_TBL}.tbl "
-            f"(skipped {_reg_result['skipped']} vanilla/existing"
+            f"(skipped {_reg_result['skipped']} vanilla/existing)"
         )
-        if _reg_result.get("skipped_json"):
-            _msg += f", skipped {_reg_result['skipped_json']} json-served"
-        _msg += ")"
-        warnings.append(_msg)
     else:
         warnings.append("CustomUniques: UniqueItems.txt not found in build — skipping")
-
-    # Step 5e: Build string registry (custom strings for runtime injection)
-    # Diffs built .tbl files against vanilla to produce a flat key→value
-    # registry consumed by the runtime string injector.
-    from d2r_mod.build_steps.build_string_registry import run as _build_string_registry
-    _str_registry = _build_string_registry(
-        build_dir=build_dir,
-        vanilla_dir=vanilla_dir,
-        write=True,
-    )
-    _total_custom = sum(len(v) for v in _str_registry.values())
-    if _total_custom:
-        warnings.append(
-            f"StringRegistry: {_total_custom} custom string(s) across "
-            f"{len(_str_registry)} table(s) → string_registry.json"
-        )
-    else:
-        warnings.append("StringRegistry: no custom strings detected")
-
-    # Step 5f: Patch JSON string files (new keys for D2R's JSON string system)
-    _json_patches_dir = os.path.join(
-        os.path.dirname(overlays_dir), "patches", "json_strings"
-    )
-    if os.path.isdir(_json_patches_dir):
-        from d2r_mod.build_steps.patch_json_strings import run as _patch_json_strings
-        _json_result = _patch_json_strings(
-            patches_dir=_json_patches_dir,
-            vanilla_dir=vanilla_dir,
-            build_dir=build_dir,
-        )
-        if _json_result["added"]:
-            warnings.append(
-                f"JsonStrings: added {_json_result['added']} new key(s) to "
-                f"{', '.join(_json_result['files'])}"
-            )
-        if _json_result.get("overridden"):
-            warnings.append(
-                f"JsonStrings: overrode {_json_result['overridden']} existing key(s)"
-            )
-    else:
-        warnings.append("JsonStrings: no patches/json_strings/ directory — skipping")
 
     # Step 6: Write modinfo.json (required for D2R to load mod .txt files)
     import json
@@ -337,7 +266,7 @@ def build_mod(
     if os.path.exists(dvb_vanilla):
         os.makedirs(os.path.dirname(dvb_out), exist_ok=True)
         shutil.copy2(dvb_vanilla, dvb_out)
-    elif game_dir is not None:
+    else:
         # Generate from .build.info
         from d2r_mod.casc import _parse_build_info
         build_info_path = os.path.join(game_dir, ".build.info")

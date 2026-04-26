@@ -14,10 +14,3 @@ def pytest_collection_modifyitems(config, items):
         for item in items:
             if "integration" in item.keywords:
                 item.add_marker(skip)
-
-
-# Hypothesis profile registration + default load.
-from tests import hypothesis_profiles  # noqa: F401, E402
-from hypothesis import settings  # noqa: E402
-
-settings.load_profile("dev")
