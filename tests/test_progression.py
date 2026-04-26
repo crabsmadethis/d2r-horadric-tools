@@ -90,7 +90,6 @@ from d2r_chargen.save import (
     set_waypoints_granular, set_quests_granular,
     find_section, set_all_waypoints, set_all_quests,
 )
-from d2r_chargen.build_lib import calc_checksum
 
 
 def _make_d2s_stub():
@@ -233,7 +232,7 @@ class TestScannerProgressionChecks(unittest.TestCase):
                         normal_q=True, nm_q=True, hell_q=True):
         """Create a d2s stub with controllable progression state."""
         from d2r_chargen.save import (
-            set_waypoints_granular, set_quests_granular, find_section,
+            set_waypoints_granular, set_quests_granular,
         )
         data = _make_d2s_stub()
         data[0x15] = prog_byte

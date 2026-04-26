@@ -62,7 +62,9 @@ def validate(name: str, yaml_only: bool = False) -> dict:
         return ok(character=name, yaml_valid=True, binary_valid=None)
 
     # Binary validation: mirror cmd_validate in d2r_chargen/cli.py
-    import shutil, struct, tempfile
+    import shutil
+    import struct
+    import tempfile
     from d2r_chargen.character import build_all_items
     from d2r_chargen.save import (
         set_character_stats, set_skills, rebuild_items, calc_checksum,

@@ -268,7 +268,6 @@ def build_mod(
         shutil.copy2(dvb_vanilla, dvb_out)
     else:
         # Generate from .build.info
-        from d2r_mod.casc import _parse_build_info
         build_info_path = os.path.join(game_dir, ".build.info")
         if os.path.exists(build_info_path):
             with open(build_info_path, "r") as f:

@@ -18,35 +18,32 @@ import random
 # Imports from data files
 # ---------------------------------------------------------------------------
 
-# Huffman encoding table (static, always available)
+# Authoritative item base database (659 entries)
+# Source: d2r_chargen/data/item_bases.py
+from d2r_chargen.data.item_bases import ITEM_BASES as ITEM_BASES_FULL
+
+# Unique items database (406 entries, UIDs 0-406)
+# Source: d2r_chargen/data/unique_items.py
+from d2r_chargen.data.unique_items import UNIQUE_ITEMS
+
+# Set items database (127 entries)
+# Source: d2r_chargen/data/set_items.py
+from d2r_chargen.data.set_items import SET_ITEMS
+
+# Runewords database (177 entries)
+# Source: d2r_chargen/data/runewords.py
+from d2r_chargen.data.runewords import RUNEWORDS
+
+# Stat encoding parameters (361 stat definitions)
+# Source: d2r_chargen/data/item_stat_cost.py
+from d2r_chargen.data.item_stat_cost import ITEM_STAT_COST, STAT_BY_NAME
+
+# Item grid dimensions (659 entries)
+# Source: d2r_chargen/data/item_dimensions.py
+
+# Huffman encoding table from d2r-editor/item_injector.py lines 43-51
+# Maps character -> (value, num_bits) for LSB-first encoding
 from d2r_chargen.data.huffman import HUFFMAN
-
-# Generated data modules — require 'd2r-mod extract' to exist
-try:
-    from d2r_chargen.data.item_bases import ITEM_BASES as ITEM_BASES_FULL
-    from d2r_chargen.data.unique_items import UNIQUE_ITEMS
-    from d2r_chargen.data.set_items import SET_ITEMS
-    from d2r_chargen.data.runewords import RUNEWORDS
-    from d2r_chargen.data.item_stat_cost import ITEM_STAT_COST, STAT_BY_NAME
-    from d2r_chargen.data.item_dimensions import ITEM_DIMENSIONS
-    _HAS_DATA = True
-except ImportError:
-    ITEM_BASES_FULL = None
-    UNIQUE_ITEMS = None
-    SET_ITEMS = None
-    RUNEWORDS = None
-    ITEM_STAT_COST = None
-    STAT_BY_NAME = None
-    ITEM_DIMENSIONS = None
-    _HAS_DATA = False
-
-
-def _require_data():
-    '''Raise RuntimeError if generated game data is not available.'''
-    if not _HAS_DATA:
-        raise RuntimeError(
-            "Game data not available. Run 'd2r-mod extract' first."
-        )
 
 from d2r_chargen.config import RW_BASE_CATEGORIES
 

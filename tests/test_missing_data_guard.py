@@ -1,7 +1,6 @@
 """Test that missing chargen data files produce a helpful error."""
 import importlib
 import importlib.util
-import sys
 import pytest
 
 

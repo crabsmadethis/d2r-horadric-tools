@@ -434,7 +434,6 @@ class TestRoundTripParity:
     def test_chargen_produces_3_parent_items(self):
         """Chargen MUST emit exactly 3 merc-section parent items (matches golden)."""
         from d2r_chargen.character import build_all_items
-        from d2r_chargen.scanner import decode_item_header
 
         char_def = _build_roundtrip_char_def()
         all_items = build_all_items(char_def)

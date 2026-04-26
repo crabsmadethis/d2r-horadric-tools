@@ -6,9 +6,9 @@ Bug A root cause: `properties:` on unique/set/runeword items silently
 dropped canonical stats because _resolve_final_properties treated it
 as a full override instead of a merge.
 """
-import pytest
 
 # Skip entire file if game data not extracted
+import pytest
 pytest.importorskip("d2r_chargen.data.item_stat_cost",
                      reason="game data not extracted (run 'd2r-mod extract')")
 

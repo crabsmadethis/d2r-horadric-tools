@@ -8,7 +8,6 @@ pytest.importorskip("d2r_chargen.data.item_stat_cost",
                      reason="game data not extracted (run 'd2r-mod extract')")
 
 from d2r_chargen.follower_block import (
-    FollowerBlock,
     decode_follower_block,
     parse_demon_payload,
 )

@@ -10,7 +10,7 @@ from d2r_chargen.decoder import decode_item_properties
 from d2r_chargen.config import (
     CLASS_DEFS, reverse_resolve_alias,
 )
-from d2r_chargen.data.item_stat_cost import ITEM_STAT_COST, STAT_BY_NAME
+from d2r_chargen.data.item_stat_cost import ITEM_STAT_COST
 from d2r_chargen.data.unique_items import UNIQUE_ITEMS
 from d2r_chargen.data.set_items import SET_ITEMS
 from d2r_chargen.data.runewords import RUNEWORDS, RUNE_CODE_TO_NAME

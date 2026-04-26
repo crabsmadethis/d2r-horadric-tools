@@ -10,7 +10,11 @@ Extracted from d2rdoctor.md skill file. Can be:
 Produces identical output to the original inline d2rdoctor.md scanner.
 """
 
-import struct, sys, os, time, json
+import struct
+import sys
+import os
+import time
+import json
 
 from d2r_chargen.data.huffman import HUFFMAN_TREE, RUNE_NAMES
 try:

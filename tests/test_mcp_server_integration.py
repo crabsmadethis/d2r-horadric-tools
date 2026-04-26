@@ -3,7 +3,6 @@
 Catches transport-level regressions that unit tests can't see: FastMCP
 serialization, async signatures, tool registration, return-type coercion.
 """
-import asyncio
 import json
 import os
 import sys

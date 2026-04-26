@@ -5,7 +5,9 @@ Tests item building, property resolution, and byte-level compatibility.
 
 Run: python3 -m pytest tests/test_chargen.py -v
 """
-import os, random, unittest
+import os
+import random
+import unittest
 
 # Skip entire file if game data not extracted
 import pytest
@@ -13,10 +15,8 @@ pytest.importorskip("d2r_chargen.data.item_stat_cost",
                      reason="game data not extracted (run 'd2r-mod extract')")
 
 from d2r_chargen.data.item_stat_cost import STAT_BY_NAME
-from d2r_chargen.build_lib import build_item
 from d2r_chargen.config import PROPERTY_ALIASES, CHARS_DIR
 from d2r_chargen.resolve import resolve_properties, resolve_unique, resolve_runeword
-from d2r_chargen.items import build_equipment_item
 from d2r_chargen.character import load_character_yaml, validate_char_def, build_all_items
 
 
@@ -441,7 +441,7 @@ class TestFreshnessGate(unittest.TestCase):
 
     def test_stale_import_blocks_deploy(self):
         """deploy_character returns False with stale checksum."""
-        import tempfile, yaml
+        import yaml
         from d2r_chargen.character import deploy_character
 
         saves = os.path.expanduser(
@@ -474,7 +474,8 @@ class TestFreshnessGate(unittest.TestCase):
             with open(yaml_path, 'w') as f:
                 yaml.dump(char_def, f)
             # Should return False because checksum doesn't match
-            import io, contextlib
+            import io
+            import contextlib
             output = io.StringIO()
             with contextlib.redirect_stdout(output):
                 result = deploy_character('_TestFreshness')
@@ -659,7 +660,6 @@ class TestMaxLevelDefaults(unittest.TestCase):
 
     def test_defaults_off_by_default(self):
         """No flag == no injection."""
-        from d2r_chargen.character import _inject_max_level_defaults
         c = {
             'schema_version': 1, 'name': 'T', 'class': 'sorceress', 'level': 99,
             'stats': {'strength': 10, 'dexterity': 25, 'vitality': 10, 'energy': 35},
@@ -669,7 +669,8 @@ class TestMaxLevelDefaults(unittest.TestCase):
         # When called directly it still injects (caller's responsibility);
         # the guard is in load_character_yaml. Verify load_character_yaml
         # does not inject absent the flag — simulate by writing tmp file.
-        import tempfile, yaml as _yaml
+        import tempfile
+        import yaml as _yaml
         from d2r_chargen.character import load_character_yaml
         with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
             _yaml.safe_dump(c, f)

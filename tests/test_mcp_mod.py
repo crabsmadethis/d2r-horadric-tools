@@ -1,5 +1,4 @@
 """Tests for d2r_mcp.mod tool implementations."""
-import os
 import pytest
 
 

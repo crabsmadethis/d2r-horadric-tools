@@ -3,9 +3,7 @@
 import hashlib
 import os
 import shutil
-import struct
 import sys
-import tempfile
 
 import pytest
 
@@ -16,7 +14,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from d2r_mod.casc import (
     DEFAULT_GAME_DIR,
     _build_index,
-    _decompress_blte,
     _parse_build_config,
     _parse_build_info,
     _parse_tvfs,
@@ -26,7 +23,6 @@ from d2r_mod.casc_write import (
     CASCWriteError,
     _find_writable_archive,
     _update_build_config,
-    blte_encode,
     inject_files,
 )
 

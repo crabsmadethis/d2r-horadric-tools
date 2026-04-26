@@ -10,11 +10,10 @@ import sys
 
 import yaml
 from d2r_chargen.config import (
-    SAVES, CHARS_DIR, FIXTURES_DIR, SLOT_MAP, CLASS_DEFS, PROPERTY_ALIASES,
-    CHARM_DIMS,
+    SAVES, CHARS_DIR, FIXTURES_DIR, SLOT_MAP, CLASS_DEFS, CHARM_DIMS,
 )
 from d2r_chargen.resolve import (
-    resolve_property_name, resolve_skills, resolve_runeword, resolve_unique,
+    resolve_property_name, resolve_skills, resolve_unique,
     resolve_progression, resolve_bound_demon,
 )
 from d2r_chargen.items import build_equipment_item, build_charm, build_merc_item
@@ -1104,7 +1103,7 @@ def deploy_character(char_name, phase=4, force=False):
     """
     from d2r_chargen.save import (
         create_new_character, set_character_stats, set_skills,
-        set_waypoints, set_quests, set_difficulty,
+        set_difficulty,
         set_waypoints_granular, set_quests_granular,
         rebuild_items, calc_checksum,
         set_merc_header, MERC_HIRELING_ID,

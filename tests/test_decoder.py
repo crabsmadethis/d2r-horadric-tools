@@ -8,7 +8,6 @@ pytest.importorskip("d2r_chargen.data.item_stat_cost",
                      reason="game data not extracted (run 'd2r-mod extract')")
 
 from d2r_chargen.build_lib import BitWriter, encode_property
-from d2r_chargen.data.item_stat_cost import ITEM_STAT_COST, STAT_BY_NAME
 
 
 def encode_properties(prop_tuples):

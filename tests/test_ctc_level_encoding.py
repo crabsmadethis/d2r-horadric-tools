@@ -6,9 +6,9 @@ param) encoded skill_id alone in the param field, omitting the level bits.
 
 D2R CTC param encoding: (level << 10) | skill_id.
 """
-import pytest
 
 # Skip entire file if game data not extracted
+import pytest
 pytest.importorskip("d2r_chargen.data.item_stat_cost",
                      reason="game data not extracted (run 'd2r-mod extract')")
 

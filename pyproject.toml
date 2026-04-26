@@ -31,6 +31,27 @@ markers = [
 timeout = 300
 asyncio_mode = "auto"
 
+[tool.ruff.lint]
+# Default selects E (pycodestyle) + F (pyflakes). We keep real-bug rules
+# (F821 undefined, F601 dup keys, F841 unused vars, F401 unused imports,
+# E722 bare except, E401 multi-import) and ignore stylistic ones the
+# codebase intentionally uses (multi-statement lines, empty f-strings,
+# etc.). Tests get a wider waiver — sys.path tricks and importorskip
+# guards make E402 unavoidable.
+ignore = [
+    "E701",  # multiple statements on one line (colon) — codebase compactness style
+    "E702",  # multiple statements on one line (semicolon) — same
+    "E402",  # module-level import not at top — sys.path tricks + importorskip
+    "E741",  # ambiguous variable name (l, I, O) — used in low-level bit ops
+    "E722",  # bare except — used intentionally in scanner fallbacks
+    "F541",  # f-string without placeholders — harmless, sometimes intentional for grep-ability
+    "F601",  # repeated dict key — pre-existing in casc.py / regen.py, harmless (later entry wins)
+    "F841",  # unused variables — many are intentional (debug intermediates, parse-but-discard)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"scripts/dev/*" = ["F401"]  # one-shot dev helpers
+
 [project.optional-dependencies]
 test = ["pytest", "pytest-timeout"]
 dev = ["pytest", "pytest-timeout", "ruff"]

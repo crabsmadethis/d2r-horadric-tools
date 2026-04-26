@@ -9,7 +9,9 @@ Usage:
     python3 -m d2r_chargen validate <name>
     python3 -m d2r_chargen scan <name>
 """
-import sys, os, argparse
+import sys
+import os
+import argparse
 
 
 def cmd_build(args):
@@ -42,10 +44,12 @@ def cmd_validate(args):
 
     # Binary validation: build to temp, run scanner (Rule 17)
     if not args.yaml_only:
-        import shutil, struct, tempfile
+        import shutil
+        import struct
+        import tempfile
         from d2r_chargen.character import build_all_items
         from d2r_chargen.save import (
-            create_new_character, set_character_stats, set_skills,
+            set_character_stats, set_skills,
             rebuild_items, calc_checksum,
         )
         from d2r_chargen.resolve import resolve_skills
@@ -64,7 +68,7 @@ def cmd_validate(args):
             'drive_c/users/steamuser/Saved Games/Diablo II Resurrected'
         )
         # Prefer existing .d2s as template (has correct status/expansion bits)
-        existing_d2s = os.path.join(SAVES, f"{char_def['name']}.d2s")
+        existing_d2s = os.path.join(saves, f"{char_def['name']}.d2s")
         if os.path.exists(existing_d2s):
             template_path = existing_d2s
 
@@ -123,8 +127,11 @@ def cmd_scan(args):
 
 def cmd_import(args):
     from d2r_chargen.importer import import_character, dict_to_yaml
-    from d2r_chargen.config import SAVES
-    d2s_path = os.path.join(SAVES, f"{args.name}.d2s")
+    saves = os.path.expanduser(
+        '~/.local/share/Steam/steamapps/compatdata/2536520/pfx/'
+        'drive_c/users/steamuser/Saved Games/Diablo II Resurrected'
+    )
+    d2s_path = os.path.join(saves, f"{args.name}.d2s")
     if not os.path.exists(d2s_path):
         print(f"  ERROR: {d2s_path} not found")
         return

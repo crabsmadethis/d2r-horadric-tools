@@ -21,7 +21,6 @@ pytest.importorskip("d2r_chargen.data.item_stat_cost",
 from d2r_chargen.build_lib import build_item, encode_socketed_rune
 from d2r_chargen.save import rebuild_items
 from d2r_chargen.scanner import scan_character_data
-from d2r_chargen.data.item_stat_cost import ITEM_STAT_COST
 from d2r_chargen.data.item_bases import ITEM_BASES
 from d2r_chargen.data.unique_items import UNIQUE_ITEMS
 from d2r_chargen.data.unique_item_stats import UNIQUE_ITEM_STATS

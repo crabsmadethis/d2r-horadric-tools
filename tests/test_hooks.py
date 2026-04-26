@@ -5,7 +5,6 @@ Tests pipe JSON to hook scripts and verify exit codes + output.
 import json
 import os
 import subprocess
-import pytest
 
 HOOKS_DIR = os.path.join(os.path.dirname(__file__), "..", "hooks")
 

@@ -10,8 +10,6 @@ Covers:
   - Real UniqueItems.txt after build detects all 6 custom uniques.
 """
 
-import os
-import struct
 import unittest
 from pathlib import Path
 
@@ -230,7 +228,6 @@ class TestAutoRegisterIntegration(unittest.TestCase):
     def test_vanilla_unique_names_are_skipped(self):
         """Spot-check that well-known vanilla unique names are NOT re-added."""
         from d2r_mod.build_steps.register_custom_uniques import run, load_vanilla_keys
-        from d2r_mod.assets.tbl import parse_tbl
         import tempfile
         from pathlib import Path
 

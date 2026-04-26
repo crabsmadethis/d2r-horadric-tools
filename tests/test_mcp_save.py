@@ -2,7 +2,6 @@
 import os
 import shutil
 import struct
-import tempfile
 import pytest
 
 FIXTURE = os.path.join(

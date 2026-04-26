@@ -48,7 +48,8 @@ class TestStringPatches(unittest.TestCase):
 
     def test_string_config_format(self):
         """Verify all string patch YAMLs have required fields."""
-        import yaml, glob
+        import yaml
+        import glob
 
         patches_dir = os.path.join(os.path.dirname(__file__), "..",
                                    "patches", "strings")

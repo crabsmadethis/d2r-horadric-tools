@@ -5,7 +5,9 @@ Extracted from build_characters.py — single source of truth for save-file
 binary operations: rebuild items, set stats, waypoints, quests, skills,
 difficulty, and create new characters from templates.
 """
-import os, struct, shutil
+import os
+import struct
+import shutil
 
 from d2r_chargen.build_lib import calc_checksum
 

@@ -120,7 +120,9 @@ class TestCmdDiffSummaryFooter(unittest.TestCase):
 
     def test_summary_footer_printed(self):
         """--summary mode must print '<N> file(s) with changes' after the per-file summaries."""
-        import tempfile, os, argparse
+        import tempfile
+        import os
+        import argparse
         from unittest.mock import patch
         from d2r_mod import cli
 
@@ -146,7 +148,9 @@ class TestCmdDiffSummaryFooter(unittest.TestCase):
 
     def test_summary_footer_zero_when_no_changes(self):
         """--summary must print '0 file(s) with changes' when nothing changed."""
-        import tempfile, os, argparse
+        import tempfile
+        import os
+        import argparse
         from unittest.mock import patch
         from d2r_mod import cli
 

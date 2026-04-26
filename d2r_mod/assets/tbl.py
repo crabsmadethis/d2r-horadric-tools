@@ -28,7 +28,6 @@ Binary format (confirmed against vanilla D2R files):
     key\\0value\\0 pairs. All offsets are ABSOLUTE.
 """
 
-import os
 import struct
 
 # ── Public constants ──────────────────────────────────────────────────────────

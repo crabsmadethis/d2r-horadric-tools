@@ -1,7 +1,6 @@
 import unittest
 import tempfile
 import os
-import shutil
 from d2r_mod.build import build_mod
 from d2r_mod.tsv import read_tsv_file, write_tsv_file
 
