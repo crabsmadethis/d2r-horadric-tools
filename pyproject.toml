@@ -33,3 +33,4 @@ asyncio_mode = "auto"
 
 [project.optional-dependencies]
 test = ["pytest", "pytest-timeout"]
+dev = ["pytest", "pytest-timeout", "ruff"]
