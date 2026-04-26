@@ -284,7 +284,7 @@ class TestScannerProgressionChecks(unittest.TestCase):
                          f"Stale 'HC act byte' warning regressed: {stale}")
 
     def test_hc_with_out_of_range_merc_id_warns(self):
-        """If 0xA9-0xAA holds a value outside the known Hireling.Id ceiling (~41),
+        """If 0xA9-0xAA holds a value outside the known Hireling.Id ceiling (~35),
         the scanner should warn — likely save-corruption or unhandled mod data."""
         data = self._make_scan_stub(prog_byte=0x0F, is_hc=True, act_byte=200)
         errors, warnings = check_progression_consistency(data)

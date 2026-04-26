@@ -417,13 +417,8 @@ _MERC_CLASS_RULES = {
         'slots': {'weapon', 'shield', 'helm', 'body'},
         'weapon_categories': {'Sword'},
     },
-    'act4_smite': {
-        'ids': {41},
-        'slots': {'weapon', 'helm', 'body'},
-        'weapon_categories': {'Sword'},
-    },
     'act5_barb': {
-        'ids': set(range(24, 30)) | {38},
+        'ids': set(range(24, 30)),
         'slots': {'weapon', 'helm', 'body'},
         'weapon_categories': {'Sword', 'Axe', 'Mace', 'Hammer', 'Club'},
     },
