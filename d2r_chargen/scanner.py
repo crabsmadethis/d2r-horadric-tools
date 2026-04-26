@@ -122,8 +122,6 @@ _MERC_ID_RANGES = [
     (15, 23, 'Iron Wolf (Act 3)'),
     (24, 29, 'Barbarian 2H (Act 5)'),
     (30, 35, 'Desert Merc expansion auras'),
-    (36, 38, 'Barbarian 1H (mod)'),
-    (39, 41, 'Holy Warrior (mod, Act 4)'),
 ]
 
 
@@ -1218,9 +1216,9 @@ def check_progression_consistency(data, yaml_progression=None):
     # superseded 2026-04-19; HC chars can validly hire mercs.
     if len(data) > 0xAA:
         merc_id = struct.unpack_from('<H', data, 0xA9)[0]
-        if merc_id > 41:
+        if merc_id > 35:
             warnings.append(
-                f"merc Hireling.Id 0xA9-0xAA={merc_id} exceeds known ceiling (41) — "
+                f"merc Hireling.Id 0xA9-0xAA={merc_id} exceeds known ceiling (35) — "
                 f"possible save corruption or unhandled mod data"
             )
 

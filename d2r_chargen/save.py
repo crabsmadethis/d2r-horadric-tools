@@ -494,10 +494,6 @@ MERC_HIRELING_ID: dict = {
     # Act 5 Barbarian
     'act5_2hs':             28,   # 2H-Hell
     'act5_2hs_alt':         29,   # 2H-Hell (alt name pool)
-    'act5_1hs':             38,   # 1H-Hell (mod-added)
-    # Act 4 Holy Warrior (mod-added)
-    'act4_smite':           41,   # Smite-Hell
-    'act4_smite_nm':        40,   # Smite-NM
 }
 
 
@@ -513,7 +509,7 @@ def set_merc_header(data, hireling_id: int, seed: int | None = None,
 
     Args:
         data: bytearray of the .d2s file (modified in place)
-        hireling_id: Hireling.txt Id column value (0-41 in rebalance mod)
+        hireling_id: Hireling.txt Id column value (0-35)
         seed: u32 name seed (None → random)
         xp: initial merc XP (default 0 — D2R will accrue on kills)
         field_a7: u16 at 0xa7 (default 0; live values seen: 10 for Geshef, 13 for Elexa)
