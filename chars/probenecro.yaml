@@ -1,5 +1,5 @@
 schema_version: 1
-name: D2SProbeNecro
+name: probenecro
 class: necromancer
 level: 30
 progression: normal_complete

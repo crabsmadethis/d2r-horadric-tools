@@ -364,9 +364,9 @@ sources for full context — this is just the index.
   live-test session on 2026-05-08 found staged probe saves that scanned cleanly
   but did not appear in Offline. Adding copied companions (`.ctl`, `.key`,
   `.map`, `.ma0`) and matching the throwaway character's SC/HC status category
-  was still insufficient. Verify with a same-install lowercase clone of a
-  D2R-created throwaway character before treating an invisible probe as a
-  payload rejection.
+  was still insufficient. Same-install letter-only clones appeared, while names
+  containing the digit `2` did not. Use letter-only embedded names and matching
+  file basenames before treating an invisible probe as a payload rejection.
 - **Stats can't be 0** where class minimum applies — Dex / Energy at 0 produces `Error:7`. (`feedback_stats_nonzero.md`.)
 - **Non-simple socketed fillers are broken** — magic jewels (quality=4, location=6) cause "FAILED TO JOIN GAME" with a full save. Merge filler stats into the parent. (`feedback_jewel_filler.md`.)
 - **HC flip preserves merc bytes** — `feedback_hc_flip_merc_preserve.md`: don't zero `0xA8..0xAA` when flipping SC→HC, or merc Hireling.Id is destroyed.

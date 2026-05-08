@@ -1,5 +1,5 @@
 schema_version: 1
-name: D2SProbeSorc
+name: probesorc
 class: sorceress
 level: 80
 progression: hell_complete

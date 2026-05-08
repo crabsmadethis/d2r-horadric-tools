@@ -170,9 +170,10 @@ Live next step:
 - A scanner-clean `.d2s` can still be invisible in character select if its
   companion files or SC/HC display category do not match the active profile.
 - On the 2026-05-08 Bazzite session, adding copied companions plus matching
-  `0x14 == 0x04` still did not make the probe characters visible; run a
-  same-install lowercase clone of a D2R-created throwaway character before
-  concluding the probe payload is bad.
+  `0x14 == 0x04` still did not make digit-bearing `D2SProbe...` characters
+  visible. Same-install letter-only clones did appear, including clones that
+  changed class, level, progression, current difficulty, and merc header bytes.
+  Use letter-only probe names before concluding the probe payload is bad.
 - Only copy one test character at a time into the live save directory.
 - After each live result, copy the rewritten save back to a private fixture area
   and record only aggregate findings in public docs.

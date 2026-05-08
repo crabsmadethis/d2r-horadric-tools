@@ -50,17 +50,17 @@ bbbbb.map
 bbbbb.ma0
 ```
 
-The staged probes were scanner-clean as bare `.d2s` files, but did not appear in
-the Offline list. Adding copied companion files and matching the throwaway
-character's hardcore/alive status byte (`0x04`) was still insufficient in that
-session. Treat this as an unresolved character-select visibility rule, not as a
-payload rejection.
+The first staged probes used names like `D2SProbeWl0` and did not appear in the
+Offline list even after copied companion files and a matching hardcore/alive
+status byte (`0x04`). A same-install lowercase clone of the throwaway character
+(`ccccc`) appeared and joined successfully. Single-field clones then showed
+class, level, progression, current difficulty, and merc header bytes were not
+the visibility blocker. The decisive test was name shape: letter-only names
+appeared, while names containing the digit `2` did not.
 
-Next diagnostic: with D2R fully closed, clone the exact same-install throwaway
-file family to a simple lowercase name, patch only the `.d2s` embedded name and
-checksum, and relaunch. If the clone appears, the probe payload/header differs
-from a displayable D2R-written save. If the clone does not appear, D2R likely
-uses another character-list cache or index beyond the visible save family.
+Use letter-only probe names for live tests. Scanner-clean `.d2s` files with
+digits in the embedded character name or filename can be invisible in character
+select.
 
 For staging outside the live save directory, set both variables:
 
@@ -76,10 +76,10 @@ Committed under `chars/`:
 
 | File | Character | Purpose |
 | --- | --- | --- |
-| `D2SProbeWl0.yaml` | `D2SProbeWl0` | Warlock with Bind Demon skill but no follower payload |
-| `D2SProbeWlD.yaml` | `D2SProbeWlD` | Warlock with copied bound-demon payload |
-| `D2SProbeSorc.yaml` | `D2SProbeSorc` | Non-warlock baseline for borrowed follower forge test |
-| `D2SProbeNecro.yaml` | `D2SProbeNecro` | Iron Golem capture test |
+| `probewlzero.yaml` | `probewlzero` | Warlock with Bind Demon skill but no follower payload |
+| `probewldemon.yaml` | `probewldemon` | Warlock with copied bound-demon payload |
+| `probesorc.yaml` | `probesorc` | Non-warlock baseline for borrowed follower forge test |
+| `probenecro.yaml` | `probenecro` | Iron Golem capture test |
 
 All names are 15 bytes or fewer for the fixed name field.
 
@@ -99,17 +99,17 @@ Record only aggregate counters in public docs.
 Start with temp validation:
 
 ```bash
-python3 -m d2r_chargen validate D2SProbeWl0
-D2R_FIXTURES=${D2R_FIXTURES:-tests/fixtures} python3 -m d2r_chargen validate D2SProbeWlD
-python3 -m d2r_chargen validate D2SProbeSorc
-python3 -m d2r_chargen validate D2SProbeNecro
+python3 -m d2r_chargen validate probewlzero
+D2R_FIXTURES=${D2R_FIXTURES:-tests/fixtures} python3 -m d2r_chargen validate probewldemon
+python3 -m d2r_chargen validate probesorc
+python3 -m d2r_chargen validate probenecro
 ```
 
 Then build one at a time only when ready to run the live test:
 
 ```bash
-python3 -m d2r_chargen build D2SProbeWl0 --force
-python3 -m d2r_chargen scan D2SProbeWl0
+python3 -m d2r_chargen build probewlzero --force
+python3 -m d2r_chargen scan probewlzero
 ```
 
 Repeat for each character as needed.
@@ -130,8 +130,8 @@ than only the `.d2s`:
 5. If the probe still does not appear, compare its status byte at `0x14` with a
    fresh in-game throwaway character before assuming the save payload was
    rejected.
-6. If it still does not appear, run the lowercase clone diagnostic above before
-   changing any probe payload bytes.
+6. Confirm the embedded character name and file basename contain letters only.
+   Avoid digits such as the `2` in `D2SProbe...`.
 
 Prefer `python3 -m d2r_chargen build <name> --force` against the live save
 directory when possible, because `create_new_character()` already copies
@@ -142,24 +142,24 @@ template companion files for new characters.
 Build and scan both Warlock variants:
 
 ```bash
-python3 -m d2r_chargen build D2SProbeWl0 --force
-python3 -m d2r_chargen scan D2SProbeWl0
+python3 -m d2r_chargen build probewlzero --force
+python3 -m d2r_chargen scan probewlzero
 
-D2R_FIXTURES=${D2R_FIXTURES:-tests/fixtures} python3 -m d2r_chargen build D2SProbeWlD --force
-python3 -m d2r_chargen scan D2SProbeWlD
+D2R_FIXTURES=${D2R_FIXTURES:-tests/fixtures} python3 -m d2r_chargen build probewldemon --force
+python3 -m d2r_chargen scan probewldemon
 ```
 
 Live observations:
 
 - Can each character enter game?
-- Does `D2SProbeWlD` spawn or preserve the copied bound demon?
+- Does `probewldemon` spawn or preserve the copied bound demon?
 - After save and quit, does the rewritten `.d2s` keep `follower_count=1` and
   exactly 116 trailing payload bytes?
 
 Post-run aggregate check:
 
 ```bash
-python3 tools/d2s_corpus_scan.py "$SAVES/D2SProbeWl0.d2s" "$SAVES/D2SProbeWlD.d2s" --examples 2
+python3 tools/d2s_corpus_scan.py "$SAVES/probewlzero.d2s" "$SAVES/probewldemon.d2s" --examples 2
 ```
 
 ## Step 4: Cross-class borrowed follower test
@@ -167,26 +167,26 @@ python3 tools/d2s_corpus_scan.py "$SAVES/D2SProbeWl0.d2s" "$SAVES/D2SProbeWlD.d2
 Build a clean Sorceress baseline:
 
 ```bash
-python3 -m d2r_chargen build D2SProbeSorc --force
-python3 -m d2r_chargen scan D2SProbeSorc
+python3 -m d2r_chargen build probesorc --force
+python3 -m d2r_chargen scan probesorc
 ```
 
 Forge a staged copy with a copied demon payload:
 
 ```bash
 python3 tools/d2s_forge_follower.py \
-  "$SAVES/D2SProbeSorc.d2s" \
-  /tmp/D2SProbeSorc.borrowed-follower.d2s \
+  "$SAVES/probesorc.d2s" \
+  /tmp/probesorc.borrowed-follower.d2s \
   --template-d2s "${D2R_FIXTURES:-tests/fixtures}/marrowbind_demon_b.d2s"
 
-python3 tools/d2s_corpus_scan.py /tmp/D2SProbeSorc.borrowed-follower.d2s --examples 2
+python3 tools/d2s_corpus_scan.py /tmp/probesorc.borrowed-follower.d2s --examples 2
 ```
 
 Manual promotion for this test only:
 
 ```bash
-cp "$SAVES/D2SProbeSorc.d2s" "$SAVES/D2SProbeSorc.d2s.pre_borrowed_follower_bak"
-cp /tmp/D2SProbeSorc.borrowed-follower.d2s "$SAVES/D2SProbeSorc.d2s"
+cp "$SAVES/probesorc.d2s" "$SAVES/probesorc.d2s.pre_borrowed_follower_bak"
+cp /tmp/probesorc.borrowed-follower.d2s "$SAVES/probesorc.d2s"
 ```
 
 Live observations:
@@ -200,7 +200,7 @@ Live observations:
 Restore baseline after the test:
 
 ```bash
-cp "$SAVES/D2SProbeSorc.d2s.pre_borrowed_follower_bak" "$SAVES/D2SProbeSorc.d2s"
+cp "$SAVES/probesorc.d2s.pre_borrowed_follower_bak" "$SAVES/probesorc.d2s"
 ```
 
 ## Step 5: Negative follower mismatch test
@@ -210,11 +210,11 @@ probe character and only after backing it up.
 
 ```bash
 python3 tools/d2s_forge_follower.py \
-  "$SAVES/D2SProbeSorc.d2s" \
-  /tmp/D2SProbeSorc.invalid-follower.d2s \
+  "$SAVES/probesorc.d2s" \
+  /tmp/probesorc.invalid-follower.d2s \
   --invalid-count-without-payload
 
-python3 tools/d2s_corpus_scan.py /tmp/D2SProbeSorc.invalid-follower.d2s --examples 2
+python3 tools/d2s_corpus_scan.py /tmp/probesorc.invalid-follower.d2s --examples 2
 ```
 
 Expected scanner result: `follower_payload_ok: false`.
@@ -227,17 +227,17 @@ backup immediately afterward.
 Build the Necromancer probe:
 
 ```bash
-python3 -m d2r_chargen build D2SProbeNecro --force
-python3 -m d2r_chargen scan D2SProbeNecro
+python3 -m d2r_chargen build probenecro --force
+python3 -m d2r_chargen scan probenecro
 ```
 
 Live steps:
 
-1. Enter game with `D2SProbeNecro`.
+1. Enter game with `probenecro`.
 2. Create an Iron Golem from a simple vendor item.
 3. Save and quit.
 4. Fully exit D2R.
-5. Copy `D2SProbeNecro.d2s` to a private fixture area.
+5. Copy `probenecro.d2s` to a private fixture area.
 6. Run `python3 tools/d2s_corpus_scan.py <private fixture> --examples 1`.
 
 Expected research result: the first local example with `has_golem_byte=1`, which
