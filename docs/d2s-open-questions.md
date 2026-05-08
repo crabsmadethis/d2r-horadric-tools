@@ -86,6 +86,9 @@ Live next step:
 
 - Capture the same bound demon after damage/heal, after save/load, and after a
   rebind to a known monster. Diff only the 116-byte payload.
+- 2026-05-08 live result: `probewldemon` entered game with the copied bound
+  demon visible. After save-and-quit, D2R rewrote the save to 1319 bytes while
+  preserving `follower_count=1` and exactly 116 trailing payload bytes.
 
 ### 2. Embedded `gf` inside demon payload
 
@@ -99,6 +102,9 @@ Live next step:
 
 - Confirm a bound-demon save with a payload still has no extra section after the
   116 bytes by entering game and forcing D2R to rewrite/cache the save.
+- 2026-05-08 live result: D2R's rewritten `probewldemon.d2s` ended immediately
+  after the 116-byte follower payload; the embedded `gf` was still at payload
+  offset 92 and did not behave as a structural marker.
 
 ### 3. Cross-class follower behavior
 

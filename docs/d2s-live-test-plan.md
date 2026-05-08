@@ -158,6 +158,10 @@ Live observations:
 - After save and quit, does the rewritten `.d2s` keep `follower_count=1` and
   exactly 116 trailing payload bytes?
 
+2026-05-08 result: `probewldemon` entered game, the demon was present, and
+after save-and-quit the rewritten file remained scanner-clean with
+`follower_count=1` and 116 trailing payload bytes.
+
 Post-run aggregate check:
 
 ```bash

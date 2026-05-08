@@ -288,6 +288,11 @@ low-confidence fields like `+24/+28` runtime stats and
 Do **not** duplicate that table here — it changes as new fixtures
 arrive.
 
+2026-05-08 live check: `probewldemon` loaded with the copied bound demon
+visible. D2R rewrote the save on exit and preserved `follower_count=1` with
+exactly 116 trailing payload bytes; the embedded `gf` remained data inside the
+payload, not a new section marker.
+
 ### Cross-class behavior
 
 Phase 0.4 found D2R loads non-warlock saves carrying a follower block
