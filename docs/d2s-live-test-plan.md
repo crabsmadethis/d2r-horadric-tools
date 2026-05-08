@@ -256,3 +256,7 @@ can anchor the `kf 01 <item>` layout.
 2026-05-08 result: after creating an Iron Golem on `probenecro`, D2R rewrote
 the save with `has_golem_byte=1`, `kf_to_lf_gap=58`, and 55 bytes of golem item
 payload before `lf`.
+
+2026-05-08 persistence result: after fully reloading `probenecro`, the Iron
+Golem was still present and save-and-quit preserved the same 55-byte golem
+payload (`sha1=2f582d487d12a70b8c5cdc1da3e371b2c302c390`).

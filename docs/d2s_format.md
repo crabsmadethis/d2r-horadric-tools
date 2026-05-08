@@ -311,7 +311,9 @@ D2R v105 save examined before the live probe, chargen wrote `kf 00` (no iron
 golem). Saves that come from in-game with an active iron golem (Necromancer Iron
 Golem skill) carry `kf 01` followed by a JM-less item bitstream. The 2026-05-08
 `probenecro` capture wrote `kf 01`, had `kf_to_lf_gap=58`, and carried 55 bytes
-of golem item payload before `lf`.
+of golem item payload before `lf`. A fresh reload preserved the in-game Iron
+Golem and kept the same 55-byte payload
+(`sha1=2f582d487d12a70b8c5cdc1da3e371b2c302c390`) after save-and-quit.
 
 For warlocks with bound demons: `kf 00` is still written, the bridge
 `\x01\x00` follows, and the `lf` follower block carries the demon.
