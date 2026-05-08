@@ -322,6 +322,8 @@ contains a variable-length encoded item rather than a fixed-size golem record.
 Reloading that second golem preserved the length but changed only payload byte
 `+1` from `0x20` to `0x00`, suggesting a runtime/state bit near the start of
 the golem item encoding.
+A subsequent reload/save preserved the canonicalized 26-byte payload
+byte-for-byte.
 
 For warlocks with bound demons: `kf 00` is still written, the bridge
 `\x01\x00` follows, and the `lf` follower block carries the demon.

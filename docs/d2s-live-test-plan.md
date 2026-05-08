@@ -272,3 +272,6 @@ length follows the encoded item.
 Reloading that second golem preserved the 26-byte length but changed payload
 byte `+1` from `0x20` to `0x00` (`sha1` became
 `26515dcb0696db2cd9e60b020fdd3b5c4aa13fb1`).
+
+A subsequent reload/save preserved that canonicalized 26-byte payload
+byte-for-byte, suggesting the `+1` change is a one-time normalization.
