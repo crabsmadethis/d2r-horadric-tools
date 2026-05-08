@@ -203,6 +203,10 @@ Live observations:
 - Does fighting one small pack remain stable?
 - After save and quit, does D2R preserve, strip, or rewrite the follower block?
 
+2026-05-08 result: borrowed-follower `probesorc` entered game but no follower
+appeared. D2R rewrote the save on exit and stripped the follower block back to
+`follower_count=0` with no trailing payload.
+
 Restore baseline after the test:
 
 ```bash
@@ -248,3 +252,7 @@ Live steps:
 
 Expected research result: the first local example with `has_golem_byte=1`, which
 can anchor the `kf 01 <item>` layout.
+
+2026-05-08 result: after creating an Iron Golem on `probenecro`, D2R rewrote
+the save with `has_golem_byte=1`, `kf_to_lf_gap=58`, and 55 bytes of golem item
+payload before `lf`.

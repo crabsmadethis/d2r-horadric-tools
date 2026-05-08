@@ -109,9 +109,7 @@ Live next step:
 ### 3. Cross-class follower behavior
 
 Known: D2R accepted a Sorceress save with a Warlock-style follower payload and
-allowed it to enter the world.
-
-Unknown: whether the demon spawns, is ignored, or becomes unstable during play.
+allowed it to enter the world, but did not instantiate the demon.
 
 Independent next step:
 
@@ -122,6 +120,10 @@ Live next step:
 
 - Load the Sorceress, inspect whether the follower appears, use a waypoint,
   fight one pack, save and quit, then rescan the rewritten save.
+- 2026-05-08 live result: borrowed-follower `probesorc` entered game with no
+  visible follower. On save-and-quit, D2R rewrote `probesorc.d2s` from the
+  promoted `follower_count=1` / 116-byte payload variant back to
+  `follower_count=0` with no trailing payload.
 
 ### 4. Merc status at `0xA7..0xA8`
 
@@ -140,13 +142,17 @@ Live next step:
 
 ### 5. Iron golem block
 
-The scanned corpus has `has_golem=0` for every save, so no local fixture answers
-the `kf 01 <item>` layout.
+The initial scanned corpus had `has_golem=0` for every save, so no local fixture
+answered the `kf 01 <item>` layout.
 
 Live next step:
 
 - Build/load a Necromancer, create an Iron Golem from a simple item, save and
   quit, then rescan. Keep the captured `.d2s` private unless sanitized.
+- 2026-05-08 live result: after creating an Iron Golem on `probenecro`, D2R
+  rewrote the save with `has_golem_byte=1`, `kf_to_lf_gap=58`, and 55 bytes of
+  golem item payload between `kf 01` and `lf`. The follower block remained
+  `follower_count=0`.
 
 ### 6. `jf` marker optionality
 

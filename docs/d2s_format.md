@@ -297,19 +297,21 @@ payload, not a new section marker.
 
 Phase 0.4 found D2R loads non-warlock saves carrying a follower block
 without rejection (a Sorceress save with a borrowed Marrowbind demon
-payload entered the game cleanly). D2R does NOT class-gate the
-follower block at file load. Whether the demon actually appears
-in-game for a non-warlock is out of scope for v1. See
-`lf_count_acceptance_test.md` § "Surprising side observation".
+payload entered the game cleanly). The 2026-05-08 `probesorc` live check
+confirmed D2R does NOT class-gate the follower block at file load, but it also
+does not instantiate the borrowed demon for Sorceress. On save-and-quit, D2R
+stripped the follower block back to `follower_count=0`.
 
 ---
 
 ## Iron golem section (when present)
 
 Conditionally written as `kf <u8:has_golem> [golem_item]`. In every
-D2R v105 save examined, chargen writes `kf 00` (no iron golem). Saves
-that come from in-game with an active iron golem (Necromancer Iron
-Golem skill) carry `kf 01` followed by a JM-less item bitstream.
+D2R v105 save examined before the live probe, chargen wrote `kf 00` (no iron
+golem). Saves that come from in-game with an active iron golem (Necromancer Iron
+Golem skill) carry `kf 01` followed by a JM-less item bitstream. The 2026-05-08
+`probenecro` capture wrote `kf 01`, had `kf_to_lf_gap=58`, and carried 55 bytes
+of golem item payload before `lf`.
 
 For warlocks with bound demons: `kf 00` is still written, the bridge
 `\x01\x00` follows, and the `lf` follower block carries the demon.
