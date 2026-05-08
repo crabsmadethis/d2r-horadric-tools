@@ -295,6 +295,11 @@ visible. D2R rewrote the save on exit and preserved `follower_count=1` with
 exactly 116 trailing payload bytes; the embedded `gf` remained data inside the
 payload, not a new section marker.
 
+A later no-combat `probewldemon` reload/save on 2026-05-08 again preserved the
+116-byte follower block shape. Only bytes `+89..+91` changed
+(`ea 10 72 -> 8c ee 7b`); all high-confidence identity fields, `+64..+79`, and
+`+95..+115` stayed byte-for-byte stable.
+
 2026-05-08 live check: `probewlalt` loaded with a different known 116-byte
 payload (`tests/fixtures/demon_block_a.bin`) and spawned a demon. After
 save-and-quit, D2R preserved `follower_count=1`, the 116-byte payload length,
@@ -340,6 +345,16 @@ Reloading that second golem preserved the length but changed only payload byte
 the golem item encoding.
 A subsequent reload/save preserved the canonicalized 26-byte payload
 byte-for-byte.
+On 2026-05-08, `probegolem`, a disposable clone rebuilt through
+`rebuild_items(...)`, appeared in D2R, joined game, and still had the Iron
+Golem. After save-and-quit, D2R preserved the 24-byte golem item payload
+byte-for-byte (`sha1=5708645b2c93a15e1e6ae45aed48f74a85975a65`), confirming
+that the rebuilt `kf 01 <item> 01 00 lf 00 00` tail can preserve an active
+Iron Golem.
+On the same date, `probegnorm` proved generated writing: a normal-quality
+Falchion payload produced by `build_item(...)` joined game and stayed
+byte-for-byte identical after save-and-quit
+(`sha1=4818f07bc1e0e0907f4bcd30a50ab7c6038fb82d`).
 
 For warlocks with bound demons: `kf 00` is still written, the bridge
 `\x01\x00` follows, and the `lf` follower block carries the demon.

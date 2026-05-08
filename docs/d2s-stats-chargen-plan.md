@@ -273,6 +273,21 @@ Live test ladder:
 4. Only after a normal item survives, try magic properties. Keep the generated
    item conservative: no sockets, no runeword, no fillers.
 
+2026-05-08 preserve-path result: `probegolem`, a disposable `probenecro` clone
+rebuilt through `rebuild_items(...)`, appeared in D2R, joined game, and still
+had the Iron Golem. After save-and-quit, D2R kept the 24-byte
+`golem_item_bytes` payload byte-for-byte identical
+(`sha1=5708645b2c93a15e1e6ae45aed48f74a85975a65`). The scanner decoded the
+payload header as `type=flc`, `ilvl=35`, `quality=4`, `storage=0`, `col=4`,
+`row=0`, `bodyloc=4`, `location=1`, `ext=101`.
+
+2026-05-08 generated-writer result: `probegnorm` used a generated
+normal-quality Falchion payload from `build_item(...)`, not a copied live
+payload. The save joined game. After save-and-quit, D2R kept `has_golem=1`,
+payload length 19, and the generated payload byte-for-byte identical
+(`sha1=4818f07bc1e0e0907f4bcd30a50ab7c6038fb82d`). This proves the writer can
+synthesize at least simple normal Iron Golem items via the existing encoder.
+
 ### Milestone 4: Demon Stats Research
 
 Gather enough fixtures to separate item/monster identity from runtime state.
@@ -292,6 +307,9 @@ Tests:
   offsets `+89..+91` and `+95..+97`. On a second reload/save, `+95..+97`
   stayed stable but `+89..+91` changed again. On a third reload/save,
   `+95..+97` stayed stable again and `+89..+91` became `00 00 00`.
+- No-combat reload result: `probewldemon` joined and save-and-exit changed only
+  `+89..+91` (`ea 10 72 -> 8c ee 7b`). Everything else in the 116-byte payload
+  stayed stable, including identity fields, `+64..+79`, and `+95..+115`.
 
 Analysis:
 

@@ -91,6 +91,10 @@ Live next step:
 - 2026-05-08 live result: `probewldemon` entered game with the copied bound
   demon visible. After save-and-quit, D2R rewrote the save to 1319 bytes while
   preserving `follower_count=1` and exactly 116 trailing payload bytes.
+- 2026-05-08 no-combat reload result: `probewldemon` loaded, joined game, and
+  save-and-exit preserved the full follower block. Only payload bytes `+89..+91`
+  changed (`ea 10 72 -> 8c ee 7b`); identity fields, bitfields, and the
+  post-`gf` tail stayed byte-for-byte stable.
 - 2026-05-08 live result: two count-2 variants both failed to join game even
   though local scans were size/checksum clean and had exactly 232 trailing
   payload bytes:
@@ -190,6 +194,18 @@ Live next step:
   candidate rather than item identity.
 - A subsequent reload/save preserved that canonicalized 26-byte payload
   byte-for-byte, so the `+1` change appears to be a one-time normalization.
+- 2026-05-08 preserve-path result: `probegolem`, a disposable `probenecro`
+  clone rebuilt through `rebuild_items(...)`, appeared in D2R, joined game, and
+  still had the Iron Golem. After save-and-quit, the golem payload stayed
+  byte-for-byte identical (`sha1=5708645b2c93a15e1e6ae45aed48f74a85975a65`),
+  with header `type=flc`, `quality=4`, `storage=0`, `location=1`,
+  `bodyloc=4`.
+- 2026-05-08 generated-writer result: `probegnorm` used a generated
+  normal-quality Falchion payload from `build_item(...)`, not a copied live
+  golem payload. It joined game. After save-and-quit, D2R kept `has_golem=1`,
+  payload length 19, header `type=flc`, `quality=2`, `storage=0`,
+  `location=1`, `bodyloc=4`, and preserved the payload byte-for-byte
+  (`sha1=4818f07bc1e0e0907f4bcd30a50ab7c6038fb82d`).
 
 ### 6. `jf` marker optionality
 

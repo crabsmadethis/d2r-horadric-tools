@@ -19,6 +19,7 @@ d2r_chargen/data/unique_item_stats.py
 # Working directories
 vanilla/
 build/
+.live-evidence/
 
 # Test/IDE
 .pytest_cache/
