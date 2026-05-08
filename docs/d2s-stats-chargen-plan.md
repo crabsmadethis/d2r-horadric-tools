@@ -159,22 +159,32 @@ Acceptance:
 
 Add first-class YAML support once read-side preservation is solid.
 
+2026-05-08 status: v1 YAML support is implemented for generated normal/magic
+items only. It requires `class: necromancer` and `skills: {IronGolem: ...}`
+with level at least 1, then injects one JM-less item payload into the `kf 01`
+tail.
+
 Possible YAML:
 
 ```yaml
 iron_golem:
   item:
-    base: cap
+    magic: true
+    base: flc
     properties:
       fire_res: 10
 ```
 
 Tasks:
 
-- Reuse existing item builders to produce a single item payload.
-- Strip any leading `JM<count>` wrapper if the builder path produces one.
-- Write `kf 01 <payload> 01 00 lf 00 00`.
-- Validate the item payload with the scanner before touching live saves.
+- Done: reuse the existing item encoder to produce a single JM-less payload.
+- Done: write `kf 01 <payload> 01 00 lf <followers>` through
+  `rebuild_items(..., iron_golem_payload=...)`.
+- Done: restrict v1 to normal/magic generated items; reject sockets,
+  runewords, uniques, sets, rares, and crafted items until live testing proves
+  those encodings.
+- Still needed: one explicit visual confirmation for generated magic-property
+  golems before broadening docs from "join accepted" to "visually proven".
 
 Acceptance:
 
@@ -296,6 +306,24 @@ byte-for-byte identical (`sha1=09e7961cd4d3763fda1a073493aa97c00e38b4fd`).
 Because the file timestamp and full hash did not change after the live attempt,
 keep one visual confirmation step before calling magic-property golem
 generation fully proven.
+
+2026-05-08 chargen implementation result: YAML can now specify:
+
+```yaml
+skills:
+  IronGolem: 1
+iron_golem:
+  item:
+    magic: true
+    base: flc
+    properties:
+      fire_res: 10
+```
+
+The generated item is forced into the live-observed golem storage shape:
+`storage=0`, `location=1`, and `bodyloc`/`col` from the selected slot
+(`weapon` defaults to `bodyloc=4`). The deploy path resolves this once and
+passes it to `rebuild_items(...)` for every phase.
 
 ### Milestone 4: Demon Stats Research
 

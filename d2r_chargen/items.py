@@ -158,6 +158,102 @@ def build_equipment_item(item_def, *, is_merc=False):
         )
 
 
+def build_iron_golem_item(item_def):
+    """Build one JM-less item payload for the Iron Golem `kf 01` tail.
+
+    V1 is intentionally narrow: generated normal or magic items only, no
+    sockets, runewords, fillers, uniques, sets, rares, or crafted items. The
+    payload uses the equipped-looking storage shape observed in live D2R golem
+    saves: storage=0, location=1, and col/bodyloc set to the selected slot.
+    """
+    unsupported = {
+        'runeword', 'unique', 'set', 'rare', 'crafted',
+        'socketed', 'num_sockets', 'rune_codes',
+    }
+    present = sorted(k for k in unsupported if k in item_def)
+    if present:
+        raise ValueError(
+            f"iron_golem.item does not support {', '.join(present)} yet"
+        )
+
+    base_code = item_def.get('base')
+    if not base_code:
+        raise ValueError("iron_golem.item must specify 'base'")
+    if base_code not in ITEM_BASES:
+        raise ValueError(f"Unknown iron_golem.item base: '{base_code}'")
+
+    slot_name = item_def.get('slot', 'weapon')
+    if slot_name not in SLOT_MAP:
+        raise ValueError(f"Unknown iron_golem.item slot: '{slot_name}'")
+    slot = SLOT_MAP[slot_name]
+    bodyloc = slot['bodyloc']
+
+    base_info = ITEM_BASES[base_code]
+    props = resolve_properties(item_def.get('properties', {}))
+
+    wants_normal = bool(item_def.get('normal'))
+    wants_magic = bool(
+        item_def.get('magic')
+        or 'magic_prefix' in item_def
+        or 'magic_suffix' in item_def
+    )
+    if wants_normal and wants_magic:
+        raise ValueError("iron_golem.item cannot be both normal and magic")
+    if wants_normal and props:
+        raise ValueError(
+            "iron_golem.item normal items cannot specify properties; use magic"
+        )
+
+    quality = item_def.get('quality')
+    if quality is None:
+        if wants_normal:
+            quality = 2
+        elif wants_magic or props:
+            quality = 4
+        else:
+            quality = 2
+    if quality not in (2, 4):
+        raise ValueError(
+            f"iron_golem.item quality must be 2 (normal) or 4 (magic), got {quality}"
+        )
+    if wants_normal and quality != 2:
+        raise ValueError("iron_golem.item normal items must use quality 2")
+    if wants_magic and quality != 4:
+        raise ValueError("iron_golem.item magic items must use quality 4")
+    if quality == 2 and props:
+        raise ValueError(
+            "iron_golem.item quality 2 cannot specify properties; use magic"
+        )
+
+    magic_prefix = 0
+    magic_suffix = 0
+    if quality == 4:
+        magic_prefix, magic_suffix = _resolve_magic_affixes(
+            item_def.get('magic_prefix', 0),
+            item_def.get('magic_suffix', 0),
+            base_code,
+            props,
+        )
+
+    return build_item(
+        type_code=base_code,
+        col=bodyloc,
+        row=item_def.get('row', 0),
+        storage=0,
+        location=1,
+        bodyloc=bodyloc,
+        quality=quality,
+        ilvl=item_def.get('ilvl', 35),
+        defense=item_def.get('defense', base_info.get('max_ac', 0)),
+        max_dur=base_info.get('durability', 0),
+        cur_dur=base_info.get('durability', 0),
+        properties=props,
+        magic_prefix=magic_prefix,
+        magic_suffix=magic_suffix,
+        ethereal=item_def.get('ethereal', False),
+    )
+
+
 def _resolve_final_properties(item_def, auto_props, *, has_canonical=False):
     """Determine final properties list for an item.
 

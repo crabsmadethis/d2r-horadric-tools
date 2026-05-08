@@ -365,6 +365,9 @@ payload with `fireresist +10`: the on-disk save remained `has_golem=1`,
 (`sha1=09e7961cd4d3763fda1a073493aa97c00e38b4fd`). Because the file timestamp
 and full hash did not change after the live attempt, keep one visual
 confirmation step before calling magic-property golem generation fully proven.
+Chargen v1 can now write one generated normal or magic Iron Golem item from
+YAML for Necromancers with `IronGolem >= 1`; it rejects sockets, runewords,
+uniques, sets, rares, and crafted items until those variants have live probes.
 
 For warlocks with bound demons: `kf 00` is still written, the bridge
 `\x01\x00` follows, and the `lf` follower block carries the demon.

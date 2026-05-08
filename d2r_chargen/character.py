@@ -16,7 +16,9 @@ from d2r_chargen.resolve import (
     resolve_property_name, resolve_skills, resolve_unique,
     resolve_progression, resolve_bound_demon,
 )
-from d2r_chargen.items import build_equipment_item, build_charm, build_merc_item
+from d2r_chargen.items import (
+    build_equipment_item, build_charm, build_merc_item, build_iron_golem_item,
+)
 from d2r_chargen.data.item_bases import ITEM_BASES
 from d2r_chargen.data.item_stat_cost import STAT_BY_NAME
 from d2r_chargen.data.skills import SKILLS
@@ -351,6 +353,16 @@ def validate_char_def(char_def):
                 f"Invalid merc.equipment_mode: '{equipment_mode}'. "
                 f"Must be 'stash' or 'direct'."
             )
+
+    # Validate Iron Golem item properties early. Class/skill prerequisites are
+    # checked at build/deploy time, where we can produce the payload or None.
+    iron_golem = char_def.get('iron_golem')
+    if iron_golem is not None:
+        item_def = iron_golem.get('item') if isinstance(iron_golem, dict) else None
+        if not isinstance(item_def, dict):
+            errors.append("iron_golem must contain an item mapping")
+        else:
+            _validate_item_def(item_def, errors)
 
     if errors:
         raise ValueError(
@@ -1083,6 +1095,47 @@ def build_all_items(char_def):
             bw.dump()
 
 
+def _normalized_skill_key(name):
+    return str(name).lower().replace('_', ' ').replace(' ', '')
+
+
+def resolve_iron_golem_payload(char_def):
+    """Resolve a YAML `iron_golem:` block to one JM-less item payload.
+
+    V1 intentionally requires a Necromancer with IronGolem skill >= 1 and
+    supports generated normal/magic items only.
+    """
+    spec = char_def.get('iron_golem')
+    if spec is None:
+        return None
+    if not isinstance(spec, dict):
+        raise ValueError("iron_golem must be a mapping")
+
+    class_name = str(char_def.get('class', '')).lower()
+    if class_name != 'necromancer':
+        raise ValueError(
+            f"iron_golem: requires class=necromancer, got {char_def.get('class')!r}"
+        )
+
+    iron_golem_lvl = 0
+    for key, value in char_def.get('skills', {}).items():
+        if _normalized_skill_key(key) == 'irongolem':
+            try:
+                iron_golem_lvl = int(value)
+            except (TypeError, ValueError):
+                iron_golem_lvl = 0
+            break
+    if iron_golem_lvl < 1:
+        raise ValueError(
+            f"iron_golem: requires IronGolem skill >= 1, got {iron_golem_lvl}"
+        )
+
+    item_def = spec.get('item')
+    if not isinstance(item_def, dict):
+        raise ValueError("iron_golem must specify item")
+    return build_iron_golem_item(item_def)
+
+
 def deploy_character(char_name, phase=4, force=False):
     """Build and deploy a character from YAML definition.
 
@@ -1323,6 +1376,8 @@ def deploy_character(char_name, phase=4, force=False):
             )
         follower_payload = resolve_bound_demon(bound_demon_spec, FIXTURES_DIR)
 
+    iron_golem_payload = resolve_iron_golem_payload(char_def)
+
     try:
         for p in range(1, phase + 1):
             char_phase_items, merc_phase_items = get_phase_items(all_items, p)
@@ -1344,6 +1399,7 @@ def deploy_character(char_name, phase=4, force=False):
                 result = rebuild_items(
                     temp_path, char_phase_items, merc_phase_items,
                     follower_payload=follower_payload,
+                    iron_golem_payload=iron_golem_payload,
                 )
 
                 with open(temp_path, 'wb') as f:

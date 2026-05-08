@@ -218,6 +218,12 @@ Live next step:
   (`sha1=09e7961cd4d3763fda1a073493aa97c00e38b4fd`). The file timestamp/hash
   did not change, so record this as join acceptance plus valid on-disk
   persistence; visual golem presence still needs explicit confirmation.
+- 2026-05-08 chargen support result: v1 YAML support can now inject one
+  generated normal or magic Iron Golem item for Necromancers with
+  `skills: {IronGolem: 1}`. It writes the same live-observed storage shape
+  (`storage=0`, `location=1`, `bodyloc=4` for the default weapon slot) and
+  deliberately rejects sockets, runewords, uniques, sets, rares, and crafted
+  items until those encodings get their own live probes.
 
 ### 6. `jf` marker optionality
 
