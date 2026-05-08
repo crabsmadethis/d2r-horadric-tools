@@ -319,6 +319,9 @@ Recasting Iron Golem from a different item produced `kf_to_lf_gap=29` with a
 26-byte golem payload
 (`sha1=2b0cddc4fb4d6f53db12fa589571c864e8e40e61`), confirming the section
 contains a variable-length encoded item rather than a fixed-size golem record.
+Reloading that second golem preserved the length but changed only payload byte
+`+1` from `0x20` to `0x00`, suggesting a runtime/state bit near the start of
+the golem item encoding.
 
 For warlocks with bound demons: `kf 00` is still written, the bridge
 `\x01\x00` follows, and the `lf` follower block carries the demon.

@@ -162,6 +162,10 @@ Live next step:
   `probenecro` with `kf_to_lf_gap=29` and a 26-byte golem item payload
   (`sha1=2b0cddc4fb4d6f53db12fa589571c864e8e40e61`). The golem section length
   is item-encoding-dependent, not fixed.
+- Reloading that second golem preserved the 26-byte length but changed only
+  payload byte `+1` from `0x20` to `0x00` (`sha1` became
+  `26515dcb0696db2cd9e60b020fdd3b5c4aa13fb1`), making `+1` a runtime/state
+  candidate rather than item identity.
 
 ### 6. `jf` marker optionality
 
