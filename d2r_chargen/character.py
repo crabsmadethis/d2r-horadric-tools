@@ -1161,7 +1161,9 @@ def deploy_character(char_name, phase=4, force=False):
                 print(f"  Using bundled blank template")
 
         class_id = CLASS_DEFS[char_def['class']]['id']
-        char_path = create_new_character(template_path, char_def['name'], class_id)
+        char_path = create_new_character(
+            template_path, char_def['name'], class_id, output_dir=SAVES
+        )
 
     # Set character data (stats, skills, waypoints, quests, difficulty)
     data = bytearray(open(char_path, 'rb').read())

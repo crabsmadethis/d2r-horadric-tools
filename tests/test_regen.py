@@ -80,6 +80,14 @@ class TestRegenSkills(unittest.TestCase):
         self.assertNotIn(5, result)
         self.assertIn(1, result)
 
+    def test_blank_id_uses_row_index(self):
+        rows = [
+            {"skill": "Attack", "charclass": "", "*Id": "0"},
+            {"skill": "Mod Skill", "charclass": "war", "*Id": ""},
+        ]
+        result = regen_skills(rows)
+        self.assertEqual(result[1], {"name": "Mod Skill", "class": "wlk"})
+
 
 class TestRegenRunewords(unittest.TestCase):
     def test_basic_regen(self):

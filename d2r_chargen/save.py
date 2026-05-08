@@ -535,17 +535,19 @@ def set_merc_header(data, hireling_id: int, seed: int | None = None,
 # Character Creation
 # ============================================================
 
-def create_new_character(template_path, new_name, class_id):
+def create_new_character(template_path, new_name, class_id, output_dir=None):
     """Create a new character file by copying a template and changing name/class."""
-    save_dir = os.path.dirname(template_path)
+    template_dir = os.path.dirname(template_path)
+    save_dir = output_dir or template_dir
     template_base = os.path.splitext(os.path.basename(template_path))[0]
 
+    os.makedirs(save_dir, exist_ok=True)
     new_d2s = os.path.join(save_dir, f"{new_name}.d2s")
     shutil.copy2(template_path, new_d2s)
 
     # Copy companion files
     for ext in ['.ctl', '.key', '.ma0', '.map']:
-        src = os.path.join(save_dir, template_base + ext)
+        src = os.path.join(template_dir, template_base + ext)
         dst = os.path.join(save_dir, new_name + ext)
         if os.path.exists(src):
             shutil.copy2(src, dst)

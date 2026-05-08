@@ -1,0 +1,35 @@
+schema_version: 1
+name: D2SProbeNecro
+class: necromancer
+level: 30
+progression: normal_complete
+
+stats:
+  strength: 35
+  dexterity: 25
+  vitality: 100
+  energy: 40
+
+skills:
+  Raise Skeleton: 20
+  Skeleton Mastery: 5
+  Corpse Explosion: 1
+  Amplify Damage: 1
+  Clay Golem: 1
+  IronGolem: 1
+
+equipment:
+  - slot: weapon
+    unique: Arm of King Leoric
+  - slot: shield
+    unique: Homunculus
+  - slot: helm
+    runeword: Lore
+    base: skp
+
+inventory:
+  charms:
+    - magic_small_charm:
+        count: 1
+        properties:
+          life: 15

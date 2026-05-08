@@ -96,13 +96,19 @@ def regen_set_items(rows: list[dict]) -> dict:
 
 
 def regen_skills(rows: list[dict]) -> dict:
-    """Skills.txt -> SKILLS dict."""
+    """Skills.txt -> SKILLS dict.
+
+    D2R's stock table has explicit *Id values, but some modded tables append
+    real skills with blank *Id cells. For Skills.txt those blanks inherit the
+    row index as the in-game skill id.
+    """
     result = {}
-    for row in rows:
+    for idx, row in enumerate(rows):
         name = row.get("skill", "")
         if not name:
             continue
-        skill_id = int(row["*Id"])
+        skill_id_str = row.get("*Id", "")
+        skill_id = int(skill_id_str) if skill_id_str else idx
         entry = {"name": name}
         charclass = row.get("charclass", "")
         if charclass and charclass in _CLASS_CODES:

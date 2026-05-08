@@ -360,6 +360,13 @@ sources for full context — this is just the index.
 - **Rule 12:** edit incrementally. Don't combine stats + skills + items + stash in one shot.
 - **Rule 17:** scanner hard errors are deployment blockers — do not classify as false positives without bit-level proof. (`feedback_scanner_hard_errors.md`.)
 - **Rule 21 (NEW 2026-04-25):** preserve the follower block on rebuild. `save.py:rebuild_items` defaults to `preserve_followers=True`. Stripping it silently kills a warlock's bound demon.
+- **Character-select visibility needs more than a clean `.d2s`** — a Bazzite
+  live-test session on 2026-05-08 found staged probe saves that scanned cleanly
+  but did not appear in Offline. Adding copied companions (`.ctl`, `.key`,
+  `.map`, `.ma0`) and matching the throwaway character's SC/HC status category
+  was still insufficient. Verify with a same-install lowercase clone of a
+  D2R-created throwaway character before treating an invisible probe as a
+  payload rejection.
 - **Stats can't be 0** where class minimum applies — Dex / Energy at 0 produces `Error:7`. (`feedback_stats_nonzero.md`.)
 - **Non-simple socketed fillers are broken** — magic jewels (quality=4, location=6) cause "FAILED TO JOIN GAME" with a full save. Merge filler stats into the parent. (`feedback_jewel_filler.md`.)
 - **HC flip preserves merc bytes** — `feedback_hc_flip_merc_preserve.md`: don't zero `0xA8..0xAA` when flipping SC→HC, or merc Hireling.Id is destroyed.

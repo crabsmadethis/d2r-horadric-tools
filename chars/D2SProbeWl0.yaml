@@ -1,0 +1,39 @@
+schema_version: 1
+name: D2SProbeWl0
+class: warlock
+level: 85
+progression: hell_complete
+
+stats:
+  strength: 156
+  dexterity: 60
+  vitality: 250
+  energy: 50
+
+skills:
+  Bind Demon: 7
+  Eldritch Blast: 20
+  Hex Bane: 10
+  Levitate: 1
+  Blood Oath: 5
+
+equipment:
+  - slot: weapon
+    unique: Dreadfang
+  - slot: shield
+    unique: Stormshield
+  - slot: helm
+    unique: Harlequin Crest
+  - slot: body
+    runeword: Enigma
+    base: utp
+  - slot: ring_right
+    unique: Raven Frost
+
+inventory:
+  charms:
+    - magic_small_charm:
+        count: 2
+        properties:
+          life: 20
+          light_res: 11
