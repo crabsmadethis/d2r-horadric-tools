@@ -315,6 +315,10 @@ of golem item payload before `lf`. A fresh reload preserved the in-game Iron
 Golem and kept the same 55-byte payload
 (`sha1=2f582d487d12a70b8c5cdc1da3e371b2c302c390`) after save-and-quit.
 A second reload showed the golem again and left the on-disk save unchanged.
+Recasting Iron Golem from a different item produced `kf_to_lf_gap=29` with a
+26-byte golem payload
+(`sha1=2b0cddc4fb4d6f53db12fa589571c864e8e40e61`), confirming the section
+contains a variable-length encoded item rather than a fixed-size golem record.
 
 For warlocks with bound demons: `kf 00` is still written, the bridge
 `\x01\x00` follows, and the `lf` follower block carries the demon.

@@ -158,6 +158,10 @@ Live next step:
   golem payload (`sha1=2f582d487d12a70b8c5cdc1da3e371b2c302c390`).
 - Second reload on 2026-05-08 still showed the Iron Golem in-game and left the
   on-disk save unchanged with the same payload hash.
+- Recasting Iron Golem from a different item on 2026-05-08 rewrote
+  `probenecro` with `kf_to_lf_gap=29` and a 26-byte golem item payload
+  (`sha1=2b0cddc4fb4d6f53db12fa589571c864e8e40e61`). The golem section length
+  is item-encoding-dependent, not fixed.
 
 ### 6. `jf` marker optionality
 

@@ -263,3 +263,8 @@ payload (`sha1=2f582d487d12a70b8c5cdc1da3e371b2c302c390`).
 
 Second reload on 2026-05-08 still showed the Iron Golem and left
 `probenecro.d2s` unchanged on disk with the same payload hash.
+
+Recasting Iron Golem from a different item on 2026-05-08 rewrote the section as
+`kf_to_lf_gap=29` with a 26-byte golem payload
+(`sha1=2b0cddc4fb4d6f53db12fa589571c864e8e40e61`), confirming the payload
+length follows the encoded item.
