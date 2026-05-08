@@ -35,6 +35,7 @@ except ImportError:
     _HAS_DATA = False
 from d2r_chargen.data.monumod_affixes import affix_name
 from d2r_chargen.follower_block import decode_follower_block
+from d2r_chargen.iron_golem import decode_iron_golem_block
 
 # ============================================================
 # Constants
@@ -874,8 +875,8 @@ def scan_characters(target, all_files, ghost_chars):
                 equipped_uids.setdefault(uid,[]).append(bodyloc)
 
         # follower-section sanity
-        kf_pos=data.find(b'kf')
-        lf_pos=data.find(b'lf',kf_pos) if kf_pos>=0 else -1
+        lf_pos=data.rfind(b'lf')
+        kf_pos=data.rfind(b'kf',0,lf_pos) if lf_pos>=0 else -1
         # follower_count: live followers attached to char (warlock bound demon, etc.). Was lf_count \u2014 see CLAUDE.md rule 21 + Task 0.4 findings.
         follower_count=0
         if lf_pos>=0:
@@ -889,16 +890,23 @@ def scan_characters(target, all_files, ghost_chars):
                 status='\u2713 ok (no follower)'
             elif follower_count==1 and payload_bytes==116:
                 status='\u2713 ok (1 follower, 116B payload)'
+            elif follower_count > 1 and payload_bytes == follower_count * 116:
+                status=(
+                    f'\u26a0 structurally ok ({follower_count} followers, '
+                    f'{payload_bytes}B payload) but live D2R rejected bound-demon count>1'
+                )
             else:
                 status=f'\u2717 INVALID \u2014 count={follower_count} but payload={payload_bytes}B (will FAIL TO JOIN GAME)'
             print(f"  LF:   follower_count={follower_count}  merc_items={merc_count_val2}  {status}")
 
-        # kf/lf structural validation: gap must be exactly 5 (kf + 00 01 00 + lf)
-        # \u2014 verified across all 19 saves on disk. Larger gaps indicate corruption.
+        # kf/lf structural validation. No-golem tails have gap 5
+        # (`kf 00 01 00 lf`); active Iron Golems have a larger gap containing
+        # one variable-length item payload before the same `01 00 lf` bridge.
         if kf_pos >= 0 and lf_pos >= 0:
             gap = lf_pos - kf_pos
-            if gap != 5:
-                print(f"  !! kf-lf GAP: {gap} bytes (expected exactly 5: kf + 00 01 00 + lf)")
+            golem = decode_iron_golem_block(bytes(data))
+            if gap != 5 and not (golem.has_golem and golem.bridge_ok):
+                print(f"  !! kf-lf GAP: {gap} bytes (expected no-golem gap 5 or active-golem item payload before 01 00 lf)")
 
         # Bound-demon (warlock follower) block \u2014 Task 2.1
         fb = decode_follower_block(bytes(data))
@@ -909,6 +917,9 @@ def scan_characters(target, all_files, ghost_chars):
             print(f"    bind_demon_lv = {fb.bind_demon_level}")
             affix_names = [affix_name(b) for b in fb.affix_indices]
             print(f"    affixes       = {', '.join(affix_names)}")
+            print(f"    raw_unknown_slices:")
+            for name, raw in fb.unknown_slices.items():
+                print(f"      {name} = {raw.hex(' ')}")
 
         # Encoding issues
         if wrong_ext:

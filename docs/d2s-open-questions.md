@@ -84,11 +84,33 @@ Independent next step:
 
 Live next step:
 
-- Capture the same bound demon after damage/heal, after save/load, and after a
-  rebind to a known monster. Diff only the 116-byte payload.
+- Capture the same bound demon after save/load and after a rebind to a known
+  monster. Diff only the 116-byte payload. A damage/heal capture is lower
+  priority because bound demons are difficult to keep injured and heal quickly;
+  only use it if a durable injured snapshot is easy to create.
 - 2026-05-08 live result: `probewldemon` entered game with the copied bound
   demon visible. After save-and-quit, D2R rewrote the save to 1319 bytes while
   preserving `follower_count=1` and exactly 116 trailing payload bytes.
+- 2026-05-08 live result: two count-2 variants both failed to join game even
+  though local scans were size/checksum clean and had exactly 232 trailing
+  payload bytes:
+  - `probewltwo` copied the same valid 116-byte payload twice.
+  - `probewlmix` used two different known 116-byte payloads.
+  Neither failed join rewrote the save, so treat live D2R as accepting at most
+  one bound demon.
+- 2026-05-08 live result: `probewlalt` used `follower_count=1` with the
+  alternate known 116-byte demon payload (`tests/fixtures/demon_block_a.bin`).
+  The save appeared, joined game, and spawned a demon. After save-and-quit, D2R
+  preserved the 116-byte follower block shape but rewrote six payload bytes:
+  `+89..+91` and `+95..+97`. Keep treating `+88` and `+95..+115` as runtime or
+  hash-like fields for now.
+- 2026-05-08 reload result: `probewlalt` still had the demon on reload. A
+  second save-and-quit kept `follower_count=1` and 116 trailing payload bytes.
+  Payload bytes `+95..+97` stayed stable after the first rewrite, but
+  `+89..+91` changed again, so treat `+89..+91` as volatile runtime/hash bytes.
+- 2026-05-08 third reload result: `probewlalt` still joined with the demon.
+  A third save-and-quit kept the same valid block shape. Bytes `+95..+97`
+  remained stable, while `+89..+91` changed to `00 00 00`.
 
 ### 2. Embedded `gf` inside demon payload
 

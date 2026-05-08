@@ -9,6 +9,7 @@ pytest.importorskip("d2r_chargen.data.item_stat_cost",
 
 from d2r_chargen.follower_block import (
     decode_follower_block,
+    demon_payload_unknown_slices,
     parse_demon_payload,
 )
 
@@ -118,6 +119,20 @@ def test_parse_demon_payload_fixture_b():
     assert parsed.affix_indices == bytes([25, 6, 5, 27, 30])
 
 
+def test_demon_payload_unknown_slices_fixture_b():
+    """Unknown-slice helper exposes raw evidence without semantic overclaiming."""
+    payload = (FIX / 'demon_block_b.bin').read_bytes()
+    slices = demon_payload_unknown_slices(payload)
+
+    assert slices['runtime_stats_24_31'] == payload[24:32]
+    assert slices['percent_or_caps_44_51'] == payload[44:52]
+    assert slices['bitfields_64_79'] == payload[64:80]
+    assert slices['hash_or_runtime_byte_88'] == payload[88:89]
+    assert slices['volatile_runtime_89_91'] == payload[89:92]
+    assert slices['post_gf_opcode_94'] == payload[94:95]
+    assert slices['post_gf_tail_95_115'] == payload[95:116]
+
+
 @needs_fixtures
 def test_followerblock_exposes_demon_fields_from_save():
     """Live save end-to-end: decode_follower_block -> FollowerBlock -> demon fields."""
@@ -129,6 +144,7 @@ def test_followerblock_exposes_demon_fields_from_save():
     assert block.monster_seed == 0x0018281B  # see test_parse_demon_payload_fixture_b
     assert block.bind_demon_level == 7
     assert block.affix_indices == bytes([25, 6, 5, 27, 30])
+    assert block.unknown_slices['volatile_runtime_89_91'] == block.payload[89:92]
 
 
 @needs_fixtures
@@ -151,3 +167,9 @@ def test_parse_demon_payload_rejects_short_input():
     """parse_demon_payload demands a full 116-byte buffer."""
     with pytest.raises(ValueError):
         parse_demon_payload(b'\x00' * 80)
+
+
+def test_demon_payload_unknown_slices_rejects_short_input():
+    """Unknown-slice reporting uses the same full-payload guard."""
+    with pytest.raises(ValueError):
+        demon_payload_unknown_slices(b'\x00' * 80)

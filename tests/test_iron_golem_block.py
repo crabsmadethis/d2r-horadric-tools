@@ -1,0 +1,104 @@
+"""Tests for Iron Golem tail decoding and preservation."""
+from __future__ import annotations
+
+import struct
+
+import pytest
+
+from d2r_chargen.follower_block import decode_follower_block
+from d2r_chargen.iron_golem import decode_iron_golem_block
+from d2r_chargen.save import calc_checksum, rebuild_items
+
+
+GOLEM_PAYLOAD = bytes.fromhex(
+    "10 00 80 00 0d 11 40 be 22 5c 6e 79 "
+    "7c 8c 08 d1 00 00 08 08 8a 04 ff 01"
+)
+
+
+def _save_with_tail(tail: bytes) -> bytes:
+    data = bytearray(b"\x55\xaa\x55\xaa" + b"\x00" * 12)
+    data.extend(b"PRE")
+    data.extend(b"JM\x00\x00")  # empty char items
+    data.extend(b"jf")
+    data.extend(b"JM\x00\x00")  # empty merc items
+    data.extend(tail)
+    struct.pack_into("<I", data, 8, len(data))
+    data[12:16] = b"\x00\x00\x00\x00"
+    struct.pack_into("<I", data, 12, calc_checksum(data))
+    return bytes(data)
+
+
+def test_decode_no_golem_tail():
+    data = _save_with_tail(b"kf\x00\x01\x00lf\x00\x00")
+    block = decode_iron_golem_block(data)
+
+    assert block.has_markers
+    assert block.has_golem is False
+    assert block.has_golem_byte == 0
+    assert block.bridge_ok is True
+    assert block.item_payload == b""
+
+
+def test_decode_active_golem_payload():
+    data = _save_with_tail(b"kf\x01" + GOLEM_PAYLOAD + b"\x01\x00lf\x00\x00")
+    block = decode_iron_golem_block(data)
+
+    assert block.has_markers
+    assert block.has_golem is True
+    assert block.bridge_ok is True
+    assert block.payload_len == len(GOLEM_PAYLOAD)
+    assert block.item_payload == GOLEM_PAYLOAD
+
+
+def test_follower_decoder_allows_active_golem_gap():
+    payload = b"D" * 116
+    data = _save_with_tail(
+        b"kf\x01" + GOLEM_PAYLOAD + b"\x01\x00lf\x01\x00" + payload
+    )
+
+    followers = decode_follower_block(data)
+
+    assert followers.follower_count == 1
+    assert followers.payload == payload
+
+
+def test_rebuild_items_preserves_active_golem_by_default(tmp_path):
+    src = tmp_path / "golem.d2s"
+    src.write_bytes(_save_with_tail(b"kf\x01" + GOLEM_PAYLOAD + b"\x01\x00lf\x00\x00"))
+
+    rebuilt = rebuild_items(str(src), [], [])
+    block = decode_iron_golem_block(bytes(rebuilt))
+
+    assert block.has_golem is True
+    assert block.item_payload == GOLEM_PAYLOAD
+
+
+def test_rebuild_items_can_strip_golem(tmp_path):
+    src = tmp_path / "golem.d2s"
+    src.write_bytes(_save_with_tail(b"kf\x01" + GOLEM_PAYLOAD + b"\x01\x00lf\x00\x00"))
+
+    rebuilt = rebuild_items(str(src), [], [], preserve_golem=False)
+    block = decode_iron_golem_block(bytes(rebuilt))
+
+    assert block.has_golem is False
+    assert block.item_payload == b""
+
+
+def test_rebuild_items_can_inject_golem_payload(tmp_path):
+    src = tmp_path / "no_golem.d2s"
+    src.write_bytes(_save_with_tail(b"kf\x00\x01\x00lf\x00\x00"))
+
+    rebuilt = rebuild_items(str(src), [], [], iron_golem_payload=GOLEM_PAYLOAD)
+    block = decode_iron_golem_block(bytes(rebuilt))
+
+    assert block.has_golem is True
+    assert block.item_payload == GOLEM_PAYLOAD
+
+
+def test_rebuild_items_rejects_empty_golem_payload(tmp_path):
+    src = tmp_path / "no_golem.d2s"
+    src.write_bytes(_save_with_tail(b"kf\x00\x01\x00lf\x00\x00"))
+
+    with pytest.raises(ValueError, match="iron_golem_payload"):
+        rebuild_items(str(src), [], [], iron_golem_payload=b"")

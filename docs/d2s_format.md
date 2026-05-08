@@ -266,8 +266,10 @@ with no log message and no cache files written. Verified by
 `scripts/dev/forge_lf_test.py` 2026-04-25 — full results in
 `tests/fixtures/lf_count_acceptance_test.md`.
 
-For the only currently-known follower kind (warlock bound demon), N is
-0 or 1.
+For the only currently-known follower kind (warlock bound demon), live D2R
+accepts N=0 or N=1. On 2026-05-08, D2R rejected two scanner-clean N=2 probes:
+one with the same 116-byte payload duplicated and one with two different known
+116-byte payloads. Both failed to join game and neither save was rewritten.
 
 ### Demon payload (116 bytes)
 
@@ -292,6 +294,20 @@ arrive.
 visible. D2R rewrote the save on exit and preserved `follower_count=1` with
 exactly 116 trailing payload bytes; the embedded `gf` remained data inside the
 payload, not a new section marker.
+
+2026-05-08 live check: `probewlalt` loaded with a different known 116-byte
+payload (`tests/fixtures/demon_block_a.bin`) and spawned a demon. After
+save-and-quit, D2R preserved `follower_count=1`, the 116-byte payload length,
+and the high-confidence identity fields, but rewrote payload bytes `+89..+91`
+and `+95..+97`. Treat those bytes as runtime/hash-like until further fixtures
+pin them down.
+
+A second `probewlalt` reload/save on 2026-05-08 kept the demon and the same
+116-byte payload shape. Bytes `+95..+97` stayed stable after the first rewrite,
+while `+89..+91` changed again. Treat `+89..+91` as volatile runtime/hash bytes.
+
+A third reload/save again kept the demon and the valid block shape. Bytes
+`+95..+97` stayed stable and `+89..+91` changed to `00 00 00`.
 
 ### Cross-class behavior
 

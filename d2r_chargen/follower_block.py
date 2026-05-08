@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 DEMON_PAYLOAD_LEN = 116
-EXPECTED_KF_TO_LF_GAP = 5  # `kf` + `00 01 00` + `lf` — verified across 19 saves
+EXPECTED_TAIL_BRIDGE = b'\x01\x00'  # bytes immediately before trailing `lf`
 
 # High-confidence field offsets within the 116-byte demon payload.
 # Source: tests/fixtures/demon_block_decoded.md (Phase 0 decode notes).
@@ -32,6 +32,19 @@ _OFF_MONSTER_SEED = 6    # u32 LE — random instance seed
 _OFF_BIND_DEMON_LEVEL = 52  # u32 LE — Bind Demon skill level at bind time
 _OFF_AFFIX_INDICES = 80  # 5 raw bytes — MonUMod.txt indices (NOT a u32)
 _AFFIX_LEN = 5
+
+# Raw slices that are useful for live research but not yet safe to interpret as
+# writer inputs. Names are intentionally cautious: these bytes are evidence, not
+# schema.
+DEMON_UNKNOWN_SLICE_RANGES = (
+    ("runtime_stats_24_31", 24, 32),
+    ("percent_or_caps_44_51", 44, 52),
+    ("bitfields_64_79", 64, 80),
+    ("hash_or_runtime_byte_88", 88, 89),
+    ("volatile_runtime_89_91", 89, 92),
+    ("post_gf_opcode_94", 94, 95),
+    ("post_gf_tail_95_115", 95, 116),
+)
 
 
 @dataclass
@@ -59,6 +72,24 @@ def parse_demon_payload(payload: bytes) -> DemonPayloadFields:
         bind_demon_level=struct.unpack_from('<I', payload, _OFF_BIND_DEMON_LEVEL)[0],
         affix_indices=bytes(payload[_OFF_AFFIX_INDICES:_OFF_AFFIX_INDICES + _AFFIX_LEN]),
     )
+
+
+def demon_payload_unknown_slices(payload: bytes) -> dict[str, bytes]:
+    """Return raw research slices from a 116-byte bound-demon payload.
+
+    These slices deliberately do not assign semantic field names. They are for
+    corpus comparison and live-test diffing while demon synthesis remains
+    template-only.
+    """
+    if len(payload) < DEMON_PAYLOAD_LEN:
+        raise ValueError(
+            f'demon payload too short: got {len(payload)} bytes, '
+            f'need {DEMON_PAYLOAD_LEN}'
+        )
+    return {
+        name: bytes(payload[start:end])
+        for name, start, end in DEMON_UNKNOWN_SLICE_RANGES
+    }
 
 
 @dataclass
@@ -103,14 +134,26 @@ class FollowerBlock:
             return b''
         return bytes(self.payload[_OFF_AFFIX_INDICES:_OFF_AFFIX_INDICES + _AFFIX_LEN])
 
+    @property
+    def unknown_slices(self) -> dict[str, bytes]:
+        if len(self.payload) < DEMON_PAYLOAD_LEN:
+            return {}
+        return demon_payload_unknown_slices(self.payload)
+
 
 def decode_follower_block(data: bytes) -> FollowerBlock:
-    kf = data.rfind(b'kf')
-    if kf < 0:
+    lf = data.rfind(b'lf')
+    if lf < 0 or lf + 4 > len(data):
         return FollowerBlock(0)
-    lf = data.find(b'lf', kf + 2)
-    if lf < 0 or lf - kf != EXPECTED_KF_TO_LF_GAP:
+
+    # The follower block starts after the final `lf`. The bytes immediately
+    # before it are the fixed tail bridge (`01 00`) for both no-golem and
+    # active-golem saves. Do not require `lf - kf == 5`; active Iron Golems
+    # place a variable-length item payload between `kf 01` and this bridge.
+    kf = data.rfind(b'kf', 0, lf)
+    if kf < 0 or lf < 2 or data[lf - 2:lf] != EXPECTED_TAIL_BRIDGE:
         return FollowerBlock(0)
+
     count = struct.unpack_from('<H', data, lf + 2)[0]
     if count == 0:
         return FollowerBlock(0)

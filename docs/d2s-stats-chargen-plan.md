@@ -101,6 +101,17 @@ Test:
 Safety: this is a deliberate format-boundary test. Keep it out of normal
 chargen until live behavior is known.
 
+2026-05-08 result: D2R rejected both count-2 bound-demon probes at game join:
+
+- `probewltwo`: `follower_count=2` with the same valid 116-byte payload copied
+  twice. The scanner reported checksum/size ok and exactly 232 trailing bytes.
+- `probewlmix`: `follower_count=2` with two different known 116-byte payloads.
+  The scanner again reported checksum/size ok and exactly 232 trailing bytes.
+
+Neither save was rewritten after the failed join attempts. Treat live D2R as
+supporting one bound demon at most, even though the trailing `lf` field is a
+numeric count.
+
 ## Work Plan
 
 ### Milestone 1: Read-Side Parsers
@@ -172,6 +183,96 @@ Acceptance:
 - Save/quit keeps `has_golem=1`.
 - Repeated reload preserves or canonicalizes only known runtime bytes.
 
+### Iron Golem Item Encoding Plan
+
+Use the existing item encoder. `build_item(...)` already returns a raw item
+bitstream without a `JM<count>` section wrapper; `rebuild_items(...)` adds `JM`
+only around character, corpse, and merc item sections. The Iron Golem writer
+should therefore pass one generated item byte string directly into the `kf`
+tail.
+
+Tail shape:
+
+```text
+kf <u8:has_golem> [golem_item_bytes] 01 00 lf <u16:follower_count> [followers]
+```
+
+Use precise length names in code:
+
+- `kf_to_lf_gap = lf - kf`
+- `golem_item_bytes = data[kf + 3 : lf - 2]`
+- `bridge = data[lf - 2 : lf]`, expected `01 00`
+
+The current live `probenecro` second-golem save has `kf_to_lf_gap=29`,
+`has_golem=1`, `bridge=01 00`, and a 24-byte `golem_item_bytes` payload. That
+payload decodes as a normal item header at byte 0:
+
+```text
+type=flc ilvl=35 quality=4 storage=0 col=4 row=0 bodyloc=4 location=1 ext=101
+```
+
+This confirms the item starts immediately after the `has_golem` byte; there is
+no `JM` prefix and no additional golem header.
+
+Implementation order:
+
+1. Add a read-only `d2r_chargen/iron_golem.py` helper with:
+   - `decode_iron_golem_block(data) -> has_golem, item_payload, bridge`
+   - strict marker checks: `kf` before trailing `lf`, bridge must be `01 00`
+   - `decode_item_header(item_payload, 0)` best-effort metadata when present
+2. Update `tools/d2s_corpus_scan.py` to report:
+   - `has_golem_byte`
+   - `golem_item_payload_bytes`
+   - `golem_bridge_ok`
+   - optional item header buckets: type, quality, storage, location, bodyloc
+3. Update `rebuild_items(...)` to preserve the existing golem block by default:
+   - current behavior always writes `kf 00`, which strips an active Iron Golem
+   - add `preserve_golem=True` and optional `iron_golem_payload=None`
+   - precedence should mirror followers: explicit payload > preserve > strip
+4. Add YAML support after preservation tests pass:
+
+```yaml
+iron_golem:
+  item:
+    normal: true
+    base: cap
+    ilvl: 35
+    quality: 2
+```
+
+The resolver should reuse the existing item-definition path, but force the
+storage/location fields into the same equipped-looking shape D2R wrote for the
+live golem (`storage=0`, `location=1`, nonzero `bodyloc`). Start with simple
+normal or magic items. Defer runewords, socket fillers, and inventory-position
+semantics until a plain item survives live testing.
+
+Writer output rules:
+
+- No active golem:
+  `kf 00 01 00 lf <followers>`
+- Active golem:
+  `kf 01 <single item bytes> 01 00 lf <followers>`
+- Do not write more than one golem item. The live recast test replaced the
+  previous golem, and the section has only one flag plus one item byte stream.
+
+Tests before live promotion:
+
+- No-golem fixture round-trips to `kf 00 01 00 lf`.
+- Active-golem fixture round-trips with the same `golem_item_bytes` hash.
+- Explicit `iron_golem_payload` writes `kf 01` and keeps followers unchanged.
+- Explicit strip writes `kf 00` and keeps followers unchanged.
+- Scanner can decode the current live `probenecro` payload header from byte 0.
+
+Live test ladder:
+
+1. Preserve-only rebuild of `probenecro`; confirm the existing golem still
+   appears and payload hash is unchanged or only known runtime bytes change.
+2. Generate a disposable Necromancer with a plain normal item golem.
+3. Reload/save once; expect D2R may canonicalize byte `+1`, based on the
+   second-golem capture.
+4. Only after a normal item survives, try magic properties. Keep the generated
+   item conservative: no sockets, no runeword, no fillers.
+
 ### Milestone 4: Demon Stats Research
 
 Gather enough fixtures to separate item/monster identity from runtime state.
@@ -179,10 +280,18 @@ Gather enough fixtures to separate item/monster identity from runtime state.
 Tests:
 
 - Reload/save `probewldemon` without combat.
-- Damage/heal the demon, save/quit.
+- Treat damage/heal as optional instead of primary: bound demons are hard to
+  keep injured and heal quickly, so this only helps if a durable injured save
+  can be captured without a lot of manual wrestling.
 - Waypoint and fight one small pack, save/quit.
 - Rebind to two known monsters, save/quit each.
 - If safe, vary Bind Demon skill level and compare `+52` and derived fields.
+- Positive template-variant probe: `probewlalt` joined and spawned a demon with
+  the alternate known 116-byte payload. On save-and-quit, D2R preserved
+  `follower_count=1` and the 116-byte payload shape but canonicalized payload
+  offsets `+89..+91` and `+95..+97`. On a second reload/save, `+95..+97`
+  stayed stable but `+89..+91` changed again. On a third reload/save,
+  `+95..+97` stayed stable again and `+89..+91` became `00 00 00`.
 
 Analysis:
 
@@ -191,6 +300,8 @@ Analysis:
 - Cross-reference `monster_hcidx` with MonStats and affixes with MonUMod.
 - Treat `+24..+31`, `+44/+48`, `+64..+79`, `+88`, and `+95..+115` as unknown
   until multiple controlled fixtures agree.
+- Treat `+89..+91` as actively volatile based on the repeated `probewlalt`
+  reload/save result.
 
 Acceptance:
 

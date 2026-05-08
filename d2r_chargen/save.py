@@ -9,12 +9,19 @@ import os
 import struct
 import shutil
 
-from d2r_chargen.build_lib import calc_checksum
-
 
 # ============================================================
 # Helpers
 # ============================================================
+
+def calc_checksum(data):
+    cs = 0
+    for i, b in enumerate(data):
+        if 0x0c <= i <= 0x0f:
+            b = 0
+        cs = (((cs << 1) | (cs >> 31)) + b) & 0xFFFFFFFF
+    return cs
+
 
 def find_section(data, marker, start=0):
     """Find a section marker in save data."""
@@ -581,7 +588,8 @@ def create_new_character(template_path, new_name, class_id, output_dir=None):
 # ============================================================
 
 def rebuild_items(filepath, char_items_bytes, merc_items_bytes,
-                  preserve_followers=True, follower_payload=None):
+                  preserve_followers=True, follower_payload=None,
+                  preserve_golem=True, iron_golem_payload=None):
     """Replace all items in a save file.
 
     Args:
@@ -597,9 +605,16 @@ def rebuild_items(filepath, char_items_bytes, merc_items_bytes,
             When provided, the rebuilt save emits follower_count=1 followed
             by these bytes regardless of `preserve_followers` or the input's
             existing follower state. Used by `bound_demon:` YAML resolution.
+        preserve_golem: when True (default), an existing Iron Golem item
+            payload in the input save is copied verbatim into the rebuilt
+            output. When False, the golem block is stripped to `kf 00`.
+            Ignored when iron_golem_payload is given.
+        iron_golem_payload: optional JM-less item payload to inject as an
+            active Iron Golem. Used by future `iron_golem:` YAML resolution.
 
     Raises:
         ValueError: follower_payload is not exactly 116 bytes.
+        ValueError: iron_golem_payload is empty.
     """
     data = bytearray(open(filepath, 'rb').read())
 
@@ -649,8 +664,10 @@ def rebuild_items(filepath, char_items_bytes, merc_items_bytes,
         print(f"  Merc items: {len(merc_items_bytes)} total, {merc_count} parents (JM count)")
 
     # Always construct a clean end section to avoid stale merc items (Rule 6).
-    # D2S structure after char items (verified against working Tempest save):
-    #   JM[0] (corpse) | jf | [JM[n] merc_items] | kf | \x00 (golem) | \x01\x00 | lf[count] [payload?]
+    # D2S structure after char items:
+    #   JM[0] (corpse) | jf | [JM[n] merc_items] |
+    #   kf | <golem flag> [golem item payload] | \x01\x00 |
+    #   lf[count] [follower payload?]
     #
     # follower_count: live followers attached to char (warlock bound demon, etc.).
     # Was lf_count — see CLAUDE.md rule 21 + Task 0.4 findings.
@@ -691,6 +708,25 @@ def rebuild_items(filepath, char_items_bytes, merc_items_bytes,
     else:
         follower_count = 0
         follower_payload = b''
+
+    from d2r_chargen.iron_golem import decode_iron_golem_block
+    if iron_golem_payload is not None:
+        if not iron_golem_payload:
+            raise ValueError('iron_golem_payload must not be empty')
+        golem_byte = b'\x01'
+        golem_payload = bytes(iron_golem_payload)
+    elif preserve_golem:
+        existing_golem = decode_iron_golem_block(bytes(data))
+        if existing_golem.has_golem:
+            golem_byte = b'\x01'
+            golem_payload = existing_golem.item_payload
+        else:
+            golem_byte = b'\x00'
+            golem_payload = b''
+    else:
+        golem_byte = b'\x00'
+        golem_payload = b''
+
     merc_jm = struct.pack('<2sH', b'JM', merc_count)
     merc_section = merc_jm + b''.join(merc_items_bytes)
     end_section = (
@@ -698,7 +734,8 @@ def rebuild_items(filepath, char_items_bytes, merc_items_bytes,
         b'jf' +                              # corpse marker (after corpse JM)
         merc_section +                        # JM[merc] between jf and kf (always present, even if empty)
         b'kf' +                              # iron golem marker
-        b'\x00' +                            # no iron golem
+        golem_byte +
+        golem_payload +
         b'\x01\x00' +                        # constant
         struct.pack('<2sH', b'lf', follower_count) +  # follower count (0 = no live followers attached)
         follower_payload                     # follower payload (e.g., 116B bound-demon block) when count >= 1

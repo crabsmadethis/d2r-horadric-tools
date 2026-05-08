@@ -27,7 +27,7 @@
 | +80..+84 | 5B | `1b 1e 05 1c 06` | `19 06 05 1b 1e` | diff | **Affix indices** (refer to MonUMod.txt). Both contain `5` (Strong), `1B` (Spectral Hit), `1E` (Aura Enchanted) — the par2/par3/par4/par5 mandatory affixes from Skills.txt:384. The 5th byte is the per-roll random affix: A=`1c` (28), B=`06` (Fast). Order is roll order, not declaration order. |
 | +85..+87 | 3B | zeros | zeros | same | Padding. |
 | +88 | u32 | 0xFED42200    | 0x03B8C400    | diff | Looks like a checksum or hash. Both have a non-zero high-entropy value. |
-| +92..+93 | 2B | `gf`         | `gf`         | same | Section delimiter — same byte position in both. **Note:** this is `gf` (golem section) per vanilla D2, but the warlock has no iron golem. RotW may co-opt this section, OR it's a permanent section delimiter that always appears when the follower block is present. |
+| +92..+93 | 2B | `gf`         | `gf`         | same | Embedded payload data, not a section delimiter. Live 2026-05-08 rewrites kept the save ending immediately after the 116-byte demon payload, so decoders must not split on these bytes. |
 | +94 | u8  | 0x06          | 0x06          | same | Byte after `gf`. In vanilla D2 this is `has_golem` (0/1). Here it's 6 — **NOT a vanilla golem flag**. Could be a count, a follower-state byte, or a RotW-specific opcode. |
 | +95..+115 | 21B | `16 8c df 06 0e d0 7f c3 0d 30 d0 02 00 00 68 20 34 be 01 f0 1f` | `d0 29 48 00 0e a0 53 90 00 30 c0 02 00 00 68 80 3d 51 00 f0 1f` | diff | Encoded payload after `gf`. Last 2 bytes (`f0 1f`) match → likely a fixed terminator. The middle is variable. Could be golem item (encoded `JM`-less), a second follower record, or a hash. |
 
@@ -37,7 +37,7 @@
 - `+6 u32` → **monster_seed** (4-byte LE random instance seed)
 - `+52 u32` → **bind_demon_level** (player's skill level at bind time)
 - `+80..+84` → **affix_indices** (5 bytes, MonUMod.txt indices)
-- `+92..+93` → **golem/follower section delimiter** (`gf` marker)
+- `+92..+93` → embedded ASCII `gf` payload bytes, not a structural marker
 
 ## Medium-confidence (need more fixtures)
 
@@ -50,7 +50,7 @@
 - `+24 u32` and `+28 u32` change between binds — what aspect of the monster do they encode? Likely runtime stats (HP/AR/level) — needs damaged-demon fixture or known-monster-stats cross-reference.
 - `+64..+79` bitfields — what triggers them? Champion roll? Paragon? Affix-application stages?
 - `+88 u32` — is it a hash of the preceding bytes, or independent runtime data?
-- `+95..+115` post-`gf` payload — is this golem-related (vanilla repurposed) or RotW-specific?
+- `+95..+115` post-embedded-`gf` payload — RotW-specific/runtime data until proven otherwise.
 
 ## Confirmed invariants for the writer
 

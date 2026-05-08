@@ -10,9 +10,19 @@ from __future__ import annotations
 import argparse
 import json
 import struct
+import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from d2r_chargen.iron_golem import (
+    decode_iron_golem_block,
+    decode_iron_golem_item_header,
+)
 
 
 MAGIC = b"\x55\xaa\x55\xaa"
@@ -185,8 +195,20 @@ def summarize_file(summary: CorpusSummary, root: Path, path: Path) -> None:
         summary.add_counter("stats_block_bytes", if_marker - (gf + 2))
     if kf >= 0 and lf >= 0:
         summary.add_counter("kf_to_lf_gap", lf - kf)
-        if kf + 2 < len(data):
-            summary.add_counter("has_golem_byte", data[kf + 2])
+        golem = decode_iron_golem_block(data)
+        if golem.has_markers:
+            summary.add_counter("has_golem_byte", golem.has_golem_byte)
+            summary.add_counter("golem_bridge_ok", golem.bridge_ok)
+            summary.add_counter("golem_item_payload_bytes", golem.payload_len)
+            if golem.has_golem:
+                header = decode_iron_golem_item_header(golem.item_payload)
+                summary.add_counter("golem_item_header_ok", header is not None)
+                if header is not None:
+                    summary.add_counter("golem_item_type", header.type_code)
+                    summary.add_counter("golem_item_quality", header.quality)
+                    summary.add_counter("golem_item_storage", header.storage)
+                    summary.add_counter("golem_item_location", header.location)
+                    summary.add_counter("golem_item_bodyloc", header.bodyloc)
     if merc_jm >= 0 and merc_jm + 4 <= len(data):
         summary.add_counter("merc_item_count", struct.unpack_from("<H", data, merc_jm + 2)[0])
     if lf >= 0 and lf + 4 <= len(data):
