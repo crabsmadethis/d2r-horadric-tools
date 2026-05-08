@@ -260,3 +260,6 @@ payload before `lf`.
 2026-05-08 persistence result: after fully reloading `probenecro`, the Iron
 Golem was still present and save-and-quit preserved the same 55-byte golem
 payload (`sha1=2f582d487d12a70b8c5cdc1da3e371b2c302c390`).
+
+Second reload on 2026-05-08 still showed the Iron Golem and left
+`probenecro.d2s` unchanged on disk with the same payload hash.
