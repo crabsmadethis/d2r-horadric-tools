@@ -288,12 +288,14 @@ payload length 19, and the generated payload byte-for-byte identical
 (`sha1=4818f07bc1e0e0907f4bcd30a50ab7c6038fb82d`). This proves the writer can
 synthesize at least simple normal Iron Golem items via the existing encoder.
 
-2026-05-08 generated-magic result: `probegmag` joined game and kept an active
-Iron Golem from a generated magic-quality Falchion payload. After save-and-exit,
-the scanner reported `has_golem=1`, `kf_to_lf_gap=29`, payload length 24,
-`type=flc`, `quality=4`, `storage=0`, `location=1`, and `bodyloc=4`
-(`sha1=09e7961cd4d3763fda1a073493aa97c00e38b4fd`). Magic item support is now a
-live-positive path, though sockets/runewords/fillers should remain deferred.
+2026-05-08 generated-magic result: `probegmag` used a generated magic-quality
+Falchion payload with `fireresist +10`. It joined game, and the on-disk save
+remained `has_golem=1` with `kf_to_lf_gap=29`, payload length 24, `type=flc`,
+`quality=4`, `storage=0`, `location=1`, `bodyloc=4`, and the payload
+byte-for-byte identical (`sha1=09e7961cd4d3763fda1a073493aa97c00e38b4fd`).
+Because the file timestamp and full hash did not change after the live attempt,
+keep one visual confirmation step before calling magic-property golem
+generation fully proven.
 
 ### Milestone 4: Demon Stats Research
 
@@ -317,6 +319,9 @@ Tests:
 - No-combat reload result: `probewldemon` joined and save-and-exit changed only
   `+89..+91` (`ea 10 72 -> 8c ee 7b`). Everything else in the 116-byte payload
   stayed stable, including identity fields, `+64..+79`, and `+95..+115`.
+- No-combat `probewlalt` reload result: the demon appeared again and save-exit
+  changed only `+89..+91` (`00 00 00 -> ff 8b 58`). This confirms the all-zero
+  triplet can be a transient value, not a stable canonical endpoint.
 
 Analysis:
 

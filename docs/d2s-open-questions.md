@@ -115,6 +115,10 @@ Live next step:
 - 2026-05-08 third reload result: `probewlalt` still joined with the demon.
   A third save-and-quit kept the same valid block shape. Bytes `+95..+97`
   remained stable, while `+89..+91` changed to `00 00 00`.
+- 2026-05-08 no-combat reload result: `probewlalt` loaded with the demon again.
+  After save-and-exit, the payload stayed valid and only bytes `+89..+91`
+  changed (`00 00 00 -> ff 8b 58`). The zero triplet is not sticky; keep
+  treating `+89..+91` as volatile session/runtime bytes.
 
 ### 2. Embedded `gf` inside demon payload
 
@@ -206,12 +210,14 @@ Live next step:
   payload length 19, header `type=flc`, `quality=2`, `storage=0`,
   `location=1`, `bodyloc=4`, and preserved the payload byte-for-byte
   (`sha1=4818f07bc1e0e0907f4bcd30a50ab7c6038fb82d`).
-- 2026-05-08 generated-magic result: `probegmag` joined game and kept an active
-  Iron Golem with a generated magic-quality Falchion payload. After save-and-exit
-  the save was checksum-clean with `has_golem=1`, `kf_to_lf_gap=29`, payload
-  length 24, header `type=flc`, `quality=4`, `storage=0`, `location=1`,
-  `bodyloc=4`, and payload
-  `sha1=09e7961cd4d3763fda1a073493aa97c00e38b4fd`.
+- 2026-05-08 generated-magic result: `probegmag` used a generated magic-quality
+  Falchion payload with an encoded `fireresist +10` property. It joined game.
+  The on-disk save remained `has_golem=1`, payload length 24, header
+  `type=flc`, `quality=4`, `storage=0`, `location=1`, `bodyloc=4`, and the
+  payload remained byte-for-byte identical
+  (`sha1=09e7961cd4d3763fda1a073493aa97c00e38b4fd`). The file timestamp/hash
+  did not change, so record this as join acceptance plus valid on-disk
+  persistence; visual golem presence still needs explicit confirmation.
 
 ### 6. `jf` marker optionality
 

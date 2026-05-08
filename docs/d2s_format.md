@@ -313,6 +313,9 @@ while `+89..+91` changed again. Treat `+89..+91` as volatile runtime/hash bytes.
 
 A third reload/save again kept the demon and the valid block shape. Bytes
 `+95..+97` stayed stable and `+89..+91` changed to `00 00 00`.
+Another no-combat `probewlalt` reload/save kept the demon but changed only
+`+89..+91` again (`00 00 00 -> ff 8b 58`), confirming that the zero triplet is
+not a stable canonical endpoint.
 
 ### Cross-class behavior
 
@@ -355,10 +358,13 @@ On the same date, `probegnorm` proved generated writing: a normal-quality
 Falchion payload produced by `build_item(...)` joined game and stayed
 byte-for-byte identical after save-and-quit
 (`sha1=4818f07bc1e0e0907f4bcd30a50ab7c6038fb82d`).
-`probegmag` then proved the same for a generated magic-quality Falchion payload:
-D2R kept `has_golem=1`, `kf_to_lf_gap=29`, a 24-byte payload, and header
-`type=flc`, `quality=4`, `storage=0`, `location=1`, `bodyloc=4`
-(`sha1=09e7961cd4d3763fda1a073493aa97c00e38b4fd`).
+`probegmag` then showed join acceptance for a generated magic-quality Falchion
+payload with `fireresist +10`: the on-disk save remained `has_golem=1`,
+`kf_to_lf_gap=29`, payload length 24, and header `type=flc`, `quality=4`,
+`storage=0`, `location=1`, `bodyloc=4`
+(`sha1=09e7961cd4d3763fda1a073493aa97c00e38b4fd`). Because the file timestamp
+and full hash did not change after the live attempt, keep one visual
+confirmation step before calling magic-property golem generation fully proven.
 
 For warlocks with bound demons: `kf 00` is still written, the bridge
 `\x01\x00` follows, and the `lf` follower block carries the demon.
