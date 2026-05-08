@@ -366,7 +366,8 @@ sources for full context — this is just the index.
   `.map`, `.ma0`) and matching the throwaway character's SC/HC status category
   was still insufficient. Same-install letter-only clones appeared, while names
   containing the digit `2` did not. Use letter-only embedded names and matching
-  file basenames before treating an invisible probe as a payload rejection.
+  file basenames before treating an invisible probe as a payload rejection; the
+  renamed `probe...` saves appeared in Offline.
 - **Stats can't be 0** where class minimum applies — Dex / Energy at 0 produces `Error:7`. (`feedback_stats_nonzero.md`.)
 - **Non-simple socketed fillers are broken** — magic jewels (quality=4, location=6) cause "FAILED TO JOIN GAME" with a full save. Merge filler stats into the parent. (`feedback_jewel_filler.md`.)
 - **HC flip preserves merc bytes** — `feedback_hc_flip_merc_preserve.md`: don't zero `0xA8..0xAA` when flipping SC→HC, or merc Hireling.Id is destroyed.

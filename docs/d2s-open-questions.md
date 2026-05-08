@@ -173,7 +173,9 @@ Live next step:
   `0x14 == 0x04` still did not make digit-bearing `D2SProbe...` characters
   visible. Same-install letter-only clones did appear, including clones that
   changed class, level, progression, current difficulty, and merc header bytes.
-  Use letter-only probe names before concluding the probe payload is bad.
+  The letter-only aliases `probesorc`, `probenecro`, `probewlzero`, and
+  `probewldemon` all appeared in the Offline list. Use letter-only probe names
+  before concluding the probe payload is bad.
 - Only copy one test character at a time into the live save directory.
 - After each live result, copy the rewritten save back to a private fixture area
   and record only aggregate findings in public docs.

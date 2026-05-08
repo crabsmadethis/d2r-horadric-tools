@@ -60,7 +60,9 @@ appeared, while names containing the digit `2` did not.
 
 Use letter-only probe names for live tests. Scanner-clean `.d2s` files with
 digits in the embedded character name or filename can be invisible in character
-select.
+select. After renaming the four probes to `probesorc`, `probenecro`,
+`probewlzero`, and `probewldemon`, all four appeared in D2R's Offline list on
+Bazzite.
 
 For staging outside the live save directory, set both variables:
 
