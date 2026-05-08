@@ -206,6 +206,12 @@ Live next step:
   payload length 19, header `type=flc`, `quality=2`, `storage=0`,
   `location=1`, `bodyloc=4`, and preserved the payload byte-for-byte
   (`sha1=4818f07bc1e0e0907f4bcd30a50ab7c6038fb82d`).
+- 2026-05-08 generated-magic result: `probegmag` joined game and kept an active
+  Iron Golem with a generated magic-quality Falchion payload. After save-and-exit
+  the save was checksum-clean with `has_golem=1`, `kf_to_lf_gap=29`, payload
+  length 24, header `type=flc`, `quality=4`, `storage=0`, `location=1`,
+  `bodyloc=4`, and payload
+  `sha1=09e7961cd4d3763fda1a073493aa97c00e38b4fd`.
 
 ### 6. `jf` marker optionality
 

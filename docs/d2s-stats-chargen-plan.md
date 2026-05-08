@@ -288,6 +288,13 @@ payload length 19, and the generated payload byte-for-byte identical
 (`sha1=4818f07bc1e0e0907f4bcd30a50ab7c6038fb82d`). This proves the writer can
 synthesize at least simple normal Iron Golem items via the existing encoder.
 
+2026-05-08 generated-magic result: `probegmag` joined game and kept an active
+Iron Golem from a generated magic-quality Falchion payload. After save-and-exit,
+the scanner reported `has_golem=1`, `kf_to_lf_gap=29`, payload length 24,
+`type=flc`, `quality=4`, `storage=0`, `location=1`, and `bodyloc=4`
+(`sha1=09e7961cd4d3763fda1a073493aa97c00e38b4fd`). Magic item support is now a
+live-positive path, though sockets/runewords/fillers should remain deferred.
+
 ### Milestone 4: Demon Stats Research
 
 Gather enough fixtures to separate item/monster identity from runtime state.

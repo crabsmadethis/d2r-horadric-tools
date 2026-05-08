@@ -355,6 +355,10 @@ On the same date, `probegnorm` proved generated writing: a normal-quality
 Falchion payload produced by `build_item(...)` joined game and stayed
 byte-for-byte identical after save-and-quit
 (`sha1=4818f07bc1e0e0907f4bcd30a50ab7c6038fb82d`).
+`probegmag` then proved the same for a generated magic-quality Falchion payload:
+D2R kept `has_golem=1`, `kf_to_lf_gap=29`, a 24-byte payload, and header
+`type=flc`, `quality=4`, `storage=0`, `location=1`, `bodyloc=4`
+(`sha1=09e7961cd4d3763fda1a073493aa97c00e38b4fd`).
 
 For warlocks with bound demons: `kf 00` is still written, the bridge
 `\x01\x00` follows, and the `lf` follower block carries the demon.
