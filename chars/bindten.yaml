@@ -81,3 +81,9 @@ equipment:
     extra_properties:
       life: 250
       absorb_fire_pct: 40
+
+bound_demon:
+  template: demclone
+  monster_hcidx: 20
+  bind_level: 10
+  affixes: []
