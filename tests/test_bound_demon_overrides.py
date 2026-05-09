@@ -2,6 +2,11 @@ from pathlib import Path
 
 import pytest
 
+pytest.importorskip(
+    "d2r_chargen.data.item_stat_cost",
+    reason="game data not extracted (run 'd2r-mod extract')",
+)
+
 from d2r_chargen.follower_block import decode_follower_block, parse_demon_payload
 from d2r_chargen.resolve import resolve_bound_demon
 from d2r_chargen.save import calc_checksum
