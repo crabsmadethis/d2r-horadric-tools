@@ -243,6 +243,14 @@ Live next step:
   header `type=flc`, `quality=4`, `storage=0`, `location=1`, `bodyloc=4`, and
   preserved the golem item payload byte-for-byte
   (`sha1=8c5b252152951340325803723c8c166adacef406`).
+- 2026-05-08 expansion batch result: `probegsok`, `probegrun`, `probeguni`,
+  `probegset`, and `probegcrf` all appeared in Offline, joined game, and
+  saved back with `has_golem=1`, valid golem headers, checksum OK, and
+  `follower_count=0`. Empty socketed normal, set, and ethereal crafted payloads
+  stayed byte-for-byte identical. Steel runeword and unique Bloodrise payloads
+  stayed active but D2R canonicalized bytes inside the payload. Visual golem
+  presence was not separately reported for this batch, so record it as
+  load/save persistence rather than visual confirmation.
 
 ### 6. `jf` marker optionality
 

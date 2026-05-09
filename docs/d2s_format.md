@@ -384,6 +384,12 @@ uniques, sets, rares, and crafted items until those variants have live probes.
 with `fire_res: 10` appeared in Offline, joined game, showed the Iron Golem
 in-game, and preserved the 24-byte golem item payload byte-for-byte after
 save-and-exit (`sha1=8c5b252152951340325803723c8c166adacef406`).
+The expansion batch then showed load/save persistence for five additional
+families: empty socketed normal, Steel runeword with embedded rune fillers,
+unique Bloodrise, set Civerb's Cudgel, and ethereal crafted Falchion. All five
+saved back with `has_golem=1`; socketed normal, set, and crafted payloads were
+byte-stable, while runeword and unique payloads stayed active but were
+canonicalized by D2R.
 
 For warlocks with bound demons: `kf 00` is still written, the bridge
 `\x01\x00` follows, and the `lf` follower block carries the demon.
