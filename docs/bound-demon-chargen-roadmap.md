@@ -31,7 +31,7 @@ and hash-like bytes are decoded or proven ignorable.
 | --- | --- | --- |
 | `+0..+1` | follower kind tag `0x0018` | fixed |
 | `+4..+5` | `monster_hcidx` | authorable in template-derived payloads |
-| `+6..+9` | monster seed | authorable in template-derived payloads |
+| `+6..+9` | monster seed | preserve template value; arbitrary override is unsafe |
 | `+52..+55` | Bind Demon level | persistent; visible effect not fully proven |
 | `+80..+84` | five MonUMod affix bytes | authorable in template-derived payloads |
 | `+89..+91` | volatile runtime bytes | do not author |
@@ -39,6 +39,14 @@ and hash-like bytes are decoded or proven ignorable.
 
 The five MonUMod bytes do not explain every visible property. Some properties
 can be monster-specific or stored in other still-unknown payload regions.
+
+Recent live validation tightened two important limits:
+
+- A direct Spectral Hit plus Aura Enchanted affix-byte override persisted in
+  the save, but did not visibly display those properties.
+- A non-template monster seed caused D2R to save the character back with
+  `follower_count=0`, so seed override must stay blocked until seed semantics
+  are decoded.
 
 ## Support Tiers
 
@@ -64,3 +72,11 @@ can be monster-specific or stored in other still-unknown payload regions.
 Use `docs/manual-save-validation.md` for any local game validation. Public docs
 should record the stable behavior and limitation, not disposable character
 names, machine details, or session logs.
+
+## Active Manual Probe Focus
+
+The next manual batch isolates the five-affix result by checking single
+Extra Strong, Fire Enchanted, Cursed, Mana Burn, Extra Fast, and a
+Fire/Cursed/Mana mix. The purpose is to determine whether the unexpected
+Spectral Hit plus Aura Enchanted display is tied to one affix, a smaller
+combination, or only the original five-affix set.

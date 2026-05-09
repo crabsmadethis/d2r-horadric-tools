@@ -12,7 +12,8 @@ questions must include a proof method.
 | Bound demon count | D2R accepts one known Warlock bound-demon payload and rejects tested count-2 bound-demon saves. | Public chargen should support at most one bound demon. |
 | Embedded `gf` bytes | `payload[92:94] == b"gf"` inside a bound-demon payload is data, not a section marker. | Do not split the save at that embedded byte pair. |
 | Volatile demon bytes | Bound-demon payload bytes `+89..+91` may change on save/exit. | Treat that slice as runtime data; do not author it. |
-| Authorable demon fields | Template-derived edits to `monster_hcidx`, monster seed, bind level, and the five MonUMod bytes can persist. | Keep these behind the experimental template-derived YAML path. |
+| Authorable demon fields | Template-derived edits to `monster_hcidx`, bind level, and the five MonUMod bytes can persist. A random monster seed override was stripped back to `follower_count=0` on save/exit. | Keep seed preservation separate from authored seed overrides. |
+| Bound-demon visible affixes | Direct Spectral Hit and Aura Enchanted bytes can persist without visibly displaying those properties. | Treat the five MonUMod bytes as persisted labels, not the whole visible-property model. |
 | Cross-class followers | A structurally valid borrowed follower block can load on a non-Warlock save but is stripped back to `follower_count=0` on save/exit. | Do not expose cross-class follower payloads as normal chargen behavior. |
 | Iron Golem block | Iron Golem data lives in `kf` before `lf` as a single variable-length item payload. | Generated golems should use item encoding and must not write multiple golem payloads. |
 | `jf` before merc items | The `jf` corpse marker can be present or absent before merc `JM` while the tail remains parseable. | Preserve the existing marker shape unless a targeted edit proves a safe normalization. |

@@ -1,0 +1,31 @@
+schema_version: 1
+name: demxmix
+class: warlock
+level: 99
+progression: hell_complete
+
+stats:
+  strength: 180
+  dexterity: 180
+  vitality: 600
+  energy: 250
+
+skills:
+  Bind Demon: 20
+  Demonic Mastery: 20
+  Eldritch Blast: 20
+  Hex Bane: 20
+  Hex Siphon: 20
+  Psychic Ward: 20
+  Blood Oath: 20
+
+equipment: []
+
+bound_demon:
+  template: demclone
+  monster_hcidx: 20
+  bind_level: 20
+  affixes:
+    - Fire Enchanted
+    - Cursed
+    - Mana Burn
