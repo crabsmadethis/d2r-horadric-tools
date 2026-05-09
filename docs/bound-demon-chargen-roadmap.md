@@ -50,6 +50,10 @@ Recent live validation tightened two important limits:
 - A natural bind with the Warlock skill block showing Bind Demon level 20 still
   saved payload `+52` as `7`; do not treat this field as the current skill
   level until a natural bind-level matrix explains it.
+- A pre-authored empty-affix follower matrix at hard Bind Demon levels 1, 5,
+  10, 15, and 20 displayed no added properties and saved back with unchanged
+  empty affix bytes. Skill level and payload `+52` are therefore not sufficient
+  to make tooltip-granted properties appear on an authored follower.
 
 ## Support Tiers
 
@@ -64,7 +68,9 @@ Recent live validation tightened two important limits:
 
 - Decode or classify unknown slices at `+24..+31`, `+44/+48`, `+64..+79`,
   `+88`, and `+95..+115`.
-- Prove whether Bind Demon level affects visible behavior.
+- Prove which template/model fields control visible demon shape.
+- Prove whether Bind Demon level affects freshly bound demons, as distinct from
+  pre-authored follower payloads.
 - Build canonicalization-aware assertions for any field D2R rewrites on
   save/exit.
 - Promote experimental YAML fields only after the scanner and docs agree on the
@@ -82,7 +88,7 @@ The affix-isolation batch ruled out single Extra Strong, Fire Enchanted,
 Cursed, Mana Burn, Extra Fast, and Fire/Cursed/Mana as the source of the
 unexpected Spectral Hit plus Aura Enchanted display.
 
-The next manual batch should bind fresh demons at hard Bind Demon levels 1, 5,
-10, 15, and 20. The purpose is to compare the actual skill tooltip/tier against
-the persisted payload fields, instead of assuming payload `+52` stores the
-effective skill level.
+The next manual batch should compare original-template payloads against
+monster-identity overrides and cleared affix bytes. The purpose is to separate
+"wrong-looking model" failures from actual property encoding failures before
+promoting any monster-identity YAML surface beyond experimental status.
