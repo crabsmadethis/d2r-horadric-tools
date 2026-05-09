@@ -33,6 +33,8 @@ You can develop and run the Tier 1 test suite without D2R installed.
 The CI-equivalent set (no game data required):
 
 ```bash
+python tools/public_hygiene_check.py
+ruff check .
 pytest tests/ -v --timeout=60 \
   -m "not integration and not slow and not e2e and not smoke" \
   --ignore=tests/fixtures/ \
@@ -42,7 +44,10 @@ pytest tests/ -v --timeout=60 \
   --ignore=tests/test_importer.py
 ```
 
-The `--ignore` flags drop tests that need extracted game data or `.d2s` fixtures (neither is checked in). Run them locally after `d2r-mod extract` with the matching marker.
+The hygiene check keeps internal planning notes, machine-specific paths, and
+disposable validation logs out of GitHub-facing docs. The `--ignore` flags drop
+tests that need extracted game data or `.d2s` fixtures (neither is checked in).
+Run them locally after `d2r-mod extract` with the matching marker.
 
 Test markers (defined in `pyproject.toml`):
 
