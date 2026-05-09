@@ -1,206 +1,164 @@
-# d2r-tools
+# Horadric Tools for Diablo II: Resurrected
 
 [![Tests](https://github.com/crabsmadethis/d2r-horadric-tools/actions/workflows/test.yml/badge.svg)](https://github.com/crabsmadethis/d2r-horadric-tools/actions/workflows/test.yml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform: Linux](https://img.shields.io/badge/platform-Linux%20%7C%20Steam%20Deck-orange.svg)](#platform-support)
 
-D2R modding toolkit for Linux and Steam Deck (Proton). YAML-driven character builder, data modding pipeline, and an MCP server that exposes the tools to agentic clients (Claude Code, Codex, Cursor, etc.).
+Horadric Tools is a Python toolkit for offline Diablo II: Resurrected modding
+and save-file workflows. It turns YAML into `.d2s` characters, builds data mods
+from declarative patches, inspects save files before you load them, and exposes
+the same tools through an MCP server for Claude Code, Codex, Cursor, and other
+agent clients.
 
-## Features
+The project is Linux / Steam Deck first, with Windows path detection included
+but not heavily tested. It does not ship Blizzard game data, private save files,
+or Battle.net automation.
 
-- **YAML character builder** - declare characters in YAML, build `.d2s` save files
-- **Data mod pipeline** - YAML overlays applied to game tables, built and deployed
-- **JSON string patches** - rename or add item / UI strings via YAML, no string-table surgery
-- **CASC read/write** - pure Python, no external tools needed
-- **Integrated validation** - scanner catches structural problems before loading the game
-- **Reign of the Warlock** expansion support (8 classes including Warlock)
+## What It Does
+
+- Build offline `.d2s` characters from YAML.
+- Encode equipment, runewords, charms, stats, skills, merc gear, Iron Golems,
+  and experimental template-derived bound demons.
+- Scan saves for structural problems before you try them in game.
+- Extract local D2R data into generated Python lookup tables.
+- Build and deploy data mods from YAML overlays and JSON string patches.
+- Provide 23 MCP tools for game-data lookup, save inspection, chargen, and mod
+  pipeline automation.
+
+## What It Is Not
+
+- Not an online-play tool.
+- Not a trainer, bot, maphack, or memory editor.
+- Not a bundle of extracted D2R data.
+- Not a promise that every generated save is safe to load without scanning.
+
+For save-file work, the core rule is simple: build or edit in staging, scan the
+result, then promote it only if validation passes.
 
 ## Quickstart
 
 ```bash
-git clone <repo-url>
-cd d2r-tools
-pip3 install -e .
-d2r-mod extract        # extracts + generates data from your D2R install
-d2r-chargen build MyChar
+git clone https://github.com/crabsmadethis/d2r-horadric-tools.git
+cd d2r-horadric-tools
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
 ```
 
-(or `pip install -e .` if `pip` points to Python 3 on your system)
-
-Three commands from clone to working. The extract step generates Python data modules from your D2R installation (required for legal reasons - no game data is distributed).
+Generate local lookup data from your D2R install:
 
 ```bash
-# If D2R is not auto-detected:
-d2r-mod extract --game-dir /path/to/Diablo\ II\ Resurrected
-# Or set the environment variable:
-export D2R_GAME_DIR="/path/to/Diablo II Resurrected"
+d2r-mod extract
 ```
 
-An example character YAML is included in `chars/ExamplePaladin.yaml`. 
-Create your own characters in the `chars/` directory.
+If the install is not auto-detected:
 
-D2R install path is auto-detected on Linux/Steam Deck and Windows. Use `--game-dir` to override.
+```bash
+d2r-mod extract --game-dir "/path/to/Diablo II Resurrected"
+```
 
-## Character Definition (YAML)
+Validate the included example character:
 
-Characters are defined in YAML files placed in a `chars/` directory. Here's a complete example:
+```bash
+d2r-chargen validate ExamplePaladin
+```
+
+Build it only when your save directory is configured and you are ready to write
+the generated save:
+
+```bash
+d2r-chargen build ExamplePaladin --force
+d2r-chargen scan ExamplePaladin
+```
+
+## Character YAML
+
+Characters live in `chars/*.yaml`. A small character definition looks like:
 
 ```yaml
 schema_version: 1
-name: MyPaladin
+name: ExamplePaladin
 class: paladin
 level: 85
+progression: hell_complete
 
 stats:
   strength: 156
-  dexterity: 100
+  dexterity: 125
   vitality: 250
-  energy: 15
+  energy: 25
 
 skills:
-  Holy Shield: 20
-  Smite: 20
-  Fanaticism: 20
-  Charge: 1
-  Salvation: 1
-  Cleansing: 1
+  Blessed Hammer: 20
+  Concentration: 20
+  Vigor: 20
 
 equipment:
-  # Unique items - resolved automatically from game data
   - slot: helm
-    unique: Guillaume's Face
-
-  # Runeword items - specify runeword name and base item code
+    unique: Harlequin Crest
   - slot: body
-    runeword: Fortitude
-    base: utp         # Archon Plate
-
-  # Rare/crafted items with explicit properties
-  - slot: hands
-    rare: true
-    base: uvg          # Vampirebone Gloves
-    ilvl: 90
-    properties:
-      fire_res: 30
-      cold_res: 30
-      light_res: 30
-      life: 20
-
+    runeword: Enigma
+    base: utp
   - slot: weapon
-    unique: Grief
-    base: 7cr          # Phase Blade
-
-  - slot: shield
-    unique: Herald of Zakarum
-
-  - slot: belt
-    unique: Verdungo's Hearty Cord
-
-  - slot: feet
-    unique: Gore Rider
-
-  - slot: neck
-    rare: true
-    ilvl: 90
-    properties:
-      class_skills: [2, paladin]
-      fcr: 10
-      fire_res: 30
-      light_res: 25
-
-  - slot: ring_right
-    unique: Bul Katho's Wedding Band
-
-  - slot: ring_left
-    unique: Ravenfrost
+    runeword: Heart of the Oak
+    base: fla
 
 inventory:
   charms:
-    # Unique charms
-    - unique: Annihilus
-      properties:
-        all_skills: 1
-        strength: 20
-        dexterity: 20
-        fire_res: 20
-        cold_res: 20
-        light_res: 20
-        poison_res: 20
-        add_exp: 10
-
-    # Repeatable magic charms
     - magic_grand_charm:
         count: 8
         properties:
-          skill_tab: [1, 15]   # Combat skills (paladin)
+          skill_tab: [1, 15]
           life: 40
-
-    - magic_small_charm:
-        count: 5
-        properties:
-          life: 20
-          light_res: 11
-
-merc:
-  equipment:
-    - slot: weapon
-      unique: The Reaper's Toll
-      ethereal: true
 ```
 
-### Slot Names
+See [chars/ExamplePaladin.yaml](chars/ExamplePaladin.yaml) for a fuller example.
 
-`helm`, `body`, `weapon`, `shield`, `hands`, `belt`, `feet`, `neck`, `ring_right`, `ring_left`, `weapon_switch`, `shield_switch`
+Supported class names:
 
-### Item Types
+```text
+amazon, sorceress, necromancer, paladin, barbarian, druid, assassin, warlock
+```
 
-| Field | Description |
-|-------|-------------|
-| `unique: "Name"` | Unique item - stats auto-resolved from game data |
-| `set_item: "Name"` | Set item |
-| `runeword: "Name"` | Runeword - requires `base` code |
-| `rare: true` | Rare item - requires `base` and `properties` |
-| `magic_grand_charm` | Magic grand charm with `count` and `properties` |
-| `magic_small_charm` | Magic small charm with `count` and `properties` |
+Common equipment slots:
 
-### Classes
-
-`amazon`, `sorceress`, `necromancer`, `paladin`, `barbarian`, `druid`, `assassin`, `warlock`
+```text
+helm, body, weapon, shield, hands, belt, feet, neck, ring_right, ring_left,
+weapon_switch, shield_switch
+```
 
 ## CLI Reference
 
-### d2r-chargen
+### `d2r-chargen`
 
 ```bash
-d2r-chargen build <name> [--phase N] [--force]   # Build character (phases 1-4)
-d2r-chargen validate <name> [--yaml-only]         # Validate YAML definition
-d2r-chargen list                                   # List defined characters
-d2r-chargen scan <name>                           # Run scanner diagnostics
-d2r-chargen import <name> [--force]               # Import .d2s -> YAML
-d2r-chargen diff <file1> <file2>                  # Compare .d2s files
+d2r-chargen list
+d2r-chargen validate <name> [--yaml-only]
+d2r-chargen build <name> [--phase N] [--force]
+d2r-chargen scan <name>
+d2r-chargen import <name> [--force]
+d2r-chargen diff <file1> <file2>
 ```
 
-### d2r-mod
+### `d2r-mod`
 
 ```bash
-d2r-mod extract [--game-dir PATH]    # Extract game data + generate Python modules
-d2r-mod build [--no-regen]           # Build mod from vanilla + overlays
-d2r-mod deploy [--force] [--no-casc] # Deploy mod to game directory
-d2r-mod undeploy                     # Remove mod from game
-d2r-mod diff [--summary]             # Compare vanilla vs modded tables
-d2r-mod inject [--from-dir PATH]     # Inject files into CASC archive
-d2r-mod audit [--skills] [--items]   # Audit game data
-d2r-mod clean                        # Remove build/ and reset data
-d2r-mod update                       # Re-extract after game update
+d2r-mod extract [--game-dir PATH]
+d2r-mod build [--no-regen]
+d2r-mod deploy [--force] [--no-casc]
+d2r-mod undeploy
+d2r-mod diff [--summary]
+d2r-mod inject [--from-dir PATH]
+d2r-mod audit [--skills] [--items]
+d2r-mod clean
+d2r-mod update
 ```
 
 ## Data Mod Overlays
 
-Overlays modify D2R data tables declaratively using YAML. Place overlay files in an `overlays/` directory and run `d2r-mod build`.
-
-Create an `overlays/` directory in your project root to add custom overlays.
-If no overlays directory exists, `d2r-mod build` will proceed with vanilla data only.
+Overlays modify D2R data tables declaratively. Place overlay files in
+`overlays/` and run `d2r-mod build`.
 
 ```yaml
 target: data/global/excel/UniqueItems.txt
@@ -213,103 +171,55 @@ changes:
     comment: "Buff The Gnasher with +50% Enhanced Damage"
 ```
 
-Each overlay targets a specific game table (TSV file) and specifies row matches and column changes. See `examples/sample_overlay.yaml` for a complete example.
+If no `overlays/` directory exists, the build proceeds with vanilla data only.
+See [examples/sample_overlay.yaml](examples/sample_overlay.yaml) for a complete
+example.
 
 ## JSON String Patches
 
-D2R reads item names, mercenary names, and most UI strings from JSON files in `data/local/lng/strings/` (not from the older `.tbl` files). To add a new string or override a vanilla one, drop a YAML spec into `patches/json_strings/` and rebuild.
+D2R reads most item, mercenary, and UI strings from JSON files under
+`data/local/lng/strings/`. Put YAML specs in `patches/json_strings/` to add or
+override strings:
 
 ```yaml
-# patches/json_strings/my_renames.yaml
 description: "Rename a few potions"
 target: item-names.json
 entries:
-  - key: "vps"                # vanilla string key (super healing potion)
-    value: "Wild Rice Cake"   # what D2R should display instead
-  - key: "MyCustomItem"       # new key — auto-allocated string ID
+  - key: "vps"
+    value: "Wild Rice Cake"
+  - key: "MyCustomItem"
     value: "Heart of the Mountain"
 ```
 
-If the key already exists in the target JSON, its `enUS` value is overridden. If it doesn't, a new entry is appended with the next free string ID (read from `data/local/lng/next_string_id.txt`). Targets currently used: `item-names.json`, `mercenaries.json`, `ui.json`.
+After `d2r-mod build`, patched JSONs land in
+`build/data/local/lng/strings/`. D2R caches strings at startup, so fully exit
+and relaunch to see changes.
 
-After `d2r-mod build`, the patched JSONs land in `build/data/local/lng/strings/`; `d2r-mod deploy` injects them into CASC. D2R caches strings at startup, so fully exit and relaunch to see changes.
+## MCP Server
 
-If no `patches/json_strings/` directory exists, the build skips this step.
+Horadric Tools ships an [MCP](https://modelcontextprotocol.io) server for agent
+clients. It exposes game-data lookups, save inspection, character generation,
+and mod pipeline commands as typed tools.
 
-## Architecture
-
-```
-d2r_chargen/          YAML character builder
-  build_lib.py        Binary item encoder (Huffman, stat encoding, checksums)
-  character.py        Build orchestrator (YAML -> items -> .d2s)
-  resolve.py          Name-to-ID resolution (uniques, runewords, stats, skills)
-  save.py             Save file operations (stats, skills, waypoints, items)
-  scanner.py          Diagnostic validator
-  data/               Game data (generated via extract, not distributed)
-
-d2r_mod/              Data modding pipeline
-  casc.py             Pure Python CASC reader (TBL, TXT, JSON)
-  casc_write.py       CASC archive builder + ekey-hijack injection
-  overlay.py          YAML overlay loader and applier
-  build.py            Build orchestrator (vanilla + overlays -> build/)
-  build_steps/        Specialized build steps:
-    register_custom_uniques.py  Auto-register custom unique names in TBL
-    build_string_registry.py    Diff built TBLs vs vanilla into a registry
-    patch_json_strings.py       Apply patches/json_strings/*.yaml to JSON
-  deploy.py           Deploy/undeploy mod files
-  regen.py            Generate chargen data from extracted tables
-
-tools/                Standalone diagnostics
-  audit_string_registry.py  Categorize string_registry entries vs JSON
-```
-
-## Platform Support
-
-| Platform | Status |
-|----------|--------|
-| Linux / Steam Deck (Proton) | Supported, tested |
-| Windows | Untested — path detection included, contributions welcome |
-| macOS | Unsupported |
-
-## Requirements
-
-- Python 3.11+
-- PyYAML
-- Diablo II: Resurrected (for data extraction)
-- `mcp` SDK (installed automatically with the package)
-
-## License
-
-MIT
-
-## MCP Server (Claude Code, Codex, Cursor, …)
-
-d2r-tools ships an [MCP](https://modelcontextprotocol.io) server that exposes
-game-data lookups, save inspection, the chargen pipeline, and the mod pipeline
-as typed tools to any MCP-compatible agent. See `d2r_mcp/README.md` for the
-full tool catalog (23 tools across lookup / save / chargen / mod).
-
-### Install
+Install the MCP SDK before launching the server:
 
 ```bash
-pip install -e .                  # `mcp` SDK is included as a base dependency
+pip install mcp
 ```
 
-### Launch
+Launch it with:
 
 ```bash
-python3 -m d2r_mcp                # stdio transport
+python3 -m d2r_mcp
 ```
 
-### Client configuration
-
-**Claude Code (user-scoped):**
+Claude Code:
 
 ```bash
 claude mcp add d2r-tools --transport stdio --scope user -- python3 -m d2r_mcp
 ```
 
-**Codex / Cursor / any other MCP client** — add to the client's MCP config:
+Generic MCP config:
 
 ```json
 {
@@ -323,27 +233,66 @@ claude mcp add d2r-tools --transport stdio --scope user -- python3 -m d2r_mcp
 }
 ```
 
-Mutation tools (`d2r_chargen_build`, `d2r_mod_deploy`) enforce the project's
-safety rules structurally: they back up the live save, build to a staging
-file, run the scanner on the staging, and only promote to the live save if
-the scanner passes.
+See [d2r_mcp/README.md](d2r_mcp/README.md) for the full tool catalog.
 
-## Claude Code Plugin (optional)
+## Safety Model
 
-The `plugin/` directory is a Claude Code plugin that adds slash commands and
-skills on top of the MCP server. Point Claude Code at the repo or symlink
-`plugin/` into your Claude Code plugins directory.
+The save-file workflow is intentionally conservative:
 
-### Slash commands
+1. Start from an existing valid `.d2s` template where possible.
+2. Write changes to a temp or staging file.
+3. Recompute size and checksum.
+4. Run `d2r-chargen scan <name>`.
+5. Promote only scanner-clean files.
 
-| Command | Description |
-|---------|-------------|
-| `/d2r-build <name>` | Safe build cycle (backup → build → scan → verify) |
-| `/d2r-validate <name>` | Validate character YAML without building |
-| `/d2r-scan <name>` | Run diagnostic scanner |
-| `/d2r-lookup <query>` | Look up items, stats, skills from game data |
+Scanner hard errors are treated as deployment blockers unless there is
+bit-level evidence that the scanner is wrong. The detailed save-format notes
+live in [docs/d2s_format.md](docs/d2s_format.md).
 
-### Skills
+## Repository Map
 
-- **d2r-safe-edit** — enforces backup→edit→scan→verify on every save file change
-- **d2r-parallel-agents** — guides parallel-agent dispatch for multi-character work
+```text
+d2r_chargen/    YAML character builder, save writer, scanner, import/diff tools
+d2r_mod/        Data extraction, overlays, CASC read/write, deploy pipeline
+d2r_mcp/        MCP server and tool definitions
+chars/          Example character YAML files
+examples/       Overlay examples
+docs/           Save-format notes and manual validation guidance
+tools/          Standalone diagnostics and hygiene checks
+plugin/         Optional Claude Code plugin commands and skills
+```
+
+## Platform Support
+
+| Platform | Status |
+| --- | --- |
+| Linux / Steam Deck (Proton) | Supported, tested |
+| Windows | Path detection included, needs more testing |
+| macOS | Unsupported for playing D2R; useful for docs and code work only |
+
+## Requirements
+
+- Python 3.11+
+- PyYAML
+- Diablo II: Resurrected for data extraction
+- MCP SDK for agent integration (`pip install mcp`)
+
+## Contributing
+
+Start with [CONTRIBUTING.md](CONTRIBUTING.md). Before opening a PR, run:
+
+```bash
+python tools/public_hygiene_check.py
+ruff check .
+pytest tests/ -v --timeout=60 \
+  -m "not integration and not slow and not e2e and not smoke" \
+  --ignore=tests/fixtures/ \
+  --ignore=tests/test_chargen.py \
+  --ignore=tests/test_decoder.py \
+  --ignore=tests/test_fixtures.py \
+  --ignore=tests/test_importer.py
+```
+
+## License
+
+MIT
