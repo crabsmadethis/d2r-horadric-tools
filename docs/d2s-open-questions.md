@@ -217,13 +217,20 @@ Live next step:
   payload remained byte-for-byte identical
   (`sha1=09e7961cd4d3763fda1a073493aa97c00e38b4fd`). The file timestamp/hash
   did not change, so record this as join acceptance plus valid on-disk
-  persistence; visual golem presence still needs explicit confirmation.
+  persistence, but not as a visual-presence probe.
 - 2026-05-08 chargen support result: v1 YAML support can now inject one
   generated normal or magic Iron Golem item for Necromancers with
   `skills: {IronGolem: 1}`. It writes the same live-observed storage shape
   (`storage=0`, `location=1`, `bodyloc=4` for the default weapon slot) and
   deliberately rejects sockets, runewords, uniques, sets, rares, and crafted
   items until those encodings get their own live probes.
+- 2026-05-08 YAML live result: `probegyaml` was generated through the
+  `iron_golem:` YAML path with a magic Falchion carrying `fire_res: 10`.
+  It appeared in Offline, joined game, and the Iron Golem was visually present.
+  After save-and-exit, D2R still reported `has_golem=1`, payload length 24,
+  header `type=flc`, `quality=4`, `storage=0`, `location=1`, `bodyloc=4`, and
+  preserved the golem item payload byte-for-byte
+  (`sha1=8c5b252152951340325803723c8c166adacef406`).
 
 ### 6. `jf` marker optionality
 

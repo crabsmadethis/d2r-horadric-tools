@@ -363,11 +363,15 @@ payload with `fireresist +10`: the on-disk save remained `has_golem=1`,
 `kf_to_lf_gap=29`, payload length 24, and header `type=flc`, `quality=4`,
 `storage=0`, `location=1`, `bodyloc=4`
 (`sha1=09e7961cd4d3763fda1a073493aa97c00e38b4fd`). Because the file timestamp
-and full hash did not change after the live attempt, keep one visual
-confirmation step before calling magic-property golem generation fully proven.
+and full hash did not change after the live attempt, this proved join
+acceptance but not visual presence.
 Chargen v1 can now write one generated normal or magic Iron Golem item from
 YAML for Necromancers with `IronGolem >= 1`; it rejects sockets, runewords,
 uniques, sets, rares, and crafted items until those variants have live probes.
+`probegyaml` then visually confirmed the YAML path: a generated magic Falchion
+with `fire_res: 10` appeared in Offline, joined game, showed the Iron Golem
+in-game, and preserved the 24-byte golem item payload byte-for-byte after
+save-and-exit (`sha1=8c5b252152951340325803723c8c166adacef406`).
 
 For warlocks with bound demons: `kf 00` is still written, the bridge
 `\x01\x00` follows, and the `lf` follower block carries the demon.

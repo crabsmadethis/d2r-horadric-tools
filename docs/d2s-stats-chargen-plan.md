@@ -183,8 +183,8 @@ Tasks:
 - Done: restrict v1 to normal/magic generated items; reject sockets,
   runewords, uniques, sets, rares, and crafted items until live testing proves
   those encodings.
-- Still needed: one explicit visual confirmation for generated magic-property
-  golems before broadening docs from "join accepted" to "visually proven".
+- Done: visually confirmed generated magic-property Iron Golems through the
+  YAML chargen path.
 
 Acceptance:
 
@@ -304,8 +304,8 @@ remained `has_golem=1` with `kf_to_lf_gap=29`, payload length 24, `type=flc`,
 `quality=4`, `storage=0`, `location=1`, `bodyloc=4`, and the payload
 byte-for-byte identical (`sha1=09e7961cd4d3763fda1a073493aa97c00e38b4fd`).
 Because the file timestamp and full hash did not change after the live attempt,
-keep one visual confirmation step before calling magic-property golem
-generation fully proven.
+this first probe proved join acceptance and on-disk validity but not visual
+presence.
 
 2026-05-08 chargen implementation result: YAML can now specify:
 
@@ -324,6 +324,15 @@ The generated item is forced into the live-observed golem storage shape:
 `storage=0`, `location=1`, and `bodyloc`/`col` from the selected slot
 (`weapon` defaults to `bodyloc=4`). The deploy path resolves this once and
 passes it to `rebuild_items(...)` for every phase.
+
+2026-05-08 YAML live result: `probegyaml` was generated through this
+`iron_golem:` YAML path with a magic Falchion carrying `fire_res: 10`. It
+appeared in Offline, joined game, and the Iron Golem was visually present.
+After save-and-exit, the scanner still reported `has_golem=1`,
+`kf_to_lf_gap=29`, payload length 24, `type=flc`, `quality=4`, `storage=0`,
+`location=1`, and `bodyloc=4`. D2R rewrote unrelated character-state bytes,
+but the golem item payload stayed byte-for-byte identical
+(`sha1=8c5b252152951340325803723c8c166adacef406`).
 
 ### Milestone 4: Demon Stats Research
 
