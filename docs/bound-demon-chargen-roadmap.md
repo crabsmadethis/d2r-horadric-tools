@@ -61,6 +61,9 @@ Live facts:
 - Zeroing the five MonUMod bytes removed visible extra affixes, while the demon
   and lightning immunity remained. Treat lightning immunity as monster-specific
   for this `hcidx=347` demon, not a MonUMod byte.
+- The second edited-payload batch loaded and saved cleanly. Cold Enchanted and
+  Stone Skin showed visibly; Lightning Enchanted byte `03` persisted but did
+  not show as a visible Lightning Enchanted label for this bound demon.
 
 ## Robust Support Shape
 
@@ -73,101 +76,72 @@ Implement demon support in tiers:
 | 3 | `monster_hcidx`/`monster` with template-derived runtime fields | Change monster identity while borrowing the rest of a compatible template | Live test proves model/properties follow the edited monster and save persists |
 | 4 | fully synthesized payload | Build all 116 bytes without a template | Only after unknown fields are decoded or proven ignorable |
 
-Tier 2 and Tier 3 are now viable candidates for implementation behind an
-explicit experimental YAML mode. Keep fully synthesized payloads blocked until
-the remaining runtime slices are decoded or proven ignorable across more
-monster families.
+Tier 2 and Tier 3 are implemented as experimental template-derived YAML
+overrides. Keep fully synthesized payloads blocked until the remaining runtime
+slices are decoded or proven ignorable across more monster families.
 
-## Questions To Answer
+## Question Status
 
 ### Q1: Do the five affix bytes control visible properties?
 
-Test with the same `bindtank` high-property payload and only change
-`+80..+84`.
+Status: answered for template-derived payload edits.
 
-Characters:
+Answered finding:
 
-- `demclone`: unmodified cloned control.
-- `demauras`: affixes changed to `05 09 07 1b 1e`
-  (Extra Strong, Fire Enchanted, Cursed, Spectral Hit, Aura Enchanted).
-- `demblank`: affixes changed to `00 00 00 00 00`.
+- `demclone`, `demauras`, and `demblank` proved that `+80..+84` is authorable
+  and controls the persisted MonUMod list. Zeroing those bytes removed visible
+  extra affixes while the demon and monster-specific lightning immunity
+  remained.
 
-Expected signal:
+Residual risk:
 
-- If `demblank` still shows the same properties, visible properties are mostly
-  elsewhere or implicit.
-- If `demauras` changes the tooltip/display and persists, Tier 2 affix editing
-  is viable.
-- If D2R rewrites the five bytes back, the affix list is derived/canonicalized.
-
-2026-05-08 result:
-
-- `demclone` loaded with the same visible properties as `bindtank` and saved
-  byte-for-byte unchanged.
-- `demauras` loaded and saved with affix bytes `05 09 07 1b 1e`; the visible
-  properties looked the same to the user, consistent with the original
-  `bindtank` demon already visibly retaining Aura Enchanted and Spectral Hit
-  through another path.
-- `demblank` loaded with no visible extra properties except being a demon and
-  lightning immune. The zero affix bytes persisted after save/quit.
-
-Conclusion: `+80..+84` controls visible MonUMod properties and is safe enough
-to promote to an experimental field override. Monster-specific properties can
-still exist outside that five-byte list.
+- The five bytes do not cover every visible property. The `bindtank` demon kept
+  Aura Enchanted, Spectral Hit, and lightning immunity through some other
+  source.
 
 ### Q2: Does `monster_hcidx` control demon identity by itself?
 
-Character:
+Status: answered for the tested template-derived override.
 
-- `demfalln`: same high-property payload, but `monster_hcidx=20`
-  (`fallen2` in the existing fixture notes).
+Answered finding:
 
-Expected signal:
+- `demfalln` changed the visible model to a Fallen, joined, saved, and retained
+  `monster_hcidx=20`. D2R changed only volatile bytes `+89..+91`.
 
-- If the demon becomes a Fallen and persists, Tier 3 monster identity editing
-  is plausible.
-- If it keeps the original model or fails to join, other runtime/tail fields
-  are coupled to the monster.
+Residual risk:
 
-2026-05-08 result: `demfalln` changed to a Fallen, joined, saved, and retained
-`monster_hcidx=20`. D2R changed only volatile bytes `+89..+91`.
-
-Conclusion: `monster_hcidx` controls visible demon model strongly enough for
-experimental template-derived monster overrides.
+- This does not prove fully synthesized payloads. It proves a practical Tier 3
+  override when the rest of the 116-byte payload comes from a compatible live
+  template.
 
 ### Q3: Does Bind Demon level affect persisted properties?
 
-Character:
+Status: partially answered.
 
-- `demlvl`: same high-property payload, but `bind_demon_level=20`.
+Answered finding:
 
-Expected signal:
+- `demlvl` joined, saved, and retained `bind_demon_level=20`.
 
-- If D2R rewrites `+52` or visible properties do not change, the field is
-  mostly historical display/state.
-- If properties change and persist, the level participates in runtime
-  reconstruction.
+Still open:
 
-2026-05-08 result: `demlvl` joined, saved, and retained `bind_demon_level=20`.
-The user observed no visible difference. D2R changed only volatile bytes
-`+89..+91`.
+- The user observed no visible difference in the first level-only test, so
+  `+52` should remain persistent metadata until a skill-level matrix proves
+  visible behavior.
 
-Conclusion: `+52` is persistent, but this first test did not prove it controls
-visible properties. Treat it as metadata until a skill-level matrix says
-otherwise.
+Next proof method:
+
+- Test a small level matrix against the same monster and affix baseline, then
+  diff only the 116-byte payload and visible property report.
 
 ### Q4: Can we keep collecting natural high-property captures?
 
-Character:
+Status: still open and useful.
 
-- `demonlab`: clean no-bound-demon tank for binding fresh monsters without
-  overwriting `bindtank`.
+Next proof method:
 
-Expected signal:
-
-- Each natural capture gives a real payload where visible properties are known.
-  These are the best fixtures for decoding the unknown slices and any
-  non-MonUMod properties.
+- Use `demonlab` as the clean no-bound-demon tank for natural captures. Each
+  capture should record visible properties, save/reload stability, and a
+  public-safe payload-field summary without publishing private save data.
 
 ## Live Test Protocol
 
@@ -198,9 +172,9 @@ Promotion criteria for a field:
 - reload/save changes only known volatile bytes, or the new canonicalized bytes
   are documented and repeatable
 
-## Current Test Batch
+## Completed Test Batch
 
-The first batch was intentionally letter-only:
+The first batch was intentionally letter-only and is now answered evidence:
 
 | Character | Purpose |
 | --- | --- |
@@ -211,12 +185,12 @@ The first batch was intentionally letter-only:
 | `demfalln` | monster id changed to known Fallen id `20` |
 | `demlvl` | bind level changed to `20` |
 
-Keep these as disposable live probes. They are evidence generators, not
-production-safe chargen outputs.
+Keep these as disposable evidence references. They are not production-safe
+chargen outputs.
 
-## Next Test Batch
+## Second Test Batch
 
-The second batch is already staged on Bazzite:
+Status: complete.
 
 | Character | Purpose |
 | --- | --- |
@@ -226,23 +200,41 @@ The second batch is already staged on Bazzite:
 | `demstone` | original model with only Stone Skin |
 | `demmulti` | original model with Multiple Shots, Teleportation, Lightning Enchanted, Cold Enchanted, Stone Skin |
 
-Live questions:
+Results:
 
-- Does `demfallz` still keep any monster-specific property after both the model
-  and affix list are changed?
-- Do single-affix probes show exactly one property and persist?
-- Does the five-affix mixed probe accept less common affixes without join
-  failure or canonicalization?
+- `demfallz`: loaded as Fallen with no affix.
+- `demlite`: loaded as lightning immune, but not visibly Lightning Enchanted.
+- `demcold`: loaded as Cold Enchanted.
+- `demstone`: loaded as Stone Skin.
+- `demmulti`: loaded and saved without canonicalizing the five authored affix
+  bytes, but did not visibly show Lightning Enchanted.
 
-If this batch is clean, implement experimental YAML like:
+All five rewritten saves retained `follower_count=1`, exactly 116 payload
+bytes, valid checksums, and the authored affix bytes. Save/quit changed only
+volatile bytes `+89..+91`, except `demlite`, which was byte-stable.
+
+Conclusions:
+
+- Single-affix Cold Enchanted and Stone Skin work and persist.
+- Byte `03` persists as Lightning Enchanted but does not necessarily display as
+  Lightning Enchanted for this bound demon.
+- Five authored affix bytes can include less common affixes without join
+  failure or canonicalization.
+
+## Experimental YAML Mode
+
+Template-derived overrides are implemented:
 
 ```yaml
 bound_demon:
-  template: bindtank_capture
+  template: demclone
   monster_hcidx: 20
   affixes: [Extra Strong, Extra Fast]
   bind_level: 20
 ```
 
-That is not full synthesis yet, but it would cover practical "any
-monster/properties from a template base" chargen.
+This is not full synthesis yet, but it covers practical "pick a known template
+base, then author monster/properties" chargen. The first YAML-path live probe
+is `demexp`, deployed on Bazzite with `monster_hcidx=20`,
+`bind_demon_level=20`, and affixes `Extra Strong, Extra Fast, none, none,
+none`.
