@@ -119,6 +119,18 @@ Live next step:
   After save-and-exit, the payload stayed valid and only bytes `+89..+91`
   changed (`00 00 00 -> ff 8b 58`). The zero triplet is not sticky; keep
   treating `+89..+91` as volatile session/runtime bytes.
+- 2026-05-08 live result: `bindtank` bound a high-property demon observed in
+  game as aura enchanted, extra strong, fire enchanted, cursed, mana burn,
+  extra fast, spectral hit, and lightning immune. The saved follower payload
+  had `monster_hcidx=347`, `monster_seed=0x0018AB90`, and affix bytes
+  `05 09 07 19 06` = Extra Strong, Fire Enchanted, Cursed, Mana Burn,
+  Extra Fast. Aura Enchanted, Spectral Hit, and lightning immunity remained
+  visible in game after reload but were not represented in the five decoded
+  MonUMod bytes, so they are stored elsewhere, implicit from the monster, or
+  omitted from the bound-demon affix list.
+- 2026-05-08 `bindtank` no-combat reload result: the same demon appeared with
+  its properties still visible. Save-and-exit preserved the entire 116-byte
+  payload except `+89..+91`, which changed `1b 98 7e -> 00 00 00`.
 
 ### 2. Embedded `gf` inside demon payload
 

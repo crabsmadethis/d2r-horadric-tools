@@ -317,6 +317,18 @@ Another no-combat `probewlalt` reload/save kept the demon but changed only
 `+89..+91` again (`00 00 00 -> ff 8b 58`), confirming that the zero triplet is
 not a stable canonical endpoint.
 
+2026-05-08 live check: `bindtank` bound a demon observed in game as aura
+enchanted, extra strong, fire enchanted, cursed, mana burn, extra fast,
+spectral hit, and lightning immune. The 116-byte payload decoded as
+`monster_hcidx=347`, `monster_seed=0x0018AB90`, and affix bytes
+`05 09 07 19 06` = Extra Strong, Fire Enchanted, Cursed, Mana Burn, Extra
+Fast. After a no-combat reload/save, the demon still appeared with its
+properties visible and the payload changed only at `+89..+91`
+(`1b 98 7e -> 00 00 00`). Aura Enchanted, Spectral Hit, and lightning immunity
+were not present in the five decoded MonUMod affix bytes despite remaining
+visible in game, so those properties are stored elsewhere, implicit from the
+monster, or omitted from the bound-demon affix list.
+
 ### Cross-class behavior
 
 Phase 0.4 found D2R loads non-warlock saves carrying a follower block

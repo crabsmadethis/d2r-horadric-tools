@@ -334,6 +334,25 @@ After save-and-exit, the scanner still reported `has_golem=1`,
 but the golem item payload stayed byte-for-byte identical
 (`sha1=8c5b252152951340325803723c8c166adacef406`).
 
+2026-05-08 expansion-variant batch result: five additional generated golem
+payload families were visible in Offline, joined game, and survived
+save-and-exit with `has_golem=1`, valid `kf/lf` bridge, `follower_count=0`,
+and checksum OK. Visual golem presence was not separately reported for this
+batch, so treat these as load/save persistence results:
+
+| Probe | Payload | Result |
+| --- | --- | --- |
+| `probegsok` | empty socketed normal Falchion, 19 bytes | payload preserved byte-for-byte, `sha1=15376caf5fbbfac27c051a4008043e9850b20d37` |
+| `probegrun` | Steel Falchion with embedded rune fillers, 52 bytes | remained active but D2R canonicalized 8 payload bytes, `sha1=3d46b6ce0ae8beabd04ec1ac2ace014b04acb5fb -> 87f378f735582864614d4b7fa5dd058d917b1e2b` |
+| `probeguni` | unique Bloodrise, 36 bytes | remained active but D2R canonicalized 14 payload bytes, `sha1=e7cdade3f3fafcafa410105494b59d0c5edef3e4 -> fc4276b9f392915afea1b74e2b7eb8a9453df75a` |
+| `probegset` | set Civerb's Cudgel, 23 bytes | payload preserved byte-for-byte, `sha1=a03435551a3f4e3d8e6cabe649ecb37ef870c876` |
+| `probegcrf` | ethereal crafted Falchion, 26 bytes | payload preserved byte-for-byte, `sha1=473f6d33213e774af05bf2b324e7779a9f95ee95` |
+
+Implementation implication: broader golem writer support is viable. Socketed
+empty items, set items, and crafted/ethereal items can likely be promoted
+directly. Runewords and uniques should be promoted with a post-save
+canonicalization expectation, not strict byte-preservation assertions.
+
 ### Milestone 4: Demon Stats Research
 
 Gather enough fixtures to separate item/monster identity from runtime state.
@@ -359,12 +378,22 @@ Tests:
 - No-combat `probewlalt` reload result: the demon appeared again and save-exit
   changed only `+89..+91` (`00 00 00 -> ff 8b 58`). This confirms the all-zero
   triplet can be a transient value, not a stable canonical endpoint.
+- High-property `bindtank` result: a demon observed as aura enchanted, extra
+  strong, fire enchanted, cursed, mana burn, extra fast, spectral hit, and
+  lightning immune saved as one valid 116-byte payload. The decoded affix list
+  held only five MonUMod bytes (`05 09 07 19 06` = Extra Strong, Fire
+  Enchanted, Cursed, Mana Burn, Extra Fast). After no-combat reload/save, the
+  demon still appeared with properties visible and only `+89..+91` changed
+  (`1b 98 7e -> 00 00 00`).
 
 Analysis:
 
 - Diff only the 116-byte payload.
 - Track stable identity fields separately from runtime-mutating fields.
 - Cross-reference `monster_hcidx` with MonStats and affixes with MonUMod.
+- Do not assume the five decoded MonUMod bytes exhaust all visible bound-demon
+  properties; the `bindtank` capture kept visible Aura Enchanted, Spectral Hit,
+  and lightning immunity even though they were absent from `+80..+84`.
 - Treat `+24..+31`, `+44/+48`, `+64..+79`, `+88`, and `+95..+115` as unknown
   until multiple controlled fixtures agree.
 - Treat `+89..+91` as actively volatile based on the repeated `probewlalt`

@@ -38,7 +38,7 @@ AFFIXES: dict[int, str] = {
     22: 'questcomplete',
     23: 'poisonhit',
     24: 'thief',
-    25: 'manahit',
+    25: 'Mana Burn',
     26: 'Teleportation',
     27: 'Spectral Hit',
     28: 'Stone Skin',
