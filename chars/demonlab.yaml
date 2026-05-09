@@ -1,0 +1,163 @@
+schema_version: 1
+name: demonlab
+class: warlock
+level: 99
+progression: hell_complete
+
+stats:
+  strength: 180
+  dexterity: 180
+  vitality: 600
+  energy: 250
+
+skills:
+  Bind Demon: 20
+  Demonic Mastery: 20
+  Eldritch Blast: 20
+  Hex Bane: 20
+  Hex Siphon: 20
+  Psychic Ward: 20
+  Blood Oath: 20
+  Consume: 10
+  Death Mark: 10
+  Levitate: 10
+  Miasma Bolt: 10
+  Ring of Fire: 5
+
+equipment:
+  - slot: weapon
+    unique: Dreadfang
+    extra_properties:
+      item_preventheal: 1
+      open_wounds: 25
+      crush_blow: 10
+      slow_target: 40
+      min_dmg: 15
+      max_dmg: 35
+
+  - slot: shield
+    unique: "Ars Al'Diablolos"
+    extra_properties:
+      all_skills: 5
+      class_skills: [5, warlock]
+      block: 30
+      dr_pct: 25
+      mdr: 40
+
+  - slot: switch_weapon
+    unique: Bloodpact Shard
+    extra_properties:
+      item_preventheal: 1
+      open_wounds: 35
+      slow_target: 50
+
+  - slot: switch_shield
+    unique: "Ars Tor'Baalos"
+    extra_properties:
+      all_skills: 5
+      class_skills: [5, warlock]
+
+  - slot: helm
+    unique: Unique Warlock Helm
+    extra_properties:
+      all_skills: 5
+      life: 450
+      item_maxhp_percent: 50
+      fire_res: 120
+      cold_res: 120
+      light_res: 120
+      poison_res: 120
+
+  - slot: body
+    runeword: Enigma
+    base: utp
+    extra_properties:
+      life: 450
+      item_maxhp_percent: 50
+      dr_pct: 25
+      normal_damage_reduction: 60
+      mdr: 60
+      replenish_life: 30
+
+  - slot: hands
+    unique: Magefist
+    extra_properties:
+      fcr: 40
+      fhr: 40
+      life: 300
+      absorb_fire_pct: 40
+
+  - slot: feet
+    unique: Wraithstep
+    extra_properties:
+      frw: 40
+      fhr: 40
+      life: 300
+      absorb_cold_pct: 40
+
+  - slot: belt
+    unique: "Gheed's Wager"
+    extra_properties:
+      life: 300
+      dr_pct: 25
+      normal_damage_reduction: 60
+      mdr: 60
+      replenish_life: 30
+
+  - slot: neck
+    unique: Entropy Locket
+    extra_properties:
+      all_skills: 5
+      class_skills: [5, warlock]
+      max_fire_res: 20
+      max_cold_res: 20
+      max_light_res: 20
+      max_poison_res: 20
+
+  - slot: ring_right
+    unique: Raven Frost
+    extra_properties:
+      life: 300
+      absorb_cold_pct: 40
+      magic_absorb: 40
+
+  - slot: ring_left
+    unique: Dwarf Star
+    extra_properties:
+      life: 300
+      absorb_fire_pct: 40
+      magic_absorb: 40
+
+inventory:
+  charms:
+    - unique: Annihilus
+      extra_properties:
+        all_skills: 3
+        fire_res: 80
+        cold_res: 80
+        light_res: 80
+        poison_res: 80
+
+    - unique: Hellfire Torch
+      extra_properties:
+        class_skills: [3, warlock]
+        fire_res: 80
+        cold_res: 80
+        light_res: 80
+        poison_res: 80
+
+    - magic_small_charm:
+        count: 10
+        properties:
+          life: 40
+          fire_res: 25
+          cold_res: 25
+          light_res: 25
+          poison_res: 25
+
+    - magic_small_charm:
+        count: 8
+        properties:
+          life: 40
+          normal_damage_reduction: 10
+          mdr: 10
