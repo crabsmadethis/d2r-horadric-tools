@@ -39,8 +39,7 @@ pytest tests/ -v --timeout=60 \
   --ignore=tests/test_chargen.py \
   --ignore=tests/test_decoder.py \
   --ignore=tests/test_fixtures.py \
-  --ignore=tests/test_importer.py \
-  --ignore=tests/test_d2s_diff.py
+  --ignore=tests/test_importer.py
 ```
 
 The `--ignore` flags drop tests that need extracted game data or `.d2s` fixtures (neither is checked in). Run them locally after `d2r-mod extract` with the matching marker.

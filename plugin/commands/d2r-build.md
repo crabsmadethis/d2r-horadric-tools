@@ -17,7 +17,11 @@ Execute these in order. Do NOT skip or combine steps.
 CHAR_NAME="$ARGUMENTS"
 # Strip --phase flag if present for backup
 CHAR_NAME=$(echo "$CHAR_NAME" | sed 's/ *--phase [0-9]*//')
-SAVE_DIR="$HOME/.local/share/Steam/steamapps/compatdata/2536520/pfx/drive_c/users/steamuser/Saved Games/Diablo II Resurrected"
+SAVE_DIR="${D2R_SAVES:-$(python3 - <<'PY'
+from d2r_chargen.config import SAVES
+print(SAVES)
+PY
+)}"
 D2S="$SAVE_DIR/${CHAR_NAME}.d2s"
 if [ -f "$D2S" ]; then
     cp "$D2S" "${D2S}.pre_build_bak"

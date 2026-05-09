@@ -119,4 +119,6 @@ The integration test (`test_mcp_server_integration.py`) spawns the real server o
 
 ## Design
 
-See `docs/superpowers/specs/2026-04-22-d2r-mcp-design.md` for the full design and `docs/superpowers/plans/2026-04-22-d2r-mcp.md` for the implementation plan.
+This README is the public design reference for the MCP surface. Keep the tool
+catalog, safety notes, and tests in this file in sync with `d2r_mcp/server.py`
+and `tests/test_mcp_*.py`.

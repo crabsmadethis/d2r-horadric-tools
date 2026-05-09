@@ -64,6 +64,11 @@ Live facts:
 - The second edited-payload batch loaded and saved cleanly. Cold Enchanted and
   Stone Skin showed visibly; Lightning Enchanted byte `03` persisted but did
   not show as a visible Lightning Enchanted label for this bound demon.
+- The first real chargen YAML override probe, `demexp`, loaded live with the
+  requested Fallen model and visible Extra Strong plus Extra Fast affixes. After
+  save-and-exit, D2R preserved `monster_hcidx=20`, `monster_seed=0x0018AB90`,
+  `bind_demon_lv=20`, and affix bytes `05 06 00 00 00`; only volatile payload
+  bytes `+89..+91` changed.
 
 ## Robust Support Shape
 
@@ -221,6 +226,28 @@ Conclusions:
 - Five authored affix bytes can include less common affixes without join
   failure or canonicalization.
 
+## Experimental YAML Override Result
+
+Status: live-positive for the Tier 2/Tier 3 template-derived path.
+
+`demexp` was generated through normal chargen YAML:
+
+```yaml
+bound_demon:
+  template: demclone
+  monster_hcidx: 20
+  bind_level: 20
+  affixes:
+    - Extra Strong
+    - Extra Fast
+```
+
+The generated save appeared in Offline, joined game, and spawned a Fallen-style
+bound demon with the requested visible affixes. Post-save scanner output was
+checksum-clean with `follower_count=1` and exactly 116 follower payload bytes.
+The post-save payload retained the authored identity and affix fields, with the
+only payload diff at known volatile bytes `+89..+91`.
+
 ## Experimental YAML Mode
 
 Template-derived overrides are implemented:
@@ -235,6 +262,22 @@ bound_demon:
 
 This is not full synthesis yet, but it covers practical "pick a known template
 base, then author monster/properties" chargen. The first YAML-path live probe
-is `demexp`, deployed on Bazzite with `monster_hcidx=20`,
-`bind_demon_level=20`, and affixes `Extra Strong, Extra Fast, none, none,
-none`.
+is `demexp`, which appeared in Offline, joined game, spawned a Fallen-style
+bound demon with the requested affixes, and saved back with only known volatile
+payload bytes changed.
+
+## Next YAML Live Batch
+
+Status: staged for live Offline testing.
+
+These probes are generated through the normal YAML chargen path and should be
+tested one at a time, saving and exiting after each:
+
+| Character | Expected live question |
+| --- | --- |
+| `demynul` | Fallen-style demon with no visible extra affixes |
+| `demycol` | Fallen-style demon with Cold Enchanted |
+| `demysto` | Fallen-style demon with Stone Skin |
+| `demyfur` | Fallen-style demon with five authored affixes |
+| `demyaur` | Whether Spectral Hit and Aura Enchanted display from authored bytes |
+| `demysee` | Whether an authored non-template monster seed persists |

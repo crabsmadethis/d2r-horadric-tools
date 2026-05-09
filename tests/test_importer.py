@@ -9,17 +9,14 @@ import pytest
 pytest.importorskip("d2r_chargen.data.item_stat_cost",
                      reason="game data not extracted (run 'd2r-mod extract')")
 
-from d2r_chargen.config import CHARS_DIR
+from d2r_chargen.config import CHARS_DIR, SAVES
 
 
 class TestImportExistingCharacters(unittest.TestCase):
     """Import live .d2s files and verify basic structure."""
 
     def _get_saves_dir(self):
-        return os.path.expanduser(
-            '~/.local/share/Steam/steamapps/compatdata/2536520/pfx/'
-            'drive_c/users/steamuser/Saved Games/Diablo II Resurrected'
-        )
+        return SAVES
 
     def _find_d2s(self):
         saves = self._get_saves_dir()
@@ -64,10 +61,7 @@ class TestImportRoundTrip(unittest.TestCase):
         if not os.path.exists(yaml_path):
             self.skipTest("Tempest.yaml not found")
 
-        saves = os.path.expanduser(
-            '~/.local/share/Steam/steamapps/compatdata/2536520/pfx/'
-            'drive_c/users/steamuser/Saved Games/Diablo II Resurrected'
-        )
+        saves = SAVES
         d2s_path = os.path.join(saves, 'Tempest.d2s')
         if not os.path.exists(d2s_path):
             self.skipTest("Tempest.d2s not found (need a built character)")

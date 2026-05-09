@@ -1,6 +1,7 @@
 # D2S Open Questions Plan
 
-Status: working plan for `codex/d2s-open-questions`.
+Status: public-safe findings and remaining questions after the 2026-05-08 live
+probe cleanup.
 
 This file tracks `.d2s` questions that can be answered from public code,
 private local fixtures, and controlled live-game smoke tests. It is deliberately
@@ -14,12 +15,14 @@ forward without waiting on a game session.
 Use `tools/d2s_corpus_scan.py` to scan local `.d2s` files without printing full
 paths or character names.
 
-Recommended Bazzite command:
+Recommended command with sanitized corpus roots:
 
 ```bash
+D2S_CORPUS_ROOT_A=/path/to/public-or-private-corpus-a
+D2S_CORPUS_ROOT_B=/path/to/public-or-private-corpus-b
 python3 tools/d2s_corpus_scan.py \
-  ~/recovered-repos/d2r-horadric-tools \
-  ~/SK256-extracted/steamdeck-backup/deck \
+  "$D2S_CORPUS_ROOT_A" \
+  "$D2S_CORPUS_ROOT_B" \
   --examples 5
 ```
 
@@ -66,226 +69,176 @@ in favor of `docs/d2s_format.md` or updated to call the field
 It writes only to an explicit output file and recomputes file size/checksum.
 Use the scanner before copying any forged output into live saves.
 
-## Open Questions
+## Question Status
+
+### 0. Live probe visibility gate
+
+Status: answered for this install.
+
+Answered finding:
+
+- Scanner-clean, same-install clones were not automatically visible when their
+  embedded names and basenames contained digits. Letter-only aliases appeared
+  and loaded, while the digit-bearing `D2SProbe...` family stayed invisible.
+
+Next proof method:
+
+- Treat letter-only names as the default for every live `.d2s` probe. Only use
+  digit-bearing names in an explicit negative-control test.
 
 ### 1. Demon payload runtime fields
 
-Unknown fields:
+Status: still open, with several subquestions answered.
 
-- `+24..+31`: likely monster-derived runtime stats
-- `+64..+79`: bitfields that differ between known binds
-- `+88`: high-entropy `u32`, possibly a hash or runtime state
-- `+95..+115`: variable payload after embedded `gf`
+Answered findings:
 
-Independent next step:
+- A Warlock bound demon with `follower_count=1` and one 116-byte payload is
+  accepted, visible, and preserved across no-combat reload/save cycles.
+- Two separate `follower_count=2` probes were scanner-clean but failed to join
+  game, so live D2R should be treated as accepting at most one bound demon.
+- The repeated volatile slice is `+89..+91`; it can change to or from
+  `00 00 00`, so writers should not author it.
+- The five MonUMod bytes at `+80..+84` are authorable and control visible extra
+  affixes, but they do not exhaust every visible property.
+- `monster_hcidx` is authorable enough to change the visible demon model in the
+  tested template-derived path.
+- Bind Demon level at `+52` persists, but the first level-only test did not
+  prove visible behavior.
+- The second edited-payload batch preserved all authored affix bytes. Cold
+  Enchanted and Stone Skin showed visibly; Lightning Enchanted byte `03`
+  persisted but did not display as Lightning Enchanted for this bound demon.
+- Experimental template-derived `bound_demon:` YAML overrides now support
+  `monster_hcidx`, `monster_seed`, `bind_level` / `bind_demon_level`, and up to
+  five `affixes` padded with zeros.
+- The first YAML-generated override probe (`demexp`) appeared in Offline,
+  joined game, and showed the requested Fallen model with Extra Strong plus
+  Extra Fast affixes. After save-and-exit, D2R preserved the authored
+  `monster_hcidx`, seed, bind level, and affix bytes; only known volatile bytes
+  `+89..+91` changed.
 
-- Extend the corpus scanner or a small fixture decoder to aggregate those
-  offsets across every 116-byte follower payload already present locally.
+Still open:
 
-Live next step:
+- `+24..+31`, `+44/+48`, `+64..+79`, `+88`, and `+95..+115` remain runtime,
+  hash, derived-stat, or RotW-tail candidates.
+- The `bindtank` capture kept Aura Enchanted, Spectral Hit, and lightning
+  immunity visible even though they were absent from the five decoded MonUMod
+  bytes. Those properties are stored elsewhere, implicit from the monster, or
+  omitted from the persisted MonUMod list.
+- Fully synthesized 116-byte demon payloads remain blocked until the unknown
+  slices are decoded or proven ignorable by live reload/save evidence.
 
-- Capture the same bound demon after save/load and after a rebind to a known
-  monster. Diff only the 116-byte payload. A damage/heal capture is lower
-  priority because bound demons are difficult to keep injured and heal quickly;
-  only use it if a durable injured snapshot is easy to create.
-- 2026-05-08 live result: `probewldemon` entered game with the copied bound
-  demon visible. After save-and-quit, D2R rewrote the save to 1319 bytes while
-  preserving `follower_count=1` and exactly 116 trailing payload bytes.
-- 2026-05-08 no-combat reload result: `probewldemon` loaded, joined game, and
-  save-and-exit preserved the full follower block. Only payload bytes `+89..+91`
-  changed (`ea 10 72 -> 8c ee 7b`); identity fields, bitfields, and the
-  post-`gf` tail stayed byte-for-byte stable.
-- 2026-05-08 live result: two count-2 variants both failed to join game even
-  though local scans were size/checksum clean and had exactly 232 trailing
-  payload bytes:
-  - `probewltwo` copied the same valid 116-byte payload twice.
-  - `probewlmix` used two different known 116-byte payloads.
-  Neither failed join rewrote the save, so treat live D2R as accepting at most
-  one bound demon.
-- 2026-05-08 live result: `probewlalt` used `follower_count=1` with the
-  alternate known 116-byte demon payload (`tests/fixtures/demon_block_a.bin`).
-  The save appeared, joined game, and spawned a demon. After save-and-quit, D2R
-  preserved the 116-byte follower block shape but rewrote six payload bytes:
-  `+89..+91` and `+95..+97`. Keep treating `+88` and `+95..+115` as runtime or
-  hash-like fields for now.
-- 2026-05-08 reload result: `probewlalt` still had the demon on reload. A
-  second save-and-quit kept `follower_count=1` and 116 trailing payload bytes.
-  Payload bytes `+95..+97` stayed stable after the first rewrite, but
-  `+89..+91` changed again, so treat `+89..+91` as volatile runtime/hash bytes.
-- 2026-05-08 third reload result: `probewlalt` still joined with the demon.
-  A third save-and-quit kept the same valid block shape. Bytes `+95..+97`
-  remained stable, while `+89..+91` changed to `00 00 00`.
-- 2026-05-08 no-combat reload result: `probewlalt` loaded with the demon again.
-  After save-and-exit, the payload stayed valid and only bytes `+89..+91`
-  changed (`00 00 00 -> ff 8b 58`). The zero triplet is not sticky; keep
-  treating `+89..+91` as volatile session/runtime bytes.
-- 2026-05-08 live result: `bindtank` bound a high-property demon observed in
-  game as aura enchanted, extra strong, fire enchanted, cursed, mana burn,
-  extra fast, spectral hit, and lightning immune. The saved follower payload
-  had `monster_hcidx=347`, `monster_seed=0x0018AB90`, and affix bytes
-  `05 09 07 19 06` = Extra Strong, Fire Enchanted, Cursed, Mana Burn,
-  Extra Fast. Aura Enchanted, Spectral Hit, and lightning immunity remained
-  visible in game after reload but were not represented in the five decoded
-  MonUMod bytes, so they are stored elsewhere, implicit from the monster, or
-  omitted from the bound-demon affix list.
-- 2026-05-08 `bindtank` no-combat reload result: the same demon appeared with
-  its properties still visible. Save-and-exit preserved the entire 116-byte
-  payload except `+89..+91`, which changed `1b 98 7e -> 00 00 00`.
-- 2026-05-08 edited-payload batch result:
-  - `demclone` copied the `bindtank` demon and loaded with the same visible
-    properties; save-and-exit left the 116-byte payload byte-for-byte
-    unchanged.
-  - `demauras` changed the five MonUMod bytes to `05 09 07 1b 1e`
-    (Extra Strong, Fire Enchanted, Cursed, Spectral Hit, Aura Enchanted). It
-    loaded, looked like the same property set to the user, and saved back with
-    those bytes unchanged except volatile `+89..+91`.
-  - `demblank` changed the five MonUMod bytes to all zero. It loaded with no
-    visible extra properties except being a demon and lightning immune, and
-    saved back with the zero affix list unchanged except volatile `+89..+91`.
-  - `demfalln` changed only `monster_hcidx` to `20`; the demon became a
-    Fallen, joined, and saved back with `monster_hcidx=20` unchanged except
-    volatile `+89..+91`.
-  - `demlvl` changed only `bind_demon_level` to `20`; it joined, showed no
-    visible difference, and saved back with `bind_demon_level=20` unchanged
-    except volatile `+89..+91`.
-  The batch proves the five MonUMod bytes are authorable, `monster_hcidx` is
-  authorable, and `bind_demon_level` is persistent. It does not prove
-  `bind_demon_level` has visible behavior.
+Next proof methods:
+
+- Extend the corpus scanner or a small fixture decoder to aggregate the unknown
+  offsets across every local 116-byte follower payload.
+- Continue natural high-property captures and template-derived single-affix
+  probes. Diff only the 116-byte payload and separate stable identity fields
+  from volatile/runtime bytes.
+- Run a Bind Demon level matrix only after the identity and affix fields have a
+  stable baseline.
 
 ### 2. Embedded `gf` inside demon payload
 
-Current assumption: `payload[92:94] == b"gf"` is data, not a structural marker.
+Status: answered.
 
-Independent next step:
+Answered finding:
 
-- Count every follower payload in the corpus and verify where `b"gf"` appears.
+- The embedded `payload[92:94] == b"gf"` is payload data, not a structural
+  marker. A rewritten bound-demon save ended immediately after the 116-byte
+  follower payload.
 
-Live next step:
+Next proof method:
 
-- Confirm a bound-demon save with a payload still has no extra section after the
-  116 bytes by entering game and forcing D2R to rewrite/cache the save.
-- 2026-05-08 live result: D2R's rewritten `probewldemon.d2s` ended immediately
-  after the 116-byte follower payload; the embedded `gf` was still at payload
-  offset 92 and did not behave as a structural marker.
+- Keep corpus-level counting of `b"gf"` positions as a cheap regression check,
+  but do not block writers on this question.
 
 ### 3. Cross-class follower behavior
 
-Known: D2R accepted a Sorceress save with a Warlock-style follower payload and
-allowed it to enter the world, but did not instantiate the demon.
+Status: answered for the Sorceress borrowed-follower probe; broader class
+matrix still open.
 
-Independent next step:
+Answered finding:
 
-- Use `tools/d2s_forge_follower.py` to create a Sorceress staging save with a
-  copied demon payload and scanner-check it.
+- A Sorceress save with a structurally valid Warlock follower payload entered
+  the world, but no demon appeared. On save-and-quit, D2R stripped the save back
+  to `follower_count=0` with no trailing payload.
 
-Live next step:
+Next proof method:
 
-- Load the Sorceress, inspect whether the follower appears, use a waypoint,
-  fight one pack, save and quit, then rescan the rewritten save.
-- 2026-05-08 live result: borrowed-follower `probesorc` entered game with no
-  visible follower. On save-and-quit, D2R rewrote `probesorc.d2s` from the
-  promoted `follower_count=1` / 116-byte payload variant back to
-  `follower_count=0` with no trailing payload.
+- Keep cross-class follower payloads out of normal chargen. If other classes
+  matter, test one disposable letter-only class probe at a time and rescan after
+  save-and-quit.
 
 ### 4. Merc status at `0xA7..0xA8`
 
-Existing docs said observed values were `{0, 1, 9, 15}`. The Bazzite corpus
-shows additional values such as `3`, `11`, `50`, `16`, `18`, `5`, and `21`.
+Status: still open.
 
-Independent next step:
+Known evidence:
+
+- Existing docs listed `{0, 1, 9, 15}`. The aggregate corpus also shows values
+  such as `3`, `5`, `11`, `16`, `18`, `21`, and `50`.
+
+Next proof methods:
 
 - Group `merc_status_u16_0xA7` by hireling id, merc item count, class id,
   progression, and difficulty bytes.
+- Run a disposable live ladder: before hiring, after hiring, after merc death,
+  after resurrecting, after changing difficulty, and after removing merc gear.
 
-Live next step:
+### 5. Iron Golem block
 
-- Capture before hiring, after hiring, after merc death, after resurrecting,
-  after changing difficulty, and after removing merc gear.
+Status: answered for layout, single-golem behavior, preservation, and v1
+normal/magic YAML support; still open for full item-family visual coverage.
 
-### 5. Iron golem block
+Answered findings:
 
-The initial scanned corpus had `has_golem=0` for every save, so no local fixture
-answered the `kf 01 <item>` layout.
-
-Live next step:
-
-- Build/load a Necromancer, create an Iron Golem from a simple item, save and
-  quit, then rescan. Keep the captured `.d2s` private unless sanitized.
-- 2026-05-08 live result: after creating an Iron Golem on `probenecro`, D2R
-  rewrote the save with `has_golem_byte=1`, `kf_to_lf_gap=58`, and 55 bytes of
-  golem item payload between `kf 01` and `lf`. The follower block remained
-  `follower_count=0`.
-- 2026-05-08 persistence result: after fully reloading `probenecro`, the Iron
-  Golem was still present in-game. Save-and-quit preserved the same 55-byte
-  golem payload (`sha1=2f582d487d12a70b8c5cdc1da3e371b2c302c390`).
-- Second reload on 2026-05-08 still showed the Iron Golem in-game and left the
-  on-disk save unchanged with the same payload hash.
-- Recasting Iron Golem from a different item on 2026-05-08 rewrote
-  `probenecro` with `kf_to_lf_gap=29` and a 26-byte golem item payload
-  (`sha1=2b0cddc4fb4d6f53db12fa589571c864e8e40e61`). The golem section length
-  is item-encoding-dependent, not fixed.
-- Reloading that second golem preserved the 26-byte length but changed only
-  payload byte `+1` from `0x20` to `0x00` (`sha1` became
-  `26515dcb0696db2cd9e60b020fdd3b5c4aa13fb1`), making `+1` a runtime/state
-  candidate rather than item identity.
-- A subsequent reload/save preserved that canonicalized 26-byte payload
-  byte-for-byte, so the `+1` change appears to be a one-time normalization.
-- 2026-05-08 preserve-path result: `probegolem`, a disposable `probenecro`
-  clone rebuilt through `rebuild_items(...)`, appeared in D2R, joined game, and
-  still had the Iron Golem. After save-and-quit, the golem payload stayed
-  byte-for-byte identical (`sha1=5708645b2c93a15e1e6ae45aed48f74a85975a65`),
-  with header `type=flc`, `quality=4`, `storage=0`, `location=1`,
-  `bodyloc=4`.
-- 2026-05-08 generated-writer result: `probegnorm` used a generated
-  normal-quality Falchion payload from `build_item(...)`, not a copied live
-  golem payload. It joined game. After save-and-quit, D2R kept `has_golem=1`,
-  payload length 19, header `type=flc`, `quality=2`, `storage=0`,
-  `location=1`, `bodyloc=4`, and preserved the payload byte-for-byte
-  (`sha1=4818f07bc1e0e0907f4bcd30a50ab7c6038fb82d`).
-- 2026-05-08 generated-magic result: `probegmag` used a generated magic-quality
-  Falchion payload with an encoded `fireresist +10` property. It joined game.
-  The on-disk save remained `has_golem=1`, payload length 24, header
-  `type=flc`, `quality=4`, `storage=0`, `location=1`, `bodyloc=4`, and the
-  payload remained byte-for-byte identical
-  (`sha1=09e7961cd4d3763fda1a073493aa97c00e38b4fd`). The file timestamp/hash
-  did not change, so record this as join acceptance plus valid on-disk
-  persistence, but not as a visual-presence probe.
-- 2026-05-08 chargen support result: v1 YAML support can now inject one
-  generated normal or magic Iron Golem item for Necromancers with
-  `skills: {IronGolem: 1}`. It writes the same live-observed storage shape
-  (`storage=0`, `location=1`, `bodyloc=4` for the default weapon slot) and
-  deliberately rejects sockets, runewords, uniques, sets, rares, and crafted
-  items until those encodings get their own live probes.
-- 2026-05-08 YAML live result: `probegyaml` was generated through the
-  `iron_golem:` YAML path with a magic Falchion carrying `fire_res: 10`.
-  It appeared in Offline, joined game, and the Iron Golem was visually present.
-  After save-and-exit, D2R still reported `has_golem=1`, payload length 24,
-  header `type=flc`, `quality=4`, `storage=0`, `location=1`, `bodyloc=4`, and
-  preserved the golem item payload byte-for-byte
-  (`sha1=8c5b252152951340325803723c8c166adacef406`).
-- 2026-05-08 expansion batch result: `probegsok`, `probegrun`, `probeguni`,
-  `probegset`, and `probegcrf` all appeared in Offline, joined game, and
-  saved back with `has_golem=1`, valid golem headers, checksum OK, and
+- The Iron Golem lives in the `kf` section before `lf` as one variable-length
+  item payload. The section is item-encoding-dependent, not fixed length.
+- Two live captures had different payload lengths (`kf_to_lf_gap=58` with a
+  55-byte payload, and `kf_to_lf_gap=29` with a 26-byte payload).
+- Recasting replaced the existing golem rather than appending another payload.
+- One 26-byte payload canonicalized byte `+1` from `0x20` to `0x00` on first
+  reload/save, then stabilized.
+- Rebuild preservation kept an existing golem payload byte-for-byte in the
+  tested path.
+- Generated normal and magic Iron Golem payloads are supported through the v1
+  YAML path for Necromancers with `IronGolem` learned. The normal/magic YAML
+  support has visual positive evidence and checksum-clean post-save evidence.
+- Broader generated families appeared in Offline, joined game, and saved back
+  with `has_golem=1`, valid golem headers, checksum OK, and
   `follower_count=0`. Empty socketed normal, set, and ethereal crafted payloads
-  stayed byte-for-byte identical. Steel runeword and unique Bloodrise payloads
-  stayed active but D2R canonicalized bytes inside the payload. Visual golem
-  presence was not separately reported for this batch, so record it as
-  load/save persistence rather than visual confirmation.
+  preserved byte-for-byte; Steel runeword and unique Bloodrise payloads stayed
+  active but canonicalized payload bytes.
+
+Still open:
+
+- The expansion-family batch was not fully visually confirmed, so record it as
+  load/save persistence until a visual pass covers each family.
+- Runeword and unique golems need canonicalization-aware assertions rather than
+  strict byte-preservation expectations.
+
+Next proof methods:
+
+- Add a visual confirmation matrix for the expansion-family batch, one
+  letter-only probe at a time.
+- Keep v1 normal/magic writer support separate from experimental socketed,
+  runeword, unique, set, rare, and crafted promotion decisions.
 
 ### 6. `jf` marker optionality
 
-Current docs imply `jf` is always present between the corpse `JM` and merc `JM`.
-The corpus is split almost exactly in half: 879 saves have a `jf` before the merc
-`JM`, and 878 do not, while both groups still have the `JM[merc] | kf | lf` tail.
+Status: still open.
 
-Independent next step:
+Known evidence:
+
+- The corpus is split almost exactly in half: 879 saves have `jf` before the
+  merc `JM`, and 878 do not, while both groups still have the
+  `JM[merc] | kf | lf` tail.
+
+Next proof methods:
 
 - Group `has_jf_before_merc_jm` by file age/source, writer generation, class id,
   merc item count, and follower count.
-
-Live next step:
-
-- Build a new probe save with current chargen, enter game, save and quit, and
+- Build a new probe save with current chargen, enter game, save and quit, then
   check whether D2R preserves or removes the `jf` marker.
 
 ## Safety Rules

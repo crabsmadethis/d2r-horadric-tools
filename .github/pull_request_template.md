@@ -12,7 +12,7 @@
 
 <!-- What did you run? Tier 1 alone is fine for most changes. Note if you ran the slower tiers locally. -->
 
-- [ ] `pytest tests/ -m "not integration and not slow and not e2e and not smoke"` passes
+- [ ] Tier 1 passes: `pytest tests/ -v --timeout=60 -m "not integration and not slow and not e2e and not smoke" --ignore=tests/fixtures/ --ignore=tests/test_chargen.py --ignore=tests/test_decoder.py --ignore=tests/test_fixtures.py --ignore=tests/test_importer.py`
 - [ ] Added or updated tests for the change
 - [ ] Tested manually (describe how)
 
