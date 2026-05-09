@@ -32,7 +32,7 @@ and hash-like bytes are decoded or proven ignorable.
 | `+0..+1` | follower kind tag `0x0018` | fixed |
 | `+4..+5` | `monster_hcidx` | authorable in template-derived payloads |
 | `+6..+9` | monster seed | preserve template value; arbitrary override is unsafe |
-| `+52..+55` | Bind Demon level | persistent; visible effect not fully proven |
+| `+52..+55` | persisted bind metadata | persistent; not proven to be current Bind Demon skill level |
 | `+80..+84` | five MonUMod affix bytes | authorable in template-derived payloads |
 | `+89..+91` | volatile runtime bytes | do not author |
 | `+92..+93` | embedded `gf` payload data | data, not a section marker |
@@ -47,6 +47,9 @@ Recent live validation tightened two important limits:
 - A non-template monster seed caused D2R to save the character back with
   `follower_count=0`, so seed override must stay blocked until seed semantics
   are decoded.
+- A natural bind with the Warlock skill block showing Bind Demon level 20 still
+  saved payload `+52` as `7`; do not treat this field as the current skill
+  level until a natural bind-level matrix explains it.
 
 ## Support Tiers
 
@@ -75,8 +78,11 @@ names, machine details, or session logs.
 
 ## Active Manual Probe Focus
 
-The next manual batch isolates the five-affix result by checking single
-Extra Strong, Fire Enchanted, Cursed, Mana Burn, Extra Fast, and a
-Fire/Cursed/Mana mix. The purpose is to determine whether the unexpected
-Spectral Hit plus Aura Enchanted display is tied to one affix, a smaller
-combination, or only the original five-affix set.
+The affix-isolation batch ruled out single Extra Strong, Fire Enchanted,
+Cursed, Mana Burn, Extra Fast, and Fire/Cursed/Mana as the source of the
+unexpected Spectral Hit plus Aura Enchanted display.
+
+The next manual batch should bind fresh demons at hard Bind Demon levels 1, 5,
+10, 15, and 20. The purpose is to compare the actual skill tooltip/tier against
+the persisted payload fields, instead of assuming payload `+52` stores the
+effective skill level.

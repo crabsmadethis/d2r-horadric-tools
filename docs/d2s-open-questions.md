@@ -23,7 +23,7 @@ questions must include a proof method.
 | Question | Why it matters | Next proof method |
 | --- | --- | --- |
 | Unknown bound-demon payload slices at `+24..+31`, `+44/+48`, `+64..+79`, `+88`, and `+95..+115` | Full bound-demon synthesis is blocked until these bytes are understood or proven ignorable. | Aggregate local payloads with a decoder that reports stable/volatile slices without printing local paths. |
-| Bind Demon level behavior | The persisted level field may or may not affect visible behavior. | Run a small level matrix against one stable template-derived payload and compare only the 116-byte follower payload. |
+| Bind Demon level behavior | Payload `+52` persists, but a natural bind with the Warlock skill block at Bind Demon level 20 saved `+52 == 7`; this may not be the effective skill level. | Run fresh natural binds at hard Bind Demon levels 1, 5, 10, 15, and 20, then compare tooltip-visible affix tiers against persisted payload fields. |
 | Merc status at `0xA7..0xA8` | The field has more observed values than the writer currently understands. | Group local saves by hireling id, difficulty, merc gear count, and progression. |
 | Broader Iron Golem item families | Normal and magic generated golems are supported, but more item families need canonicalization-aware expectations. | Add synthetic fixture tests first; use manual validation only for item families tests cannot prove. |
 
