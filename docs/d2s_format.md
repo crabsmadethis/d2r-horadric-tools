@@ -5,8 +5,8 @@
 > `d2r_chargen/` parsers + writers. Compatibility links may still point to
 > `docs/save-format.md`, but new format knowledge belongs here.
 >
-> **Scope:** D2R version 105 (Reign of the Warlock expansion) on this
-> Steam Deck install. PC version. Pre-105 saves are out of scope.
+> **Scope:** D2R version 105 (Reign of the Warlock expansion). Pre-105 saves
+> are out of scope.
 >
 > **Trust hierarchy:** code in `d2r_chargen/` > fixtures under
 > `tests/fixtures/` > this doc > external/public specs. When in doubt,
@@ -91,7 +91,7 @@ Source: `d2r_chargen/config.py` `CLASS_DEFS` + `CLAUDE.md` quick reference.
 | `0x04`| **Hardcore, alive** | Correct HC status. |
 | `0x08`| Softcore + died flag set | Harmless for SC; chargen template default. |
 | `0x0C`| Hardcore + died = **DEAD HC**, cannot join game | Bug source for Malachar 2026-04-11. |
-| `0x24`| HC chargen output (status byte from Marrowbind HC flip) | Observed output; the high nibble bits are not fully decoded. |
+| `0x24`| HC chargen output | Observed output; the high nibble bits are not fully decoded. |
 
 In D2R v105 every character is implicitly expansion. There is no
 separate "expansion" bit (an earlier doc claimed bit 3 was that — it is the
@@ -135,7 +135,7 @@ In on-disk order:
 
 - No dedicated ASCII marker; sits between the WS waypoint section and
   the `gf` stats marker.
-- Verified via `tests/fixtures/tempest.d2s` 2026-04-25: only ONE `if`
+- Verified via fixture-backed acceptance testing: only ONE `if`
   occurs in the file (at offset 880, the skills marker). Earlier
   speculation that there were two `if` markers (NPC + skills) was
   wrong.
@@ -220,7 +220,7 @@ encode under one stat id.
 - If flag=1: a single golem item (JM-less item bitstream, encoded same as char items but without the JM count prefix)
 - Current chargen can preserve existing golem payloads and write supported
   generated normal/magic golem items for Necromancers. Unsupported item
-  families must stay rejected until live probes prove them.
+  families must stay rejected until manual validation proves them.
 
 ### 11. Bridge — constant `\x01\x00`
 
@@ -240,7 +240,7 @@ encode under one stat id.
 
 ### 13. EOF
 
-In all current Marrowbind/Tempest saves the file ends immediately
+In the current follower fixture pair, the file ends immediately
 after the follower block (no extra trailing bytes). The `gf` ASCII at
 offset +92 of the demon payload is **payload data**, not a section
 marker. Phase 0.4 confirmed no separate post-payload golem section in
@@ -270,10 +270,10 @@ with no log message and no cache files written. Verified by
 `scripts/dev/forge_lf_test.py` 2026-04-25 — full results in
 `tests/fixtures/lf_count_acceptance_test.md`.
 
-For the only currently-known follower kind (warlock bound demon), live D2R
-accepts N=0 or N=1. On 2026-05-08, D2R rejected two scanner-clean N=2 probes:
-one with the same 116-byte payload duplicated and one with two different known
-116-byte payloads. Both failed to join game and neither save was rewritten.
+For the only currently-known follower kind (Warlock bound demon), D2R accepts
+N=0 or N=1. Manual validation rejected two scanner-clean N=2 variants: one with
+the same 116-byte payload duplicated and one with two different known 116-byte
+payloads. Both failed to join game and neither save was rewritten.
 
 ### Demon payload (116 bytes)
 
@@ -294,62 +294,26 @@ low-confidence fields like `+24/+28` runtime stats and
 Do **not** duplicate that table here — it changes as new fixtures
 arrive.
 
-2026-05-08 live check: `probewldemon` loaded with the copied bound demon
-visible. D2R rewrote the save on exit and preserved `follower_count=1` with
-exactly 116 trailing payload bytes; the embedded `gf` remained data inside the
-payload, not a new section marker.
+Manual validation confirmed that copied 116-byte bound-demon payloads remain
+visible and preserve `follower_count=1` after save/exit. The embedded `gf`
+bytes remain data inside the payload, not a new section marker.
 
-A later no-combat `probewldemon` reload/save on 2026-05-08 again preserved the
-116-byte follower block shape. Only bytes `+89..+91` changed
-(`ea 10 72 -> 8c ee 7b`); all high-confidence identity fields, `+64..+79`, and
-`+95..+115` stayed byte-for-byte stable.
+Repeated reload/save checks show that payload bytes `+89..+91` are volatile.
+They can change to or from `00 00 00`, so zero is not a canonical endpoint.
+High-confidence identity fields persisted across the same checks.
 
-2026-05-08 live check: `probewlalt` loaded with a different known 116-byte
-payload (`tests/fixtures/demon_block_a.bin`) and spawned a demon. After
-save-and-quit, D2R preserved `follower_count=1`, the 116-byte payload length,
-and the high-confidence identity fields, but rewrote payload bytes `+89..+91`
-and `+95..+97`. Treat those bytes as runtime/hash-like until further fixtures
-pin them down.
+A high-property capture showed visible properties that were not all present in
+the five decoded MonUMod bytes at `+80..+84`. That means some visible
+properties are monster-specific, stored in other payload bytes, or omitted from
+the persisted bound-demon affix list.
 
-A second `probewlalt` reload/save on 2026-05-08 kept the demon and the same
-116-byte payload shape. Bytes `+95..+97` stayed stable after the first rewrite,
-while `+89..+91` changed again. Treat `+89..+91` as volatile runtime/hash bytes.
-
-A third reload/save again kept the demon and the valid block shape. Bytes
-`+95..+97` stayed stable and `+89..+91` changed to `00 00 00`.
-Another no-combat `probewlalt` reload/save kept the demon but changed only
-`+89..+91` again (`00 00 00 -> ff 8b 58`), confirming that the zero triplet is
-not a stable canonical endpoint.
-
-2026-05-08 live check: `bindtank` bound a demon observed in game as aura
-enchanted, extra strong, fire enchanted, cursed, mana burn, extra fast,
-spectral hit, and lightning immune. The 116-byte payload decoded as
-`monster_hcidx=347`, `monster_seed=0x0018AB90`, and affix bytes
-`05 09 07 19 06` = Extra Strong, Fire Enchanted, Cursed, Mana Burn, Extra
-Fast. After a no-combat reload/save, the demon still appeared with its
-properties visible and the payload changed only at `+89..+91`
-(`1b 98 7e -> 00 00 00`). Aura Enchanted, Spectral Hit, and lightning immunity
-were not present in the five decoded MonUMod affix bytes despite remaining
-visible in game, so those properties are stored elsewhere, implicit from the
-monster, or omitted from the bound-demon affix list.
-
-2026-05-08 edited-payload batch: D2R accepted and preserved targeted edits to
-the high-confidence fields. `demblank` zeroed all five MonUMod bytes and showed
-no visible extra properties except demon identity and lightning immunity.
-`demfalln` changed `monster_hcidx` to `20` and visibly became a Fallen.
-`demlvl` changed `bind_demon_level` to `20` and persisted, but the user saw no
-visible difference. All rewritten saves retained `follower_count=1`, a valid
-116-byte payload, and valid checksums. D2R changed only known volatile bytes
-`+89..+91` except for `demclone`, which was byte-stable.
-
-2026-05-08 second edited-payload batch: D2R accepted and preserved another set
-of targeted affix edits. `demfallz` combined `monster_hcidx=20` with zero
-affixes and loaded as a Fallen with no affix. `demcold` showed Cold Enchanted
-and `demstone` showed Stone Skin. `demlite` preserved affix byte `03` but
-showed as lightning immune rather than visibly Lightning Enchanted. `demmulti`
-preserved `1d 1a 03 12 1c` without join failure or canonicalization, but did
-not visibly show Lightning Enchanted. All rewritten saves retained one valid
-116-byte payload; only `+89..+91` changed except for byte-stable `demlite`.
+Targeted template-derived edits to high-confidence fields are accepted and
+preserved: zeroing the five MonUMod bytes removes visible extra affixes,
+changing `monster_hcidx` can change the visible model, and changing
+`bind_demon_level` persists even though its visible effect is not yet proven.
+Cold Enchanted and Stone Skin have positive single-affix evidence. Lightning
+Enchanted byte `03` can persist without necessarily displaying as a Lightning
+Enchanted label for the tested bound demon.
 
 Experimental chargen support now allows template-derived overrides for
 `monster_hcidx`, `monster_seed`, `bind_level` / `bind_demon_level`, and up to
@@ -358,65 +322,28 @@ still come from a live template payload.
 
 ### Cross-class behavior
 
-Phase 0.4 found D2R loads non-warlock saves carrying a follower block
-without rejection (a Sorceress save with a borrowed Marrowbind demon
-payload entered the game cleanly). The 2026-05-08 `probesorc` live check
-confirmed D2R does NOT class-gate the follower block at file load, but it also
-does not instantiate the borrowed demon for Sorceress. On save-and-quit, D2R
-stripped the follower block back to `follower_count=0`.
+Fixture-backed validation found D2R can load a non-Warlock save carrying a
+structurally valid Warlock follower block without rejecting the file. It does
+not instantiate the borrowed demon for that class; on save/exit, D2R strips the
+follower block back to `follower_count=0`.
 
 ---
 
 ## Iron golem section (when present)
 
 Conditionally written as `kf <u8:has_golem> [golem_item]`. In every
-D2R v105 save examined before the live probe, chargen wrote `kf 00` (no iron
+D2R v105 save examined before manual validation, chargen wrote `kf 00` (no iron
 golem). Saves that come from in-game with an active iron golem (Necromancer Iron
-Golem skill) carry `kf 01` followed by a JM-less item bitstream. The 2026-05-08
-`probenecro` capture wrote `kf 01`, had `kf_to_lf_gap=58`, and carried 55 bytes
-of golem item payload before `lf`. A fresh reload preserved the in-game Iron
-Golem and kept the same 55-byte payload
-(`sha1=2f582d487d12a70b8c5cdc1da3e371b2c302c390`) after save-and-quit.
-A second reload showed the golem again and left the on-disk save unchanged.
-Recasting Iron Golem from a different item produced `kf_to_lf_gap=29` with a
-26-byte golem payload
-(`sha1=2b0cddc4fb4d6f53db12fa589571c864e8e40e61`), confirming the section
-contains a variable-length encoded item rather than a fixed-size golem record.
-Reloading that second golem preserved the length but changed only payload byte
-`+1` from `0x20` to `0x00`, suggesting a runtime/state bit near the start of
-the golem item encoding.
-A subsequent reload/save preserved the canonicalized 26-byte payload
-byte-for-byte.
-On 2026-05-08, `probegolem`, a disposable clone rebuilt through
-`rebuild_items(...)`, appeared in D2R, joined game, and still had the Iron
-Golem. After save-and-quit, D2R preserved the 24-byte golem item payload
-byte-for-byte (`sha1=5708645b2c93a15e1e6ae45aed48f74a85975a65`), confirming
-that the rebuilt `kf 01 <item> 01 00 lf 00 00` tail can preserve an active
-Iron Golem.
-On the same date, `probegnorm` proved generated writing: a normal-quality
-Falchion payload produced by `build_item(...)` joined game and stayed
-byte-for-byte identical after save-and-quit
-(`sha1=4818f07bc1e0e0907f4bcd30a50ab7c6038fb82d`).
-`probegmag` then showed join acceptance for a generated magic-quality Falchion
-payload with `fireresist +10`: the on-disk save remained `has_golem=1`,
-`kf_to_lf_gap=29`, payload length 24, and header `type=flc`, `quality=4`,
-`storage=0`, `location=1`, `bodyloc=4`
-(`sha1=09e7961cd4d3763fda1a073493aa97c00e38b4fd`). Because the file timestamp
-and full hash did not change after the live attempt, this proved join
-acceptance but not visual presence.
-Chargen v1 can now write one generated normal or magic Iron Golem item from
-YAML for Necromancers with `IronGolem >= 1`; it rejects sockets, runewords,
-uniques, sets, rares, and crafted items until those variants have live probes.
-`probegyaml` then visually confirmed the YAML path: a generated magic Falchion
-with `fire_res: 10` appeared in Offline, joined game, showed the Iron Golem
-in-game, and preserved the 24-byte golem item payload byte-for-byte after
-save-and-exit (`sha1=8c5b252152951340325803723c8c166adacef406`).
-The expansion batch then showed load/save persistence for five additional
-families: empty socketed normal, Steel runeword with embedded rune fillers,
-unique Bloodrise, set Civerb's Cudgel, and ethereal crafted Falchion. All five
-saved back with `has_golem=1`; socketed normal, set, and crafted payloads were
-byte-stable, while runeword and unique payloads stayed active but were
-canonicalized by D2R.
+Golem skill) carry `kf 01` followed by a JM-less item bitstream. Captures with
+active golems showed variable-length payloads, confirming the section contains
+encoded item data rather than a fixed-size golem record. Recasting replaces the
+existing golem payload instead of appending another one.
+
+Rebuild tests preserved active golem payloads through the
+`kf 01 <item> 01 00 lf 00 00` tail. Generated normal and magic Iron Golem items
+are supported for Necromancers with `IronGolem >= 1`. Broader item families
+need canonicalization-aware tests before they become part of the stable public
+YAML contract.
 
 For warlocks with bound demons: `kf 00` is still written, the bridge
 `\x01\x00` follows, and the `lf` follower block carries the demon.
@@ -552,7 +479,7 @@ def calc_checksum(data: bytes) -> int:
 ```
 
 `d2r_chargen/build_lib.py:write_d2s` performs the size and checksum update.
-Scanner hard errors block live deployment unless bit-level evidence proves the
+Scanner hard errors block local deployment unless bit-level evidence proves the
 scanner is wrong.
 
 ---
@@ -563,9 +490,9 @@ Pulled from `CLAUDE.md`, fixture notes, and public-safe live findings. Read
 those sources for full context — this is just the index.
 
 - **Rule 1:** never hallucinate UIDs / item codes / binary values. Read `data/unique_items.py` etc.
-- **Rule 2:** never rebuild a `.d2s` from scratch. Header has interdependent fields. Always start from a server-synced template.
+- **Rule 2:** never rebuild a `.d2s` from scratch. Header has interdependent fields. Always start from an existing valid template.
 - **Rule 3:** always backup before write. `shutil.copy2(path, path + '.pre_X_bak')`.
-- **Rule 4:** run `/d2rdoctor` after every edit phase, not at the end.
+- **Rule 4:** run `d2r-chargen scan <name>` after every edit phase, not at the end.
 - **Rule 5:** verify checksums match after writing. `stored == calc_checksum(result)`.
 - **Rule 6:** merc items need canonical encoding in JM[merc] (col=bodyloc, biased runeword id). Use `equipment_mode: direct` in YAML. The trailing `lf` field is the follower count, not a merc-hired flag.
 - **Rule 8:** items must include stat properties — empty unique = wrong-name with zero stats.
@@ -573,14 +500,11 @@ those sources for full context — this is just the index.
 - **Rule 12:** edit incrementally. Don't combine stats + skills + items + stash in one shot.
 - **Rule 17:** scanner hard errors are deployment blockers — do not classify as false positives without bit-level proof.
 - **Rule 21 (NEW 2026-04-25):** preserve the follower block on rebuild. `save.py:rebuild_items` defaults to `preserve_followers=True`. Stripping it silently kills a warlock's bound demon.
-- **Character-select visibility needs more than a clean `.d2s`** — a Bazzite
-  live-test session on 2026-05-08 found staged probe saves that scanned cleanly
-  but did not appear in Offline. Adding copied companions (`.ctl`, `.key`,
-  `.map`, `.ma0`) and matching the throwaway character's SC/HC status category
-  was still insufficient. Same-install letter-only clones appeared, while names
-  containing the digit `2` did not. Use letter-only embedded names and matching
-  file basenames before treating an invisible probe as a payload rejection; the
-  renamed `probe...` saves appeared in Offline.
+- **Character-select visibility needs more than a clean `.d2s`** — manual
+  validation showed that companion files, softcore/hardcore category, embedded
+  character name, and filename can all affect whether a staged save appears in
+  Offline. Use short letter-only embedded names and matching file basenames
+  before treating an invisible save as a payload rejection.
 - **Stats can't be 0** where class minimum applies — Dex / Energy at 0 produces `Error:7`.
 - **Non-simple socketed fillers are broken** — magic jewels (quality=4, location=6) cause "FAILED TO JOIN GAME" with a full save. Merge filler stats into the parent.
 - **HC flip preserves merc bytes** — don't zero `0xA8..0xAA` when flipping SC→HC, or merc Hireling.Id is destroyed.
@@ -621,7 +545,7 @@ those sources for full context — this is just the index.
 ## Remaining unknown raw fields
 
 These fields remain intentionally raw. Preserve their bytes unless a future
-public-safe fixture or live probe gives bit-level evidence for a narrower
+public-safe fixture or manual validation gives bit-level evidence for a narrower
 meaning.
 
 1. **Demon payload `+24..+31`** — runtime stats vs monster-derived

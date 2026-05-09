@@ -30,6 +30,9 @@ jobs:
       - name: Lint (ruff)
         run: ruff check .
 
+      - name: Public hygiene
+        run: python tools/public_hygiene_check.py
+
       # Tier 1: no extracted D2R game data, no .d2s fixtures.
       # The --ignore'd modules require either generated data modules
       # (d2r_chargen/data/*.py from `d2r-mod extract`) or .d2s fixtures that

@@ -1,42 +1,48 @@
 # Agent Instructions for d2r-horadric-tools
 
-This is the public-safe D2R tooling repo. It should remain publishable at all
-times.
+This is a public D2R tooling repository. Keep every committed file useful to a
+GitHub reader who only has this repo.
 
-For whole-project context, read the hub docs in `../`:
+## Read First
 
-- `../D2R-PROJECT.md`
-- `../docs/status.md`
-- `../docs/public-private-boundary.md`
-- `../docs/validation-ladder.md`
+Before editing, read:
 
-For D2R-specific save and modding rules, read `CLAUDE.md` in this repo. Treat
-those rules as binding for Codex too.
+- `README.md`
+- `CONTRIBUTING.md`
+- `CLAUDE.md`
+- `docs/d2s_format.md` for save-format work
 
-## Public Repo Boundary
+## Public Repo Standard
 
-Allowed here:
+GitHub-facing docs should be product, API, format, or contributor docs. Do not
+commit internal planning scratchpads, agent orchestration notes, disposable
+test-session logs, machine-specific paths, or project-hub assumptions.
 
-- public-safe source code
-- synthetic fixtures
-- sanitized `.d2s` layout findings
-- aggregate corpus statistics
-- MCP tools and agent workflows
-- tests and docs that can be published
+Public docs may include:
 
-Not allowed here:
+- source-code behavior
+- CLI and MCP usage
+- synthetic fixtures and examples
+- sanitized save-format findings
+- repeatable validation commands
+- known limitations and remaining research questions
 
-- private `.d2s` saves or raw corpora
-- Steam userdata or Proton compatdata paths as committed fixtures
-- raw memory dumps or live process captures
-- recovered private source
-- machine-local calibration data
-- secrets or account identifiers
+Public docs should not include:
+
+- personal save files or raw save corpora
+- machine-local paths or account identifiers
+- internal project lanes or recovered-source references
+- low-level research planning unrelated to this public toolkit
+- one-off probe queues or live-session diary entries
+- claims about GitHub state that have not been verified against the remote
+
+If a local manual validation result matters, summarize the stable technical
+finding and put the reusable procedure in `docs/manual-save-validation.md`.
 
 ## `.d2s` Work Rules
 
 - Never rebuild a `.d2s` from scratch when targeted edits are possible.
-- Back up before live save writes.
+- Back up before writing local save files.
 - Write to staging/temp files first.
 - Run the scanner after every edit phase.
 - Verify checksums and file-size fields.
@@ -48,34 +54,19 @@ Not allowed here:
 Use the narrowest command that proves the change:
 
 ```bash
-python3 -m pytest
-python3 -m d2r_chargen validate <name>
-python3 -m d2r_chargen build <name> --force
-python3 -m d2r_chargen scan <name>
-python3 tools/d2s_corpus_scan.py <paths> --examples 5
+python tools/public_hygiene_check.py
+ruff check .
+python -m pytest
+python -m d2r_chargen validate <name>
+python -m d2r_chargen build <name> --force
+python -m d2r_chargen scan <name>
+python tools/d2s_corpus_scan.py <paths> --examples 5
 d2r-mod build
 d2r-mod diff --summary
 ```
 
-## Agent Workflow
+## Handoff
 
-For architecture-sensitive tasks:
-
-1. State the lane and non-goals.
-2. Write or update the plan before editing.
-3. Make bounded changes.
-4. Run validation.
-5. Update the relevant doc if the project state changed.
-
-If working in parallel with other agents, own a disjoint file/module set and do
-not revert unrelated changes.
-
-Before final handoff on meaningful work, run the hub closeout script from the
-project root:
-
-```bash
-cd .. && ./scripts/agent_session_close.sh
-```
-
-If the script flags docs, validation, or boundary updates, handle those before
-the final response.
+Before opening or updating a PR, run the public hygiene check and record the
+tests you ran. If a change needs local game data, fixtures, or manual game
+validation, say so explicitly and keep those artifacts out of the repo.
