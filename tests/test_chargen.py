@@ -15,7 +15,7 @@ pytest.importorskip("d2r_chargen.data.item_stat_cost",
                      reason="game data not extracted (run 'd2r-mod extract')")
 
 from d2r_chargen.data.item_stat_cost import STAT_BY_NAME
-from d2r_chargen.config import PROPERTY_ALIASES, CHARS_DIR
+from d2r_chargen.config import PROPERTY_ALIASES, CHARS_DIR, SAVES
 from d2r_chargen.resolve import resolve_properties, resolve_unique, resolve_runeword
 from d2r_chargen.character import load_character_yaml, validate_char_def, build_all_items
 
@@ -444,10 +444,7 @@ class TestFreshnessGate(unittest.TestCase):
         import yaml
         from d2r_chargen.character import deploy_character
 
-        saves = os.path.expanduser(
-            '~/.local/share/Steam/steamapps/compatdata/2536520/pfx/'
-            'drive_c/users/steamuser/Saved Games/Diablo II Resurrected'
-        )
+        saves = SAVES
         if not os.path.isdir(saves):
             self.skipTest("D2R saves directory not found")
         d2s_files = [f for f in os.listdir(saves) if f.endswith('.d2s')]

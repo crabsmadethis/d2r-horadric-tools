@@ -1,277 +1,289 @@
 # D2S Live Test Plan
 
-Run this on `bazzite-home` from `~/recovered-repos/d2r-horadric-tools`.
+Public tooling lane. This plan keeps live `.d2s` validation reproducible without
+committing private saves, raw save corpora, Steam paths, Proton paths, or
+machine-local calibration data.
 
-The goal is to turn the remaining `.d2s` questions into small, reversible live
-experiments. The committed YAMLs create test characters; the forge helper creates
-follower-block variants as staging files.
+Use live D2R only when scanner and tool-level checks cannot answer the question.
+Each live recipe follows the same safety loop:
+
+1. Back up the current live save family outside the public repo.
+2. Build or forge into a staging directory first.
+3. Scan the staged file before promotion.
+4. Fully close D2R, promote one probe, relaunch, and record the live observation.
+5. Fully exit D2R and run a post-run scan before drawing conclusions.
 
 ## Prerequisites
 
-1. D2R is fully closed.
-2. The repo is on a working branch.
-3. Generated game data exists. If imports like `d2r_chargen.data.skills` fail,
-   run `d2r-mod extract` first.
-4. A private fixture with an active bound demon is available. Either place it at
-   `tests/fixtures/marrowbind_demon_b.d2s` or set:
+- Work from the public repo root:
 
 ```bash
-export D2R_FIXTURES=/path/to/private/d2s-fixtures
+export D2R_PUBLIC_REPO="/path/to/d2r-horadric-tools-current"
+cd "$D2R_PUBLIC_REPO"
 ```
 
-5. Export the live save directory:
+- Generated game data exists. If imports such as `d2r_chargen.data.skills`
+  fail, run `d2r-mod extract` against the user's local D2R install.
+
+- Live runs have explicit private paths supplied by environment variables. Do
+  not write these paths into committed fixtures or docs as concrete machine
+  locations.
 
 ```bash
-export SAVES="$(python3 - <<'PY'
-from d2r_chargen.config import SAVES
-print(SAVES)
-PY
-)"
-printf '%s\n' "$SAVES"
+export D2R_LIVE_SAVES="/path/to/live/offline-save-directory"
+export D2R_STAGE="/path/to/disposable/staging-save-directory"
+export D2R_BACKUP_DIR="/path/to/private/backup-directory"
+mkdir -p "$D2R_STAGE" "$D2R_BACKUP_DIR"
 ```
 
-Before diagnosing a missing probe character, create one throwaway offline
-character in-game and fully exit D2R. Use that character as ground truth for:
-
-- the actual save directory D2R is reading
-- the companion-file family D2R expects (`.ctl`, `.key`, `.map`, and usually
-  `.ma0`)
-- the active character-select category, especially softcore vs hardcore status
-  byte behavior
-
-On the 2026-05-08 Bazzite session, a fresh throwaway character named `bbbbb`
-appeared under the same `2536520` Proton prefix as the probes and created:
-
-```text
-bbbbb.d2s
-bbbbb.ctl
-bbbbb.key
-bbbbb.map
-bbbbb.ma0
-```
-
-The first staged probes used names like `D2SProbeWl0` and did not appear in the
-Offline list even after copied companion files and a matching hardcore/alive
-status byte (`0x04`). A same-install lowercase clone of the throwaway character
-(`ccccc`) appeared and joined successfully. Single-field clones then showed
-class, level, progression, current difficulty, and merc header bytes were not
-the visibility blocker. The decisive test was name shape: letter-only names
-appeared, while names containing the digit `2` did not.
-
-Use letter-only probe names for live tests. Scanner-clean `.d2s` files with
-digits in the embedded character name or filename can be invisible in character
-select. After renaming the four probes to `probesorc`, `probenecro`,
-`probewlzero`, and `probewldemon`, all four appeared in D2R's Offline list on
-Bazzite.
-
-For staging outside the live save directory, set both variables:
+- Fixture-dependent recipes set private fixture inputs explicitly:
 
 ```bash
-export D2R_SAVES=/tmp/d2s-probe-saves
-export D2R_FIXTURES=/tmp/d2r-probe-fixtures
-mkdir -p "$D2R_SAVES" "$D2R_FIXTURES"
+export D2R_FIXTURES="/path/to/private/d2s-fixtures"
+export D2R_DEMON_FIXTURE="$D2R_FIXTURES/marrowbind_demon_b.d2s"
 ```
+
+- Before diagnosing a missing probe character, create one throwaway Offline
+  character in-game, fully exit D2R, and use that character as ground truth for:
+
+  - the live save directory D2R is reading
+  - the companion-file family D2R expects, usually `.d2s`, `.ctl`, `.key`,
+    `.map`, and `.ma0`
+  - the active character-select category, especially softcore vs. hardcore
+    status-byte behavior
+
+- Use letter-only probe names. Recent live validation showed scanner-clean
+  saves with digits in the embedded character name or filename can be invisible
+  in character select.
 
 ## Probe Characters
 
-Committed under `chars/`:
+The public probe YAMLs are committed under `chars/`:
 
 | File | Character | Purpose |
 | --- | --- | --- |
 | `probewlzero.yaml` | `probewlzero` | Warlock with Bind Demon skill but no follower payload |
 | `probewldemon.yaml` | `probewldemon` | Warlock with copied bound-demon payload |
-| `probesorc.yaml` | `probesorc` | Non-warlock baseline for borrowed follower forge test |
-| `probenecro.yaml` | `probenecro` | Iron Golem capture test |
+| `probesorc.yaml` | `probesorc` | Non-warlock baseline for borrowed-follower regression |
+| `probenecro.yaml` | `probenecro` | Iron Golem capture and parser regression |
 
-All names are 15 bytes or fewer for the fixed name field.
+All probe names are letter-only and 15 bytes or fewer for the fixed name field.
 
-## Step 1: Read-only corpus baseline
+## Repeatable Recipes
+
+### Read-Only Corpus Baseline
+
+Use this only with private corpus paths supplied at runtime. Record aggregate
+counters only in public docs.
 
 ```bash
-python3 tools/d2s_corpus_scan.py \
-  ~/recovered-repos/d2r-horadric-tools \
-  ~/SK256-extracted/steamdeck-backup/deck \
-  --examples 5
+export D2R_CORPUS_ROOT="/path/to/private/corpus"
+python3 tools/d2s_corpus_scan.py "$D2R_CORPUS_ROOT" --examples 5
 ```
 
-Record only aggregate counters in public docs.
+### Validate, Build, and Scan Probes
 
-## Step 2: Validate and build scanner-clean probes
-
-Start with temp validation:
+Build into staging first. Promote to the live save directory only after the
+scanner passes.
 
 ```bash
+export D2R_SAVES="$D2R_STAGE"
+
 python3 -m d2r_chargen validate probewlzero
-D2R_FIXTURES=${D2R_FIXTURES:-tests/fixtures} python3 -m d2r_chargen validate probewldemon
 python3 -m d2r_chargen validate probesorc
 python3 -m d2r_chargen validate probenecro
-```
+D2R_FIXTURES="$D2R_FIXTURES" python3 -m d2r_chargen validate probewldemon
 
-Then build one at a time only when ready to run the live test:
-
-```bash
 python3 -m d2r_chargen build probewlzero --force
 python3 -m d2r_chargen scan probewlzero
 ```
 
-Repeat for each character as needed.
+Repeat the build and scan pair for only the probe being tested. Do not stack
+multiple risky save changes before scanning.
 
-Note: the Bazzite staging run has already built scanner-clean `.d2s` files for
-all four probe YAMLs under `/tmp/d2s-probe-saves`. This requires regenerated
-`d2r_chargen.data.skills` data that preserves blank-`*Id` modded skill rows by
-using the Skills.txt row index as the skill id.
+### Complete Save-Family Promotion
 
-If those staged files are promoted manually, copy a complete save family rather
-than only the `.d2s`:
-
-1. Fully close D2R.
-2. Back up any existing live files with the same base name.
-3. Copy the staged `.d2s`.
-4. Copy `.ctl`, `.key`, `.map`, and `.ma0` from a known D2R-created offline
-   character in the same save directory, renamed to the probe base name.
-5. If the probe still does not appear, compare its status byte at `0x14` with a
-   fresh in-game throwaway character before assuming the save payload was
-   rejected.
-6. Confirm the embedded character name and file basename contain letters only.
-   Avoid digits such as the `2` in `D2SProbe...`.
-
-Prefer `python3 -m d2r_chargen build <name> --force` against the live save
-directory when possible, because `create_new_character()` already copies
-template companion files for new characters.
-
-## Step 3: Warlock follower presence test
-
-Build and scan both Warlock variants:
+Use this for manual promotion when not using the tool's live-save build path.
+The live game should be fully closed before every copy.
 
 ```bash
+probe="probewlzero"
+template="throwawaylettersonly"
+mkdir -p "$D2R_BACKUP_DIR/$probe"
+
+for ext in d2s ctl key map ma0; do
+  if [ -f "$D2R_LIVE_SAVES/$probe.$ext" ]; then
+    cp -p "$D2R_LIVE_SAVES/$probe.$ext" "$D2R_BACKUP_DIR/$probe/$probe.$ext"
+  fi
+done
+
+cp -p "$D2R_STAGE/$probe.d2s" "$D2R_LIVE_SAVES/$probe.d2s"
+
+for ext in ctl key map ma0; do
+  if [ -f "$D2R_LIVE_SAVES/$template.$ext" ]; then
+    cp -p "$D2R_LIVE_SAVES/$template.$ext" "$D2R_LIVE_SAVES/$probe.$ext"
+  fi
+done
+```
+
+After promotion, confirm the embedded character name and file basename are
+letter-only. If the probe is still invisible, compare its status byte at `0x14`
+with a fresh in-game throwaway character before assuming the payload was
+rejected.
+
+### Warlock Follower Regression
+
+Run after changes to follower payload copying, character creation, scanner
+follower checks, or Warlock data regeneration.
+
+```bash
+export D2R_SAVES="$D2R_STAGE"
+
 python3 -m d2r_chargen build probewlzero --force
 python3 -m d2r_chargen scan probewlzero
 
-D2R_FIXTURES=${D2R_FIXTURES:-tests/fixtures} python3 -m d2r_chargen build probewldemon --force
+D2R_FIXTURES="$D2R_FIXTURES" python3 -m d2r_chargen build probewldemon --force
 python3 -m d2r_chargen scan probewldemon
 ```
 
-Live observations:
+Promote one probe at a time with the complete save-family promotion recipe, or
+build directly to `D2R_LIVE_SAVES` after backing up any existing live family.
 
-- Can each character enter game?
-- Does `probewldemon` spawn or preserve the copied bound demon?
-- After save and quit, does the rewritten `.d2s` keep `follower_count=1` and
-  exactly 116 trailing payload bytes?
+Live observation:
 
-2026-05-08 result: `probewldemon` entered game, the demon was present, and
-after save-and-quit the rewritten file remained scanner-clean with
-`follower_count=1` and 116 trailing payload bytes.
+- `probewlzero` appears, enters game, and remains follower-free.
+- `probewldemon` appears, enters game, and preserves the bound demon.
 
-Post-run aggregate check:
+Post-run scan:
 
 ```bash
-python3 tools/d2s_corpus_scan.py "$SAVES/probewlzero.d2s" "$SAVES/probewldemon.d2s" --examples 2
+python3 tools/d2s_corpus_scan.py \
+  "$D2R_LIVE_SAVES/probewlzero.d2s" \
+  "$D2R_LIVE_SAVES/probewldemon.d2s" \
+  --examples 2
 ```
 
-## Step 4: Cross-class borrowed follower test
+### Cross-Class Borrowed Follower Regression
 
-Build a clean Sorceress baseline:
+Run after changes to `tools/d2s_forge_follower.py`, scanner follower-tail logic,
+or follower stripping assumptions.
 
 ```bash
+export D2R_SAVES="$D2R_STAGE"
+
 python3 -m d2r_chargen build probesorc --force
 python3 -m d2r_chargen scan probesorc
-```
 
-Forge a staged copy with a copied demon payload:
-
-```bash
 python3 tools/d2s_forge_follower.py \
-  "$SAVES/probesorc.d2s" \
-  /tmp/probesorc.borrowed-follower.d2s \
-  --template-d2s "${D2R_FIXTURES:-tests/fixtures}/marrowbind_demon_b.d2s"
+  "$D2R_STAGE/probesorc.d2s" \
+  "$D2R_STAGE/probesorc.borrowed-follower.d2s" \
+  --template-d2s "$D2R_DEMON_FIXTURE"
 
-python3 tools/d2s_corpus_scan.py /tmp/probesorc.borrowed-follower.d2s --examples 2
+python3 tools/d2s_corpus_scan.py \
+  "$D2R_STAGE/probesorc.borrowed-follower.d2s" \
+  --examples 2
 ```
 
-Manual promotion for this test only:
+Back up the live `probesorc` family, promote the forged `.d2s`, keep companion
+files from a known D2R-created Offline character, and run only this one live
+probe.
+
+Live observation:
+
+- The Sorceress enters game.
+- The borrowed follower is absent or ignored.
+- Save-and-quit rewrites the file without crashing or blocking join.
+
+Post-run scan:
 
 ```bash
-cp "$SAVES/probesorc.d2s" "$SAVES/probesorc.d2s.pre_borrowed_follower_bak"
-cp /tmp/probesorc.borrowed-follower.d2s "$SAVES/probesorc.d2s"
+python3 tools/d2s_corpus_scan.py "$D2R_LIVE_SAVES/probesorc.d2s" --examples 2
 ```
 
-Live observations:
+Restore the backed-up `probesorc` family after the regression check.
 
-- Can the Sorceress enter game?
-- Is the demon visible or ignored?
-- Does waypoint travel still work?
-- Does fighting one small pack remain stable?
-- After save and quit, does D2R preserve, strip, or rewrite the follower block?
+### Iron Golem Parser Regression
 
-2026-05-08 result: borrowed-follower `probesorc` entered game but no follower
-appeared. D2R rewrote the save on exit and stripped the follower block back to
-`follower_count=0` with no trailing payload.
-
-Restore baseline after the test:
+Run after changes to `kf`/`lf` parsing, Iron Golem payload reporting, or
+Necromancer probe generation.
 
 ```bash
-cp "$SAVES/probesorc.d2s.pre_borrowed_follower_bak" "$SAVES/probesorc.d2s"
-```
+export D2R_SAVES="$D2R_STAGE"
 
-## Step 5: Negative follower mismatch test
-
-This intentionally creates a save D2R should reject. Do this only with the
-probe character and only after backing it up.
-
-```bash
-python3 tools/d2s_forge_follower.py \
-  "$SAVES/probesorc.d2s" \
-  /tmp/probesorc.invalid-follower.d2s \
-  --invalid-count-without-payload
-
-python3 tools/d2s_corpus_scan.py /tmp/probesorc.invalid-follower.d2s --examples 2
-```
-
-Expected scanner result: `follower_payload_ok: false`.
-
-Expected live result after manual promotion: failed to join game. Restore the
-backup immediately afterward.
-
-## Step 6: Iron Golem fixture capture
-
-Build the Necromancer probe:
-
-```bash
 python3 -m d2r_chargen build probenecro --force
 python3 -m d2r_chargen scan probenecro
 ```
 
-Live steps:
+Promote `probenecro`, enter game, create one Iron Golem from a simple known
+item, save and quit, then fully exit D2R.
 
-1. Enter game with `probenecro`.
-2. Create an Iron Golem from a simple vendor item.
-3. Save and quit.
-4. Fully exit D2R.
-5. Copy `probenecro.d2s` to a private fixture area.
-6. Run `python3 tools/d2s_corpus_scan.py <private fixture> --examples 1`.
+Copy the resulting `.d2s` to a private fixture area outside the public repo and
+scan that private copy:
 
-Expected research result: the first local example with `has_golem_byte=1`, which
-can anchor the `kf 01 <item>` layout.
+```bash
+export D2R_PRIVATE_CAPTURE="/path/to/private/capture/probenecro.golem.d2s"
+cp -p "$D2R_LIVE_SAVES/probenecro.d2s" "$D2R_PRIVATE_CAPTURE"
+python3 tools/d2s_corpus_scan.py "$D2R_PRIVATE_CAPTURE" --examples 1
+```
 
-2026-05-08 result: after creating an Iron Golem on `probenecro`, D2R rewrote
-the save with `has_golem_byte=1`, `kf_to_lf_gap=58`, and 55 bytes of golem item
-payload before `lf`.
+Record only public-safe aggregate results such as `has_golem_byte`,
+`kf_to_lf_gap`, payload length, and payload hash.
 
-2026-05-08 persistence result: after fully reloading `probenecro`, the Iron
-Golem was still present and save-and-quit preserved the same 55-byte golem
-payload (`sha1=2f582d487d12a70b8c5cdc1da3e371b2c302c390`).
+### Invalid Follower Safety Check
 
-Second reload on 2026-05-08 still showed the Iron Golem and left
-`probenecro.d2s` unchanged on disk with the same payload hash.
+This is a true future live question, not a routine regression. Run it only if a
+scanner-blocking invalid follower case needs live corroboration.
 
-Recasting Iron Golem from a different item on 2026-05-08 rewrote the section as
-`kf_to_lf_gap=29` with a 26-byte golem payload
-(`sha1=2b0cddc4fb4d6f53db12fa589571c864e8e40e61`), confirming the payload
-length follows the encoded item.
+```bash
+python3 tools/d2s_forge_follower.py \
+  "$D2R_STAGE/probesorc.d2s" \
+  "$D2R_STAGE/probesorc.invalid-follower.d2s" \
+  --invalid-count-without-payload
 
-Reloading that second golem preserved the 26-byte length but changed payload
-byte `+1` from `0x20` to `0x00` (`sha1` became
-`26515dcb0696db2cd9e60b020fdd3b5c4aa13fb1`).
+python3 tools/d2s_corpus_scan.py \
+  "$D2R_STAGE/probesorc.invalid-follower.d2s" \
+  --examples 2
+```
 
-A subsequent reload/save preserved that canonicalized 26-byte payload
-byte-for-byte, suggesting the `+1` change is a one-time normalization.
+Expected scanner result: `follower_payload_ok: false`. Scanner hard errors block
+deployment unless there is bit-level proof that the scanner is wrong. If this is
+promoted for a live negative test, back up first, expect failed join or rewrite,
+and restore the backup immediately.
+
+## Completed Public-Safe Results
+
+- A same-install lowercase clone of an in-game throwaway character appeared and
+  joined successfully, so cloned saves are not inherently ignored by D2R Offline.
+- Companion files matter for character-select visibility. Manual promotion
+  should copy a complete save family, not only the `.d2s`.
+- Letter-only probe names appeared in D2R's Offline list. Digit-bearing probe
+  names such as the old `D2SProbe...` pattern were scanner-clean but invisible on
+  the tested install.
+- Single-field clone checks did not identify class, level, progression, current
+  difficulty, or merc header bytes as the visibility blocker.
+- `probewldemon` entered game, the bound demon was present, and after
+  save-and-quit the rewritten file stayed scanner-clean with `follower_count=1`
+  and 116 trailing payload bytes.
+- Borrowed-follower `probesorc` entered game, no follower appeared, and D2R
+  stripped the follower block on save-and-quit back to `follower_count=0` with no
+  trailing payload.
+- `probenecro` with a live-created Iron Golem produced a save with
+  `has_golem_byte=1`, `kf_to_lf_gap=58`, and 55 bytes of golem item payload
+  before `lf`.
+- Reloading that first Iron Golem preserved the same 55-byte payload hash across
+  repeated save-and-quit cycles.
+- Recasting Iron Golem from a different item rewrote the section as
+  `kf_to_lf_gap=29` with a 26-byte payload, confirming that payload length
+  follows the encoded item.
+- Reloading the second golem preserved the 26-byte length but canonicalized
+  payload byte `+1` from `0x20` to `0x00`; a later reload preserved that
+  canonicalized payload byte-for-byte.
+
+## Remaining Live Questions
+
+- Confirm the invalid follower mismatch behavior only if scanner results need a
+  live negative control.
+- Add public-safe aggregate captures for more Iron Golem item categories when
+  parser support expands.
+- Re-run the visibility, Warlock follower, Sorceress stripping, and Iron Golem
+  regression recipes after D2R patches or public save-writer changes.

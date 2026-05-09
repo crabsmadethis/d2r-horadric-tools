@@ -472,8 +472,8 @@ def set_difficulty_hell(data):
 # ============================================================
 
 # Mapping of merc template `type:` strings to Hireling.txt Id column values.
-# The Id column encodes (class, element, difficulty) — see
-# docs/superpowers/specs/2026-04-19-merc-disk-encoding.md for derivation.
+# The Id column encodes (class, element, difficulty). See
+# tests/test_merc_header.py for public regression coverage.
 # Hell-tier is the default since chargen builds are Hell-capable; NM/Normal
 # variants are explicit via the _nm_/_normal_ suffix.
 MERC_HIRELING_ID: dict = {
@@ -686,7 +686,7 @@ def rebuild_items(filepath, char_items_bytes, merc_items_bytes,
     # warlocks with a bound demon — stripping it on rebuild silently kills the
     # pet. When False, the block is stripped (count=0, no payload) regardless
     # of input state — useful for tests and deliberate-strip use cases.
-    # See docs/superpowers/plans/2026-04-25-bound-demon-save-block.md.
+    # See docs/d2s_format.md for the public follower-block reference.
     from d2r_chargen.follower_block import decode_follower_block
     # Override > preserve > strip. When YAML supplies a `bound_demon:` block,
     # its 116-byte payload wins regardless of the input save's state.

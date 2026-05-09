@@ -443,13 +443,93 @@ def resolve_unique(name):
     }
 
 
+_DEMON_AFFIX_ALIASES = {
+    'none': 0,
+    'mana burn': 25,
+    'manaburn': 25,
+    'manahit': 25,
+    'aura': 30,
+    'aura enchanted': 30,
+    'spectral': 27,
+    'spectral hit': 27,
+    'extra strong': 5,
+    'strong': 5,
+    'extra fast': 6,
+    'fast': 6,
+    'fire enchanted': 9,
+    'fire': 9,
+    'cursed': 7,
+    'lightning enchanted': 3,
+    'lightning': 3,
+    'cold enchanted': 18,
+    'cold': 18,
+    'stone skin': 28,
+    'stone': 28,
+    'teleportation': 26,
+    'teleport': 26,
+    'multiple shots': 29,
+    'multishot': 29,
+}
+
+
+def _parse_int_token(value, field_name):
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        return int(value.strip(), 0)
+    raise ValueError(f'{field_name} must be an int or int-like string')
+
+
+def _parse_demon_affix(value):
+    if isinstance(value, int):
+        idx = value
+    elif isinstance(value, str):
+        normalized = value.lower().replace('_', ' ').replace('-', ' ')
+        normalized = ' '.join(normalized.split())
+        if normalized in _DEMON_AFFIX_ALIASES:
+            idx = _DEMON_AFFIX_ALIASES[normalized]
+        else:
+            from d2r_chargen.data.monumod_affixes import AFFIXES
+            reverse = {name.lower(): key for key, name in AFFIXES.items()}
+            if normalized not in reverse:
+                raise ValueError(f'Unknown demon affix: {value!r}')
+            idx = reverse[normalized]
+    else:
+        raise ValueError(f'Unsupported demon affix value: {value!r}')
+    if not 0 <= idx <= 255:
+        raise ValueError(f'Demon affix index out of byte range: {idx}')
+    return idx
+
+
+def _resolve_demon_affixes(value):
+    if value is None:
+        return None
+    if isinstance(value, str):
+        raw_values = [part.strip() for part in value.split(',') if part.strip()]
+    elif isinstance(value, (list, tuple)):
+        raw_values = list(value)
+    else:
+        raise ValueError('bound_demon.affixes must be a list or comma string')
+    if len(raw_values) > 5:
+        raise ValueError('bound_demon.affixes supports at most 5 entries')
+    resolved = [_parse_demon_affix(item) for item in raw_values]
+    resolved.extend([0] * (5 - len(resolved)))
+    return bytes(resolved)
+
+
 def resolve_bound_demon(spec, fixtures_dir):
     """Resolve a YAML `bound_demon:` block to its 116-byte demon payload.
 
-    v1 only supports `template: NAME` mode — extracts the demon payload
+    The safe baseline is `template: NAME`, which extracts the demon payload
     verbatim from `<fixtures_dir>/NAME.d2s` via decode_follower_block.
-    Future versions may add monster/affix synthesis once more fields in
-    the 116-byte block are decoded.
+
+    Experimental template-derived overrides may change fields that have live
+    evidence behind them:
+
+      - monster_hcidx: u16 at +4
+      - monster_seed: u32 at +6
+      - bind_level / bind_demon_level: u32 at +52
+      - affixes: up to five MonUMod entries at +80..+84, padded with zeroes
 
     Args:
         spec: The dict under `bound_demon:` in the char YAML.
@@ -480,7 +560,7 @@ def resolve_bound_demon(spec, fixtures_dir):
 
     # Imported here (not at module top) to avoid a circular dep risk and
     # keep import time light when bound_demon isn't used.
-    from d2r_chargen.follower_block import decode_follower_block
+    from d2r_chargen.follower_block import decode_follower_block, mutate_demon_payload
 
     fixture_data = fixture_path.read_bytes()
     block = decode_follower_block(fixture_data)
@@ -489,7 +569,37 @@ def resolve_bound_demon(spec, fixtures_dir):
             f'Template {template!r} has no follower block — '
             f'pick a fixture with an active demon'
         )
-    return block.payload
+
+    monster_hcidx = None
+    if 'monster_hcidx' in spec:
+        monster_hcidx = _parse_int_token(spec['monster_hcidx'], 'monster_hcidx')
+    elif 'monster' in spec:
+        monster_hcidx = _parse_int_token(spec['monster'], 'monster')
+
+    monster_seed = None
+    if 'monster_seed' in spec:
+        monster_seed = _parse_int_token(spec['monster_seed'], 'monster_seed')
+
+    bind_level = None
+    if 'bind_level' in spec:
+        bind_level = _parse_int_token(spec['bind_level'], 'bind_level')
+    elif 'bind_demon_level' in spec:
+        bind_level = _parse_int_token(spec['bind_demon_level'], 'bind_demon_level')
+
+    affix_indices = _resolve_demon_affixes(spec.get('affixes'))
+    has_override = any(
+        value is not None for value in (monster_hcidx, monster_seed, bind_level, affix_indices)
+    )
+    zero_volatile = bool(spec.get('zero_volatile', has_override))
+
+    return mutate_demon_payload(
+        block.payload,
+        monster_hcidx=monster_hcidx,
+        monster_seed=monster_seed,
+        bind_level=bind_level,
+        affix_indices=affix_indices,
+        zero_volatile=zero_volatile,
+    )
 
 
 def resolve_skills(class_name, skill_dict):

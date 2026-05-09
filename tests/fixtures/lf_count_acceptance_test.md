@@ -51,4 +51,4 @@ Variant B was a **Sorceress** save with a Warlock-style bound-demon payload, and
 - Cleanup utility: `scripts/dev/_cleanup_lf_test.py`
 - Fixture A: `tests/fixtures/demon_block_a.bin` (pre-rebind, monster unknown)
 - Fixture B: `tests/fixtures/demon_block_b.bin` (post-rebind to fallen)
-- Plan reference: `docs/superpowers/plans/2026-04-25-bound-demon-save-block.md` § Phase 0 Task 0.4
+- Current public summary: `docs/d2s_format.md` follower block section.

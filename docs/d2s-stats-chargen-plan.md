@@ -67,6 +67,8 @@ tail.
 
 ### Can there be more than one Iron Golem?
 
+Status: answered.
+
 Hypothesis: no. The file format has a single `kf` marker followed by one
 `has_golem` flag and one item bitstream before the fixed `01 00 lf` bridge.
 Necromancer gameplay also replaces the existing Iron Golem when a new one is
@@ -84,10 +86,12 @@ payload remained.
 
 ### Can there be more than one bound demon?
 
+Status: answered for live D2R join behavior; unsupported for chargen.
+
 Hypothesis: probably not through normal gameplay. The known Warlock save uses
 `follower_count=1` and one fixed 116-byte payload. The format can express
-`follower_count=N` by the acceptance rule, but we have not proved D2R accepts
-`N>1` for bound demons.
+`follower_count=N`, but the live join test below rejected `N>1` for bound
+demons.
 
 Test:
 
@@ -116,198 +120,50 @@ numeric count.
 
 ### Milestone 1: Read-Side Parsers
 
-Add read-only parsers before adding writers.
+Status: answered for the current public evidence set.
 
-Tasks:
+Keep these parser contracts:
 
-- Add an `iron_golem` decoder that returns:
-  - `has_golem`
-  - raw item payload bytes
-  - payload byte length
-  - parsed item header if existing item decoder can consume the bitstream
-- Extend follower parsing reports for bound demon:
-  - keep high-confidence fields
-  - expose unknown fields as raw slices with offsets
-  - never label uncertain fields as stats in code
-- Add tests using synthetic byte fixtures or gitignored private fixtures when
-  available.
+- Iron Golem decode reports `has_golem`, raw item payload bytes, payload byte
+  length, bridge bytes, and best-effort item header metadata.
+- Follower parsing reports only high-confidence bound-demon fields and exposes
+  uncertain regions as raw slices with offsets.
+- Unknown bound-demon slices must not be labeled as stats in code.
 
-Acceptance:
+Acceptance guard:
 
-- Existing no-golem saves still round-trip as `has_golem=false`.
-- Live `probenecro` captures decode as one golem payload with lengths 55 and 26.
-- Bound demon parser still returns exactly the known high-confidence fields.
+- No-golem saves still decode as `has_golem=false`.
+- Active golem captures decode as one payload with the observed variable
+  lengths.
+- Bound demon parsing still returns exactly one 116-byte payload for the known
+  Warlock case.
 
 ### Milestone 2: Preserve and Round-Trip
 
-Make preservation explicit and tested.
+Status: answered for the tested active-golem preservation path.
 
-Tasks:
+Keep these writer contracts:
 
-- Update item rebuild logic to preserve an existing `kf 01 <item>` golem block
-  by default, just as follower payloads are preserved by default.
-- Add an explicit strip option for golem blocks for tests and deliberate edits.
-- Ensure rebuilding character inventory does not silently delete an Iron Golem.
+- No active golem: `kf 00 01 00 lf <followers>`.
+- Active golem: `kf 01 <single item bytes> 01 00 lf <followers>`.
+- Do not write more than one golem item. The live recast test replaced the
+  previous golem, and the section has only one flag plus one item byte stream.
+- Preservation should mirror followers: explicit payload over preserve over
+  strip.
 
-Acceptance:
+Acceptance guard:
 
 - A save with `kf 01` remains `kf 01` after a rebuild that edits normal items.
-- Scanner reports the same golem payload hash after no-op rebuild.
-- Tests cover both no-golem and active-golem tails.
+- Scanner reports the same golem payload hash after no-op rebuild, unless a
+  documented D2R canonicalization byte changes during live reload/save.
+- Tests cover no-golem, active-golem, explicit payload, and explicit strip.
 
 ### Milestone 3: Iron Golem Chargen Writer
 
-Add first-class YAML support once read-side preservation is solid.
+Status: implemented for v1 generated normal/magic items, with broader item
+families still experimental.
 
-2026-05-08 status: v1 YAML support is implemented for generated normal/magic
-items only. It requires `class: necromancer` and `skills: {IronGolem: ...}`
-with level at least 1, then injects one JM-less item payload into the `kf 01`
-tail.
-
-Possible YAML:
-
-```yaml
-iron_golem:
-  item:
-    magic: true
-    base: flc
-    properties:
-      fire_res: 10
-```
-
-Tasks:
-
-- Done: reuse the existing item encoder to produce a single JM-less payload.
-- Done: write `kf 01 <payload> 01 00 lf <followers>` through
-  `rebuild_items(..., iron_golem_payload=...)`.
-- Done: restrict v1 to normal/magic generated items; reject sockets,
-  runewords, uniques, sets, rares, and crafted items until live testing proves
-  those encodings.
-- Done: visually confirmed generated magic-property Iron Golems through the
-  YAML chargen path.
-
-Acceptance:
-
-- Generated Necromancer appears in character select.
-- Golem appears in game.
-- Save/quit keeps `has_golem=1`.
-- Repeated reload preserves or canonicalizes only known runtime bytes.
-
-### Iron Golem Item Encoding Plan
-
-Use the existing item encoder. `build_item(...)` already returns a raw item
-bitstream without a `JM<count>` section wrapper; `rebuild_items(...)` adds `JM`
-only around character, corpse, and merc item sections. The Iron Golem writer
-should therefore pass one generated item byte string directly into the `kf`
-tail.
-
-Tail shape:
-
-```text
-kf <u8:has_golem> [golem_item_bytes] 01 00 lf <u16:follower_count> [followers]
-```
-
-Use precise length names in code:
-
-- `kf_to_lf_gap = lf - kf`
-- `golem_item_bytes = data[kf + 3 : lf - 2]`
-- `bridge = data[lf - 2 : lf]`, expected `01 00`
-
-The current live `probenecro` second-golem save has `kf_to_lf_gap=29`,
-`has_golem=1`, `bridge=01 00`, and a 24-byte `golem_item_bytes` payload. That
-payload decodes as a normal item header at byte 0:
-
-```text
-type=flc ilvl=35 quality=4 storage=0 col=4 row=0 bodyloc=4 location=1 ext=101
-```
-
-This confirms the item starts immediately after the `has_golem` byte; there is
-no `JM` prefix and no additional golem header.
-
-Implementation order:
-
-1. Add a read-only `d2r_chargen/iron_golem.py` helper with:
-   - `decode_iron_golem_block(data) -> has_golem, item_payload, bridge`
-   - strict marker checks: `kf` before trailing `lf`, bridge must be `01 00`
-   - `decode_item_header(item_payload, 0)` best-effort metadata when present
-2. Update `tools/d2s_corpus_scan.py` to report:
-   - `has_golem_byte`
-   - `golem_item_payload_bytes`
-   - `golem_bridge_ok`
-   - optional item header buckets: type, quality, storage, location, bodyloc
-3. Update `rebuild_items(...)` to preserve the existing golem block by default:
-   - current behavior always writes `kf 00`, which strips an active Iron Golem
-   - add `preserve_golem=True` and optional `iron_golem_payload=None`
-   - precedence should mirror followers: explicit payload > preserve > strip
-4. Add YAML support after preservation tests pass:
-
-```yaml
-iron_golem:
-  item:
-    normal: true
-    base: cap
-    ilvl: 35
-    quality: 2
-```
-
-The resolver should reuse the existing item-definition path, but force the
-storage/location fields into the same equipped-looking shape D2R wrote for the
-live golem (`storage=0`, `location=1`, nonzero `bodyloc`). Start with simple
-normal or magic items. Defer runewords, socket fillers, and inventory-position
-semantics until a plain item survives live testing.
-
-Writer output rules:
-
-- No active golem:
-  `kf 00 01 00 lf <followers>`
-- Active golem:
-  `kf 01 <single item bytes> 01 00 lf <followers>`
-- Do not write more than one golem item. The live recast test replaced the
-  previous golem, and the section has only one flag plus one item byte stream.
-
-Tests before live promotion:
-
-- No-golem fixture round-trips to `kf 00 01 00 lf`.
-- Active-golem fixture round-trips with the same `golem_item_bytes` hash.
-- Explicit `iron_golem_payload` writes `kf 01` and keeps followers unchanged.
-- Explicit strip writes `kf 00` and keeps followers unchanged.
-- Scanner can decode the current live `probenecro` payload header from byte 0.
-
-Live test ladder:
-
-1. Preserve-only rebuild of `probenecro`; confirm the existing golem still
-   appears and payload hash is unchanged or only known runtime bytes change.
-2. Generate a disposable Necromancer with a plain normal item golem.
-3. Reload/save once; expect D2R may canonicalize byte `+1`, based on the
-   second-golem capture.
-4. Only after a normal item survives, try magic properties. Keep the generated
-   item conservative: no sockets, no runeword, no fillers.
-
-2026-05-08 preserve-path result: `probegolem`, a disposable `probenecro` clone
-rebuilt through `rebuild_items(...)`, appeared in D2R, joined game, and still
-had the Iron Golem. After save-and-quit, D2R kept the 24-byte
-`golem_item_bytes` payload byte-for-byte identical
-(`sha1=5708645b2c93a15e1e6ae45aed48f74a85975a65`). The scanner decoded the
-payload header as `type=flc`, `ilvl=35`, `quality=4`, `storage=0`, `col=4`,
-`row=0`, `bodyloc=4`, `location=1`, `ext=101`.
-
-2026-05-08 generated-writer result: `probegnorm` used a generated
-normal-quality Falchion payload from `build_item(...)`, not a copied live
-payload. The save joined game. After save-and-quit, D2R kept `has_golem=1`,
-payload length 19, and the generated payload byte-for-byte identical
-(`sha1=4818f07bc1e0e0907f4bcd30a50ab7c6038fb82d`). This proves the writer can
-synthesize at least simple normal Iron Golem items via the existing encoder.
-
-2026-05-08 generated-magic result: `probegmag` used a generated magic-quality
-Falchion payload with `fireresist +10`. It joined game, and the on-disk save
-remained `has_golem=1` with `kf_to_lf_gap=29`, payload length 24, `type=flc`,
-`quality=4`, `storage=0`, `location=1`, `bodyloc=4`, and the payload
-byte-for-byte identical (`sha1=09e7961cd4d3763fda1a073493aa97c00e38b4fd`).
-Because the file timestamp and full hash did not change after the live attempt,
-this first probe proved join acceptance and on-disk validity but not visual
-presence.
-
-2026-05-08 chargen implementation result: YAML can now specify:
+Supported v1 YAML shape:
 
 ```yaml
 skills:
@@ -320,94 +176,82 @@ iron_golem:
       fire_res: 10
 ```
 
-The generated item is forced into the live-observed golem storage shape:
-`storage=0`, `location=1`, and `bodyloc`/`col` from the selected slot
-(`weapon` defaults to `bodyloc=4`). The deploy path resolves this once and
-passes it to `rebuild_items(...)` for every phase.
+Answered evidence:
 
-2026-05-08 YAML live result: `probegyaml` was generated through this
-`iron_golem:` YAML path with a magic Falchion carrying `fire_res: 10`. It
-appeared in Offline, joined game, and the Iron Golem was visually present.
-After save-and-exit, the scanner still reported `has_golem=1`,
-`kf_to_lf_gap=29`, payload length 24, `type=flc`, `quality=4`, `storage=0`,
-`location=1`, and `bodyloc=4`. D2R rewrote unrelated character-state bytes,
-but the golem item payload stayed byte-for-byte identical
-(`sha1=8c5b252152951340325803723c8c166adacef406`).
+- The Iron Golem item starts immediately after the `has_golem` byte. There is
+  no `JM` prefix and no additional golem header.
+- The existing item encoder can produce a JM-less payload suitable for the
+  `kf 01 <payload> 01 00 lf <followers>` tail.
+- The live storage shape is `storage=0`, `location=1`, and nonzero `bodyloc`
+  from the selected slot (`weapon` defaults to `bodyloc=4`).
+- Generated normal and magic v1 YAML support has visual positive evidence and
+  checksum-clean post-save evidence.
+- The broader expansion batch has load/save persistence evidence, but not full
+  visual confirmation for every family.
 
-2026-05-08 expansion-variant batch result: five additional generated golem
-payload families were visible in Offline, joined game, and survived
-save-and-exit with `has_golem=1`, valid `kf/lf` bridge, `follower_count=0`,
-and checksum OK. Visual golem presence was not separately reported for this
-batch, so treat these as load/save persistence results:
+Current promotion policy:
 
-| Probe | Payload | Result |
-| --- | --- | --- |
-| `probegsok` | empty socketed normal Falchion, 19 bytes | payload preserved byte-for-byte, `sha1=15376caf5fbbfac27c051a4008043e9850b20d37` |
-| `probegrun` | Steel Falchion with embedded rune fillers, 52 bytes | remained active but D2R canonicalized 8 payload bytes, `sha1=3d46b6ce0ae8beabd04ec1ac2ace014b04acb5fb -> 87f378f735582864614d4b7fa5dd058d917b1e2b` |
-| `probeguni` | unique Bloodrise, 36 bytes | remained active but D2R canonicalized 14 payload bytes, `sha1=e7cdade3f3fafcafa410105494b59d0c5edef3e4 -> fc4276b9f392915afea1b74e2b7eb8a9453df75a` |
-| `probegset` | set Civerb's Cudgel, 23 bytes | payload preserved byte-for-byte, `sha1=a03435551a3f4e3d8e6cabe649ecb37ef870c876` |
-| `probegcrf` | ethereal crafted Falchion, 26 bytes | payload preserved byte-for-byte, `sha1=473f6d33213e774af05bf2b324e7779a9f95ee95` |
+- Keep normal/magic generated Iron Golems in the supported v1 surface.
+- Treat empty socketed normal, set, and crafted/ethereal payloads as promising
+  but not promoted until visual confirmation is recorded.
+- Treat runewords and uniques as canonicalization-aware candidates, not strict
+  byte-preservation cases.
 
-Implementation implication: broader golem writer support is viable. Socketed
-empty items, set items, and crafted/ethereal items can likely be promoted
-directly. Runewords and uniques should be promoted with a post-save
-canonicalization expectation, not strict byte-preservation assertions.
+Next proof methods:
+
+- Add a visual confirmation matrix for socketed, runeword, unique, set, rare,
+  and crafted families before broadening the public YAML contract.
+- For runewords and uniques, assert post-save structural validity and documented
+  canonicalization rather than unchanged payload bytes.
 
 ### Milestone 4: Demon Stats Research
 
-Gather enough fixtures to separate item/monster identity from runtime state.
+Status: still open; template-derived field overrides have answered pieces, but
+full synthesis remains blocked.
 
-Tests:
+Answered evidence:
 
-- Reload/save `probewldemon` without combat.
-- Treat damage/heal as optional instead of primary: bound demons are hard to
-  keep injured and heal quickly, so this only helps if a durable injured save
-  can be captured without a lot of manual wrestling.
-- Waypoint and fight one small pack, save/quit.
-- Rebind to two known monsters, save/quit each.
-- If safe, vary Bind Demon skill level and compare `+52` and derived fields.
-- Positive template-variant probe: `probewlalt` joined and spawned a demon with
-  the alternate known 116-byte payload. On save-and-quit, D2R preserved
-  `follower_count=1` and the 116-byte payload shape but canonicalized payload
-  offsets `+89..+91` and `+95..+97`. On a second reload/save, `+95..+97`
-  stayed stable but `+89..+91` changed again. On a third reload/save,
-  `+95..+97` stayed stable again and `+89..+91` became `00 00 00`.
-- No-combat reload result: `probewldemon` joined and save-and-exit changed only
-  `+89..+91` (`ea 10 72 -> 8c ee 7b`). Everything else in the 116-byte payload
-  stayed stable, including identity fields, `+64..+79`, and `+95..+115`.
-- No-combat `probewlalt` reload result: the demon appeared again and save-exit
-  changed only `+89..+91` (`00 00 00 -> ff 8b 58`). This confirms the all-zero
-  triplet can be a transient value, not a stable canonical endpoint.
-- High-property `bindtank` result: a demon observed as aura enchanted, extra
-  strong, fire enchanted, cursed, mana burn, extra fast, spectral hit, and
-  lightning immune saved as one valid 116-byte payload. The decoded affix list
-  held only five MonUMod bytes (`05 09 07 19 06` = Extra Strong, Fire
-  Enchanted, Cursed, Mana Burn, Extra Fast). After no-combat reload/save, the
-  demon still appeared with properties visible and only `+89..+91` changed
-  (`1b 98 7e -> 00 00 00`).
+- `probewldemon` proves one visible Warlock bound demon can persist as
+  `follower_count=1` plus exactly 116 payload bytes.
+- Count-2 bound-demon probes were scanner-clean but failed game join; treat live
+  D2R as supporting one bound demon at most.
+- `+89..+91` is volatile runtime data and should not be authored.
+- `+80..+84` and `+4..+5` are authorable experimental fields for affixes and
+  monster identity in a template-derived payload.
+- `+52` persists as Bind Demon level metadata, but visible behavior is unproved.
+- The second edited-payload batch proved Cold Enchanted and Stone Skin display
+  from single authored affix bytes and persist. Lightning Enchanted byte `03`
+  persists but did not display as Lightning Enchanted for this bound demon.
+- The embedded `gf` bytes are payload data, not a section marker.
+- Sorceress borrowed-follower payloads load structurally but are stripped back
+  to `follower_count=0` on save.
 
-Analysis:
+Still open:
+
+- `+24..+31`, `+44/+48`, `+64..+79`, `+88`, and `+95..+115` remain unknown.
+- The five MonUMod bytes do not account for every visible property; `bindtank`
+  retained visible properties outside that decoded list.
+- Damage/heal captures are optional, not primary, because bound demons heal
+  quickly and are hard to preserve in an injured state.
+
+Next proof methods:
 
 - Diff only the 116-byte payload.
 - Track stable identity fields separately from runtime-mutating fields.
 - Cross-reference `monster_hcidx` with MonStats and affixes with MonUMod.
-- Do not assume the five decoded MonUMod bytes exhaust all visible bound-demon
-  properties; the `bindtank` capture kept visible Aura Enchanted, Spectral Hit,
-  and lightning immunity even though they were absent from `+80..+84`.
-- Treat `+24..+31`, `+44/+48`, `+64..+79`, `+88`, and `+95..+115` as unknown
-  until multiple controlled fixtures agree.
-- Treat `+89..+91` as actively volatile based on the repeated `probewlalt`
-  reload/save result.
+- Run natural high-property captures and a small Bind Demon level matrix.
 
-Acceptance:
+Acceptance guard:
 
-- A table of field confidence levels exists.
+- A field-confidence table exists.
 - The scanner reports high-confidence fields and raw unknown slices.
-- No writer tries to synthesize unknown runtime fields.
+- No writer synthesizes unknown runtime fields.
 
 ### Milestone 5: Bound Demon Chargen Policy
 
-Decide what chargen should support.
+Status: v1 template cloning remains supported; experimental template-derived
+overrides are implemented for proven fields. Fully synthesized payloads remain
+blocked.
 
 Safe v1:
 
@@ -416,25 +260,24 @@ bound_demon:
   template: marrowbind_demon_b
 ```
 
-Possible v2:
+Experimental v2, only with a live-derived template base:
 
 ```yaml
 bound_demon:
-  monster: fallen
-  affixes: [Strong, Fast]
-  bind_level: 7
+  template: bindtank_capture
+  monster_hcidx: 20
+  affixes: [Extra Strong, Extra Fast]
+  bind_level: 20
 ```
 
-Do not implement v2 until the unknown runtime/hash fields are understood or
-until we can prove D2R canonicalizes a minimally synthesized payload safely.
+Blocked:
 
-Acceptance:
-
-- v1 template cloning remains supported and documented.
-- v2 remains blocked behind explicit fixture evidence.
+- Fully synthesized `monster: fallen` payloads without a live-derived 116-byte
+  template remain blocked until unknown runtime/hash fields are decoded or live
+  proof shows D2R canonicalizes a minimal synthesized payload safely.
 
 ## Recommended Next Action
 
-Implement Milestone 1 for Iron Golem read-side parsing first. It gives immediate
-chargen safety value and uses evidence we already captured. Demon stat synthesis
-should remain research-only until more controlled payload diffs exist.
+Use the cleaned evidence split to drive two separate follow-ups: a golem
+expansion-family visual matrix before broadening YAML support, and live-test
+`demexp` to verify the new YAML override path end to end.

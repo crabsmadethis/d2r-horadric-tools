@@ -63,10 +63,8 @@ def cmd_validate(args):
             os.path.dirname(os.path.abspath(__file__)), 'data', 'template.d2s'
         )
 
-        saves = os.path.expanduser(
-            '~/.local/share/Steam/steamapps/compatdata/2536520/pfx/'
-            'drive_c/users/steamuser/Saved Games/Diablo II Resurrected'
-        )
+        from d2r_chargen.config import SAVES
+        saves = SAVES
         # Prefer existing .d2s as template (has correct status/expansion bits)
         existing_d2s = os.path.join(saves, f"{char_def['name']}.d2s")
         if os.path.exists(existing_d2s):
@@ -127,10 +125,8 @@ def cmd_scan(args):
 
 def cmd_import(args):
     from d2r_chargen.importer import import_character, dict_to_yaml
-    saves = os.path.expanduser(
-        '~/.local/share/Steam/steamapps/compatdata/2536520/pfx/'
-        'drive_c/users/steamuser/Saved Games/Diablo II Resurrected'
-    )
+    from d2r_chargen.config import SAVES
+    saves = SAVES
     d2s_path = os.path.join(saves, f"{args.name}.d2s")
     if not os.path.exists(d2s_path):
         print(f"  ERROR: {d2s_path} not found")

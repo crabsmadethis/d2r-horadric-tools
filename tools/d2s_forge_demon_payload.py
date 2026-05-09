@@ -19,7 +19,11 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from d2r_chargen.data.monumod_affixes import AFFIXES
-from d2r_chargen.follower_block import DEMON_PAYLOAD_LEN, decode_follower_block
+from d2r_chargen.follower_block import (
+    DEMON_PAYLOAD_LEN,
+    decode_follower_block,
+    mutate_demon_payload,
+)
 from d2r_chargen.save import calc_checksum
 
 _OFF_MONSTER_HCIDX = 4
@@ -104,28 +108,14 @@ def mutate_payload(
     zero_volatile: bool = False,
 ) -> bytes:
     """Return a mutated copy of a 116-byte demon payload."""
-    if len(payload) != DEMON_PAYLOAD_LEN:
-        raise ValueError(f"payload must be {DEMON_PAYLOAD_LEN} bytes, got {len(payload)}")
-    out = bytearray(payload)
-    if monster_hcidx is not None:
-        if monster_hcidx < 0 or monster_hcidx > 0xFFFF:
-            raise ValueError(f"monster_hcidx out of u16 range: {monster_hcidx}")
-        struct.pack_into("<H", out, _OFF_MONSTER_HCIDX, monster_hcidx)
-    if monster_seed is not None:
-        if monster_seed < 0 or monster_seed > 0xFFFFFFFF:
-            raise ValueError(f"monster_seed out of u32 range: {monster_seed}")
-        struct.pack_into("<I", out, _OFF_MONSTER_SEED, monster_seed)
-    if bind_level is not None:
-        if bind_level < 0 or bind_level > 0xFFFFFFFF:
-            raise ValueError(f"bind_level out of u32 range: {bind_level}")
-        struct.pack_into("<I", out, _OFF_BIND_DEMON_LEVEL, bind_level)
-    if affixes is not None:
-        if len(affixes) != _AFFIX_LEN:
-            raise ValueError(f"affixes must be {_AFFIX_LEN} bytes, got {len(affixes)}")
-        out[_OFF_AFFIX_INDICES:_OFF_AFFIX_INDICES + _AFFIX_LEN] = affixes
-    if zero_volatile:
-        out[_OFF_VOLATILE_RUNTIME:_OFF_VOLATILE_RUNTIME + 3] = b"\x00\x00\x00"
-    return bytes(out)
+    return mutate_demon_payload(
+        payload,
+        monster_hcidx=monster_hcidx,
+        monster_seed=monster_seed,
+        bind_level=bind_level,
+        affix_indices=affixes,
+        zero_volatile=zero_volatile,
+    )
 
 
 def _update_size_and_checksum(data: bytearray) -> None:

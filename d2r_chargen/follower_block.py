@@ -92,6 +92,54 @@ def demon_payload_unknown_slices(payload: bytes) -> dict[str, bytes]:
     }
 
 
+def mutate_demon_payload(
+    payload: bytes,
+    *,
+    monster_hcidx: Optional[int] = None,
+    monster_seed: Optional[int] = None,
+    bind_level: Optional[int] = None,
+    affix_indices: Optional[bytes] = None,
+    zero_volatile: bool = False,
+) -> bytes:
+    """Return a copy of `payload` with proven-authorable fields changed.
+
+    This is intentionally limited to fields that have live evidence behind
+    them. It does not synthesize the whole 116-byte record.
+    """
+    if len(payload) != DEMON_PAYLOAD_LEN:
+        raise ValueError(
+            f'demon payload must be {DEMON_PAYLOAD_LEN} bytes, got {len(payload)}'
+        )
+
+    out = bytearray(payload)
+    if monster_hcidx is not None:
+        if not 0 <= monster_hcidx <= 0xFFFF:
+            raise ValueError(f'monster_hcidx out of u16 range: {monster_hcidx}')
+        struct.pack_into('<H', out, _OFF_MONSTER_HCIDX, monster_hcidx)
+
+    if monster_seed is not None:
+        if not 0 <= monster_seed <= 0xFFFFFFFF:
+            raise ValueError(f'monster_seed out of u32 range: {monster_seed}')
+        struct.pack_into('<I', out, _OFF_MONSTER_SEED, monster_seed)
+
+    if bind_level is not None:
+        if not 0 <= bind_level <= 0xFFFFFFFF:
+            raise ValueError(f'bind_level out of u32 range: {bind_level}')
+        struct.pack_into('<I', out, _OFF_BIND_DEMON_LEVEL, bind_level)
+
+    if affix_indices is not None:
+        if len(affix_indices) != _AFFIX_LEN:
+            raise ValueError(
+                f'affix_indices must be {_AFFIX_LEN} bytes, got {len(affix_indices)}'
+            )
+        out[_OFF_AFFIX_INDICES:_OFF_AFFIX_INDICES + _AFFIX_LEN] = affix_indices
+
+    if zero_volatile:
+        out[89:92] = b'\x00\x00\x00'
+
+    return bytes(out)
+
+
 @dataclass
 class FollowerBlock:
     follower_count: int

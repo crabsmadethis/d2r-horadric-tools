@@ -137,8 +137,7 @@ def _resolve_merc_level_to_xp(char_def):
     """Convert `merc.level` into `merc.xp` using the closed-form curve.
 
     Formula: merc_xp = Exp/Lvl × (level + 1) × level²  (see
-    d2r_chargen/data/merc_xp_curve.py and
-    docs/superpowers/specs/2026-04-20-merc-xp-formula.md).
+    d2r_chargen/data/merc_xp_curve.py).
 
     Precedence: if both `level` and `xp` are set, `xp` wins (explicit
     override) and a warning is printed. If only `level` is set, it's
@@ -1063,7 +1062,7 @@ def build_all_items(char_def):
                 # col=0.  Observed in golden fixture hexshade_lv98_haseen:
                 # Insight 7wc col=4 (bodyloc=4), Andariel's usk col=1
                 # (bodyloc=1), Fortitude utp col=3 (bodyloc=3).
-                # See docs/superpowers/specs/2026-04-20-merc-direct-mode-gap.md.
+                # See tests/test_merc_encoding.py for round-trip coverage.
                 for item_def in merc_equipment:
                     built = build_equipment_item(item_def, is_merc=True)
                     for _section, item_bytes in built:

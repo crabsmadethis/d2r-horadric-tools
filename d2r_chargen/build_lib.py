@@ -50,7 +50,6 @@ from d2r_chargen.config import RW_BASE_CATEGORIES
 # ---------------------------------------------------------------------------
 # Canonical Constants
 # Reference: d2rdoctor.md lines 696-698 (bodyloc), d2rdoctor.md line 38 (storage)
-# Reference: rca_master_plan.md lines 207-221
 # ---------------------------------------------------------------------------
 BODYLOC = {
     'helm': 1, 'neck': 2, 'body': 3, 'rhand': 4, 'lhand': 5,
@@ -83,7 +82,6 @@ def set_build_warnings(w):
 
 # ---------------------------------------------------------------------------
 # A. Dynamic BASES Lookup
-# Reference: rca_master_plan.md lines 182-193
 # Reference: item_bases.py flags field (bit 0=quantity, bit 1=durability,
 #            bit 2=defense, bit 3=book)
 # ---------------------------------------------------------------------------
@@ -159,7 +157,6 @@ class BitWriter:
 # ---------------------------------------------------------------------------
 # C. Property Encoder
 # Reference: fix_obsidian_rw.py lines 58-84 (the working implementation)
-# Reference: rca_master_plan.md lines 223-230 (overflow protection)
 # Reference: item_stat_cost.py header lines 1-31 (encoding type docs)
 # ---------------------------------------------------------------------------
 
@@ -325,7 +322,6 @@ def encode_property(w, stat_id, value, param=0):
 
 # ---------------------------------------------------------------------------
 # D. Property List Termination
-# Reference: rca_master_plan.md lines 196-204
 # Reference: fix_obsidian_rw.py lines 227-240 (runeword double terminator)
 # Reference: d2rdoctor.md line 229 — terminators_expected = 2 if is_runeword
 # ---------------------------------------------------------------------------
@@ -398,7 +394,6 @@ def encode_properties_terminated(w, props, is_runeword=False):
 
 # ---------------------------------------------------------------------------
 # E. Validation Functions
-# Reference: rca_master_plan.md lines 232-244
 # ---------------------------------------------------------------------------
 def validate_unique_item(type_code, unique_id):
     """Verify that a unique item UID exists and matches the given type code.
@@ -557,8 +552,7 @@ def build_item(type_code, col, row, storage,
 
     tc = type_code.strip()
 
-    # Dynamic base flags lookup (replaces hardcoded BASES dicts)
-    # Reference: rca_master_plan.md lines 186-192
+    # Dynamic base flags lookup (replaces hardcoded BASES dicts).
     base = get_base_flags(tc)
 
     # Validate unique items (quality=7)
@@ -788,7 +782,7 @@ def build_item(type_code, col, row, storage,
     # D2R accepts the raw form (low12 = runeword_id, high4 = 0) for
     # char-equipped items but rejects it for merc-equipped items during
     # game-enter validation. Writing the canonical biased form satisfies
-    # both code paths.  See docs/superpowers/specs/2026-04-20-merc-direct-mode-gap.md.
+    # both code paths.
     # ==========================================================
     if runeword:
         w.write_bits(runeword_id + 27, 12)

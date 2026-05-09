@@ -7,7 +7,7 @@ name = "d2r-tools"
 version = "1.0.0"
 description = "D2R modding toolkit — YAML character builder and data pipeline"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 license = "MIT"
 dependencies = ["pyyaml>=6.0"]
 
@@ -24,6 +24,7 @@ d2r_chargen = ["data/template.d2s"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = [
+    "smoke: lightweight checks that may touch generated data",
     "integration: tests requiring real D2R binaries on SD card",
     "slow: tests involving engine disasm, host patching, or CASC I/O",
     "e2e: end-to-end tests requiring D2R running",
@@ -53,5 +54,5 @@ ignore = [
 "scripts/dev/*" = ["F401"]  # one-shot dev helpers
 
 [project.optional-dependencies]
-test = ["pytest", "pytest-timeout"]
-dev = ["pytest", "pytest-timeout", "ruff"]
+test = ["pytest", "pytest-timeout", "pytest-asyncio"]
+dev = ["pytest", "pytest-timeout", "pytest-asyncio", "ruff"]
