@@ -131,6 +131,26 @@ Live next step:
 - 2026-05-08 `bindtank` no-combat reload result: the same demon appeared with
   its properties still visible. Save-and-exit preserved the entire 116-byte
   payload except `+89..+91`, which changed `1b 98 7e -> 00 00 00`.
+- 2026-05-08 edited-payload batch result:
+  - `demclone` copied the `bindtank` demon and loaded with the same visible
+    properties; save-and-exit left the 116-byte payload byte-for-byte
+    unchanged.
+  - `demauras` changed the five MonUMod bytes to `05 09 07 1b 1e`
+    (Extra Strong, Fire Enchanted, Cursed, Spectral Hit, Aura Enchanted). It
+    loaded, looked like the same property set to the user, and saved back with
+    those bytes unchanged except volatile `+89..+91`.
+  - `demblank` changed the five MonUMod bytes to all zero. It loaded with no
+    visible extra properties except being a demon and lightning immune, and
+    saved back with the zero affix list unchanged except volatile `+89..+91`.
+  - `demfalln` changed only `monster_hcidx` to `20`; the demon became a
+    Fallen, joined, and saved back with `monster_hcidx=20` unchanged except
+    volatile `+89..+91`.
+  - `demlvl` changed only `bind_demon_level` to `20`; it joined, showed no
+    visible difference, and saved back with `bind_demon_level=20` unchanged
+    except volatile `+89..+91`.
+  The batch proves the five MonUMod bytes are authorable, `monster_hcidx` is
+  authorable, and `bind_demon_level` is persistent. It does not prove
+  `bind_demon_level` has visible behavior.
 
 ### 2. Embedded `gf` inside demon payload
 

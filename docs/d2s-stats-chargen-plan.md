@@ -385,6 +385,13 @@ Tests:
   Enchanted, Cursed, Mana Burn, Extra Fast). After no-combat reload/save, the
   demon still appeared with properties visible and only `+89..+91` changed
   (`1b 98 7e -> 00 00 00`).
+- Edited-payload batch result: `demclone`, `demauras`, `demblank`, `demfalln`,
+  and `demlvl` all joined and saved back with valid `follower_count=1` /
+  116-byte payloads. The intentional affix, monster id, and bind-level edits
+  persisted. `demblank` removed visible extra affixes while lightning immunity
+  remained; `demfalln` changed the visible model to Fallen; `demlvl` showed no
+  visible difference. Only `+89..+91` changed on save, except `demclone`, which
+  was byte-stable.
 
 Analysis:
 
@@ -394,6 +401,9 @@ Analysis:
 - Do not assume the five decoded MonUMod bytes exhaust all visible bound-demon
   properties; the `bindtank` capture kept visible Aura Enchanted, Spectral Hit,
   and lightning immunity even though they were absent from `+80..+84`.
+- Treat `+80..+84` and `+4..+5` as authorable experimental fields after the
+  first edited-payload batch. Treat `+52` as persistent metadata until a
+  stronger skill-level matrix proves visible behavior.
 - Treat `+24..+31`, `+44/+48`, `+64..+79`, `+88`, and `+95..+115` as unknown
   until multiple controlled fixtures agree.
 - Treat `+89..+91` as actively volatile based on the repeated `probewlalt`

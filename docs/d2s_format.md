@@ -329,6 +329,15 @@ were not present in the five decoded MonUMod affix bytes despite remaining
 visible in game, so those properties are stored elsewhere, implicit from the
 monster, or omitted from the bound-demon affix list.
 
+2026-05-08 edited-payload batch: D2R accepted and preserved targeted edits to
+the high-confidence fields. `demblank` zeroed all five MonUMod bytes and showed
+no visible extra properties except demon identity and lightning immunity.
+`demfalln` changed `monster_hcidx` to `20` and visibly became a Fallen.
+`demlvl` changed `bind_demon_level` to `20` and persisted, but the user saw no
+visible difference. All rewritten saves retained `follower_count=1`, a valid
+116-byte payload, and valid checksums. D2R changed only known volatile bytes
+`+89..+91` except for `demclone`, which was byte-stable.
+
 ### Cross-class behavior
 
 Phase 0.4 found D2R loads non-warlock saves carrying a follower block
