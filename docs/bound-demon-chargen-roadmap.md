@@ -89,10 +89,33 @@ names, machine details, or session logs.
 
 ## Active Manual Probe Focus
 
-The affix-isolation batch ruled out single Extra Strong, Fire Enchanted,
-Cursed, Mana Burn, Extra Fast, and Fire/Cursed/Mana as the source of the
-unexpected Spectral Hit plus Aura Enchanted display.
+Bind Demon table review confirmed that the real skill adds monster affix ids at
+specific skill thresholds during the bind action:
 
-The next manual batch should isolate whether the Spectral Hit plus Aura
-Enchanted runtime display is triggered by affix count, a specific affix
-combination, or the presence of Extra Fast with the earlier affixes.
+| Bind Demon level | Expected skill-granted affixes |
+| --- | --- |
+| `1..4` | none |
+| `5..9` | Extra Strong |
+| `10..14` | Extra Strong, Extra Fast |
+| `15..19` | Extra Strong, Extra Fast, Spectral Hit |
+| `20+` | Extra Strong, Extra Fast, Spectral Hit, Aura Enchanted |
+
+The next decisive manual batch is the natural-bind matrix. These characters
+start with no follower and must bind a fresh demon in game so D2R runs the
+actual Bind Demon server function:
+
+- `natone`: hard Bind Demon level 1
+- `natfive`: hard Bind Demon level 5
+- `natten`: hard Bind Demon level 10
+- `natteen`: hard Bind Demon level 15
+- `nattwen`: hard Bind Demon level 20
+
+Record the visible affixes after a successful bind, then save/exit and scan the
+resulting follower payload. This proves whether the skill table writes the
+expected affix bytes and whether payload `+52` is skill level, bind chance
+metadata, or something else.
+
+The secondary manual batch is the synthetic combo control, already built as
+`btone`, `bttwo`, `btthr`, `btfor`, `btfast`, and `btmiss`. Use it only after
+the natural-bind matrix if the live affix labels still need byte-combination
+isolation.
