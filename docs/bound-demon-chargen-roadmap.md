@@ -77,8 +77,8 @@ Recent live validation tightened two important limits:
 - Decode or classify unknown slices at `+24..+31`, `+44/+48`, `+64..+79`,
   `+88`, and `+95..+115`.
 - Prove which template/model fields control visible demon shape.
-- Prove whether Bind Demon level affects freshly bound demons, as distinct from
-  pre-authored follower payloads.
+- Convert the now-proven natural Bind Demon level thresholds into writer
+  semantics that do not depend on payload `+52`.
 - Build canonicalization-aware assertions for any field D2R rewrites on
   save/exit.
 - Promote experimental YAML fields only after the scanner and docs agree on the
@@ -129,14 +129,16 @@ Current natural-bind results:
 | Character | Hard level | Source | Visible result | Payload affixes |
 | --- | ---: | --- | --- | --- |
 | `natone` | 1 | Hell Fallen | no added properties | none |
-| `natfive` | 5 | Ghostly/champion Hell Fallen | Extra Strong plus source champion data | `24, 5` |
+| `natfive` | 5 | Hell Fallen | Extra Strong | `5` |
 | `natten` | 10 | rare Hell Fallen, started Lightning/Cold/Cursed | retained source affixes, gained Extra Strong and Extra Fast | `7, 17, 18, 5, 6` |
-| `natteen` | 15 | not yet bound | missing datapoint | no follower |
+| `natteen` | 15 | Hell Fallen | Extra Strong, Extra Fast, Spectral Hit | `5, 6, 27` |
 | `nattwen` | 20 | Hell Fallen | Extra Strong, Extra Fast, Spectral Hit, Aura Enchanted | `5, 6, 27, 30` |
 
-The level-5 champion-pack case needs one more control bind from a non-champion
-source because the visible "Ghostly" label did not correspond directly to the
-decoded `36` Ghostly MonUMod id.
+The natural-bind matrix confirms that D2R writes the expected threshold affixes
+into the MonUMod bytes during the bind action. Existing source-monster affixes
+can carry through ahead of or alongside those threshold affixes, so robust
+chargen should model two inputs: source monster affixes and skill-granted
+threshold affixes.
 
 The secondary manual batch is the synthetic combo control, already built as
 `btone`, `bttwo`, `btthr`, `btfor`, `btfast`, and `btmiss`. Use it only after
