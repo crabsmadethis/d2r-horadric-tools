@@ -110,6 +110,12 @@ actual Bind Demon server function:
 - `natteen`: hard Bind Demon level 15
 - `nattwen`: hard Bind Demon level 20
 
+The `nat*` builds intentionally avoid Annihilus, Hellfire Torch, skillers,
+`all_skills`, and `class_skills`. They instead use rare non-skill gear and
+small charms for durability, resists, cast/recovery speed, damage reduction,
+open wounds, crushing blow, prevent heal, and slow target. This keeps the hard
+Bind Demon thresholds exact while still making the live bind attempt practical.
+
 Record the visible affixes after a successful bind, then save/exit and scan the
 resulting follower payload. This proves whether the skill table writes the
 expected affix bytes and whether payload `+52` is skill level, bind chance
