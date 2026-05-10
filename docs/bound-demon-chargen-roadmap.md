@@ -54,6 +54,11 @@ Recent live validation tightened two important limits:
   10, 15, and 20 displayed no added properties and saved back with unchanged
   empty affix bytes. Skill level and payload `+52` are therefore not sufficient
   to make tooltip-granted properties appear on an authored follower.
+- Original-template and forced-monster payloads both displayed the five authored
+  normal affixes. Spectral Hit plus Aura Enchanted displayed when authored
+  directly on the original template model, and also appeared at runtime when
+  the five normal affix bytes were authored together. Clearing those five bytes
+  removed all visible properties.
 
 ## Support Tiers
 
@@ -88,7 +93,6 @@ The affix-isolation batch ruled out single Extra Strong, Fire Enchanted,
 Cursed, Mana Burn, Extra Fast, and Fire/Cursed/Mana as the source of the
 unexpected Spectral Hit plus Aura Enchanted display.
 
-The next manual batch should compare original-template payloads against
-monster-identity overrides and cleared affix bytes. The purpose is to separate
-"wrong-looking model" failures from actual property encoding failures before
-promoting any monster-identity YAML surface beyond experimental status.
+The next manual batch should isolate whether the Spectral Hit plus Aura
+Enchanted runtime display is triggered by affix count, a specific affix
+combination, or the presence of Extra Fast with the earlier affixes.

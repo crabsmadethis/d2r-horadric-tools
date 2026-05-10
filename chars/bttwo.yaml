@@ -1,0 +1,28 @@
+schema_version: 1
+name: bttwo
+class: warlock
+level: 99
+progression: hell_complete
+
+stats:
+  strength: 180
+  dexterity: 180
+  vitality: 200
+  energy: 25
+
+skills:
+  Bind Demon: 20
+  Death Mark: 20
+  Demonic Mastery: 20
+  Blood Oath: 20
+  Eldritch Blast: 20
+
+equipment: []
+
+bound_demon:
+  template: demclone
+  monster_hcidx: 20
+  affixes:
+    - Extra Strong
+    - Fire Enchanted
+
