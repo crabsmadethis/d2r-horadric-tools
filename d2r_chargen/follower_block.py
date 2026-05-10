@@ -29,7 +29,7 @@ EXPECTED_TAIL_BRIDGE = b'\x01\x00'  # bytes immediately before trailing `lf`
 # omitted — silently-wrong parsers are worse than missing parsers.
 _OFF_MONSTER_HCIDX = 4   # u16 LE — MonStats.txt row index
 _OFF_MONSTER_SEED = 6    # u32 LE — random instance seed
-_OFF_BIND_DEMON_LEVEL = 52  # u32 LE — Bind Demon skill level at bind time
+_OFF_BIND_DEMON_LEVEL = 52  # u32 LE — persisted bind metadata, not effective skill level
 _OFF_AFFIX_INDICES = 80  # 5 raw bytes — MonUMod.txt indices (NOT a u32)
 _AFFIX_LEN = 5
 

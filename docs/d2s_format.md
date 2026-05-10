@@ -284,7 +284,7 @@ High-confidence fields parsed by `d2r_chargen/follower_block.py`:
 | `+0`         | u16  | section/follower-kind tag | invariant `0x0018` across binds; likely "bound demon" type marker |
 | `+4`         | u16  | `monster_hcidx`   | MonStats.txt row index (e.g. `20` = `fallen2`) |
 | `+6`         | u32  | `monster_seed`    | random instance seed; rerolls every bind |
-| `+52`        | u32  | `bind_demon_level`| player's Bind Demon skill level at bind time |
+| `+52`        | u32  | `bind_demon_level`| persisted bind metadata; not the effective Bind Demon skill level |
 | `+80..+84`   | 5B   | `affix_indices`   | MonUMod.txt indices, raw bytes (NOT a u32) |
 | `+92..+93`   | 2B   | ASCII `gf`        | **DATA, not a section marker.** Same byte position in both fixtures. The decoder must use a fixed 116B length, not a `gf`-terminated slice. |
 
@@ -310,7 +310,9 @@ the persisted bound-demon affix list.
 Targeted template-derived edits to high-confidence fields are accepted and
 preserved: zeroing the five MonUMod bytes removes visible extra affixes,
 changing `monster_hcidx` can change the visible model, and changing
-`bind_demon_level` persists even though its visible effect is not yet proven.
+`bind_demon_level` persists, but natural live binds at hard skill levels 1, 5,
+10, and 20 all saved this field as `7`; do not treat it as the effective skill
+level.
 Cold Enchanted and Stone Skin have positive single-affix evidence. Lightning
 Enchanted byte `03` can persist without necessarily displaying as a Lightning
 Enchanted label for the tested bound demon.

@@ -50,6 +50,9 @@ Recent live validation tightened two important limits:
 - A natural bind with the Warlock skill block showing Bind Demon level 20 still
   saved payload `+52` as `7`; do not treat this field as the current skill
   level until a natural bind-level matrix explains it.
+- Natural binds at hard Bind Demon levels 1, 5, 10, and 20 all saved payload
+  `+52` as `7`, while writing the expected threshold affixes into the MonUMod
+  bytes. This confirms `+52` is not effective Bind Demon level.
 - A pre-authored empty-affix follower matrix at hard Bind Demon levels 1, 5,
   10, 15, and 20 displayed no added properties and saved back with unchanged
   empty affix bytes. Skill level and payload `+52` are therefore not sufficient
@@ -120,6 +123,20 @@ Record the visible affixes after a successful bind, then save/exit and scan the
 resulting follower payload. This proves whether the skill table writes the
 expected affix bytes and whether payload `+52` is skill level, bind chance
 metadata, or something else.
+
+Current natural-bind results:
+
+| Character | Hard level | Source | Visible result | Payload affixes |
+| --- | ---: | --- | --- | --- |
+| `natone` | 1 | Hell Fallen | no added properties | none |
+| `natfive` | 5 | Ghostly/champion Hell Fallen | Extra Strong plus source champion data | `24, 5` |
+| `natten` | 10 | rare Hell Fallen, started Lightning/Cold/Cursed | retained source affixes, gained Extra Strong and Extra Fast | `7, 17, 18, 5, 6` |
+| `natteen` | 15 | not yet bound | missing datapoint | no follower |
+| `nattwen` | 20 | Hell Fallen | Extra Strong, Extra Fast, Spectral Hit, Aura Enchanted | `5, 6, 27, 30` |
+
+The level-5 champion-pack case needs one more control bind from a non-champion
+source because the visible "Ghostly" label did not correspond directly to the
+decoded `36` Ghostly MonUMod id.
 
 The secondary manual batch is the synthetic combo control, already built as
 `btone`, `bttwo`, `btthr`, `btfor`, `btfast`, and `btmiss`. Use it only after
