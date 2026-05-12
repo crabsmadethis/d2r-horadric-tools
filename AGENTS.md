@@ -1,57 +1,72 @@
-# Agent Instructions for d2r-horadric-tools
+# Agent Instructions
 
-This is a public D2R tooling repository. Keep every committed file useful to a
-GitHub reader who only has this repo.
+This is a public Diablo II: Resurrected tooling repository. Keep every change
+usable by a GitHub reader who has only this repo and their own local D2R
+install.
 
 ## Read First
 
-Before editing, read:
+Before editing, read the files relevant to the task:
 
 - `README.md`
 - `CONTRIBUTING.md`
 - `CLAUDE.md`
 - `docs/d2s_format.md` for save-format work
+- `d2r_mcp/README.md` for MCP tool changes
 
-## Public Repo Standard
+## Public Boundary
 
-GitHub-facing docs should be product, API, format, or contributor docs. Do not
-commit internal planning scratchpads, agent orchestration notes, disposable
-test-session logs, machine-specific paths, or project-hub assumptions.
+Committed content must be public-safe. Do not add:
 
-Public docs may include:
+- personal `.d2s` saves or raw save corpora
+- raw memory dumps or live process captures
+- machine-local paths, account identifiers, tokens, or secrets
+- extracted Blizzard game data
+- internal planning notes, disposable probe queues, or live-session diaries
+- recovered private source or references that require private repositories to
+  understand this project
 
-- source-code behavior
-- CLI and MCP usage
-- synthetic fixtures and examples
-- sanitized save-format findings
-- repeatable validation commands
-- known limitations and remaining research questions
+Public docs may include source behavior, CLI and MCP usage, synthetic fixtures,
+sanitized binary-layout findings, repeatable validation commands, known
+limitations, and open research questions that belong to this public toolkit.
 
-Public docs should not include:
+If local manual validation matters, record the stable technical result and a
+repeatable public procedure. Leave private artifacts and machine-specific
+details out of the repo.
 
-- personal save files or raw save corpora
-- machine-local paths or account identifiers
-- internal project lanes or recovered-source references
-- low-level research planning unrelated to this public toolkit
-- one-off probe queues or live-session diary entries
-- claims about GitHub state that have not been verified against the remote
+## Save-File Rules
 
-If a local manual validation result matters, summarize the stable technical
-finding and put the reusable procedure in `docs/manual-save-validation.md`.
+For `.d2s` work:
 
-## `.d2s` Work Rules
-
-- Never rebuild a `.d2s` from scratch when targeted edits are possible.
-- Back up before writing local save files.
-- Write to staging/temp files first.
+- Prefer targeted edits over rebuilding a save from scratch.
+- Back up before writing any local save file.
+- Write to temp or staging files first.
 - Run the scanner after every edit phase.
 - Verify checksums and file-size fields.
-- Do not stack risky edits before testing.
-- Scanner hard errors block deployment unless disproven with bit-level evidence.
+- Promote only after validation passes.
+- Do not stack risky edits before scanning.
+- Treat scanner hard errors as deployment blockers unless bit-level evidence
+  proves the scanner is wrong.
+
+Use repo-generated data modules for D2R constants. Do not use web research as
+the source of truth for item UIDs, item codes, stat encoding, runeword indices,
+or skill IDs.
+
+## MCP Rules
+
+MCP tool changes require synchronized docs and tests. If you add, remove,
+rename, or change a tool in `d2r_mcp/`, update:
+
+- `d2r_mcp/README.md` with the current tool count and tool behavior.
+- Root `README.md` if its MCP tool count is now stale.
+- `tests/test_mcp_*.py`.
+
+Mutation tools must enforce the same backup, scan, and promote pipeline as
+`d2r_chargen_build`.
 
 ## Validation Commands
 
-Use the narrowest command that proves the change:
+Use the narrowest command set that proves the change:
 
 ```bash
 python tools/public_hygiene_check.py
@@ -65,8 +80,28 @@ d2r-mod build
 d2r-mod diff --summary
 ```
 
+For fixture-light CI parity:
+
+```bash
+pytest tests/ -v --timeout=60 \
+  -m "not integration and not slow and not e2e and not smoke" \
+  --ignore=tests/fixtures/ \
+  --ignore=tests/test_chargen.py \
+  --ignore=tests/test_decoder.py \
+  --ignore=tests/test_fixtures.py \
+  --ignore=tests/test_importer.py
+```
+
+If a change requires local game data, Offline game validation, or private
+fixtures, state that limit in the handoff and keep those artifacts out of the
+repo.
+
 ## Handoff
 
-Before opening or updating a PR, run the public hygiene check and record the
-tests you ran. If a change needs local game data, fixtures, or manual game
-validation, say so explicitly and keep those artifacts out of the repo.
+Before handing off a meaningful change:
+
+- Run `python tools/public_hygiene_check.py`.
+- Run the relevant tests or explain why they were not run.
+- Summarize save-file safety impact when `.d2s` writes are involved.
+- For MCP changes, confirm the README and `tests/test_mcp_*.py` updates.
+- Report only verified GitHub branch, PR, or release state.

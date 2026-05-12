@@ -47,7 +47,11 @@ def cmd_validate(args):
         import shutil
         import struct
         import tempfile
-        from d2r_chargen.character import build_all_items
+        from d2r_chargen.character import (
+            build_all_items,
+            resolve_bound_demon_payload,
+            resolve_iron_golem_payload,
+        )
         from d2r_chargen.save import (
             set_character_stats, set_skills,
             rebuild_items, calc_checksum,
@@ -56,6 +60,8 @@ def cmd_validate(args):
         from d2r_chargen.scanner import scan_character_data
 
         all_items = build_all_items(char_def)
+        follower_payload = resolve_bound_demon_payload(char_def)
+        iron_golem_payload = resolve_iron_golem_payload(char_def)
         print(f"  {args.name}: built {len(all_items)} items")
 
         # Build a temp .d2s with these items for scanner validation
@@ -96,7 +102,13 @@ def cmd_validate(args):
 
             # Inject all items and run scanner
             item_bytes_list = [item_bytes for _, item_bytes in all_items]
-            result_data = rebuild_items(tmp_path, item_bytes_list, [])
+            result_data = rebuild_items(
+                tmp_path,
+                item_bytes_list,
+                [],
+                follower_payload=follower_payload,
+                iron_golem_payload=iron_golem_payload,
+            )
             with open(tmp_path, 'wb') as f:
                 f.write(result_data)
 

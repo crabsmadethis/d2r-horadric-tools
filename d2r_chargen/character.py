@@ -383,6 +383,33 @@ def validate_char_def(char_def):
         merc_level = merc.get('level', char_level)
         _warn_level_reqs(merc.get('equipment', []), merc_level, 'merc')
         _validate_merc_equipment(merc)
+    _warn_bound_demon_source_context(char_def)
+
+
+def _has_bound_demon_source_affixes(bound_demon_spec):
+    source_affixes = bound_demon_spec.get('source_affixes')
+    if source_affixes is None:
+        return False
+    if isinstance(source_affixes, str):
+        return any(part.strip() for part in source_affixes.split(','))
+    if isinstance(source_affixes, (list, tuple)):
+        return bool(source_affixes)
+    return True
+
+
+def _warn_bound_demon_source_context(char_def):
+    bound_demon_spec = char_def.get('bound_demon')
+    if not isinstance(bound_demon_spec, dict):
+        return
+    if not _has_bound_demon_source_affixes(bound_demon_spec):
+        return
+    print(
+        "  WARNING: bound_demon.source_affixes depend on compatible template "
+        "source context; inspect the template with "
+        "tools/d2s_demon_template_inspect.py and record validation in "
+        "docs/bound-demon-template-recipes.md before treating this recipe as "
+        "portable."
+    )
 
 
 def _warn_level_reqs(items, char_level, section):
@@ -1264,6 +1291,37 @@ def resolve_iron_golem_payload(char_def):
     return build_iron_golem_item(item_def)
 
 
+def resolve_bound_demon_payload(char_def):
+    """Resolve a YAML `bound_demon:` block to one 116-byte follower payload."""
+    bound_demon_spec = char_def.get('bound_demon')
+    if bound_demon_spec is None:
+        return None
+
+    # D2R can load borrowed follower blocks on other classes, but save/exit
+    # strips them. Keep normal chargen authoring on the Warlock-only path.
+    if char_def['class'] != 'warlock':
+        raise ValueError(
+            f"bound_demon: requires class=warlock, got {char_def['class']!r}"
+        )
+
+    effective_bind_level = _effective_bind_demon_level(char_def)
+    if isinstance(bound_demon_spec, dict) and 'effective_bind_level' in bound_demon_spec:
+        try:
+            effective_bind_level = int(bound_demon_spec['effective_bind_level'])
+        except (TypeError, ValueError):
+            effective_bind_level = 0
+    if effective_bind_level < 1:
+        raise ValueError(
+            f"bound_demon: requires effective Bind Demon skill >= 1, got {effective_bind_level}"
+        )
+
+    return resolve_bound_demon(
+        bound_demon_spec,
+        FIXTURES_DIR,
+        effective_bind_level=effective_bind_level,
+    )
+
+
 def deploy_character(char_name, phase=4, force=False):
     """Build and deploy a character from YAML definition.
 
@@ -1472,42 +1530,9 @@ def deploy_character(char_name, phase=4, force=False):
                     char_result.append(item_bytes)
         return char_result, merc_result
 
-    # Resolve bound_demon block (if any) once outside the phase loop —
-    # the payload is identical across phases, no need to re-read the
-    # fixture on each iteration. None means "fall back to preserve".
-    bound_demon_spec = char_def.get('bound_demon')
-    follower_payload = None
-    if bound_demon_spec is not None:
-        # Validate prerequisites before reading the fixture.
-        # 1. Class must be Warlock — D2R loads cross-class follower blocks
-        #    (Phase 0.4 finding) but only Warlocks can interact with Bind
-        #    Demon, and shipping a non-warlock with a borrowed demon block
-        #    is almost certainly a YAML mistake.
-        if char_def['class'] != 'warlock':
-            raise ValueError(
-                f"bound_demon: requires class=warlock, got {char_def['class']!r}"
-            )
-        # 2. Effective Bind Demon level must be >= 1. Hard points unlock
-        #    normal +skill bonuses; direct item skill grants can also make the
-        #    skill available. `bound_demon.effective_bind_level` may override
-        #    this value for player-authored saves that mirror an in-game state
-        #    chargen cannot infer, such as binding on weapon swap.
-        effective_bind_level = _effective_bind_demon_level(char_def)
-        if isinstance(bound_demon_spec, dict) and 'effective_bind_level' in bound_demon_spec:
-            try:
-                effective_bind_level = int(bound_demon_spec['effective_bind_level'])
-            except (TypeError, ValueError):
-                effective_bind_level = 0
-        if effective_bind_level < 1:
-            raise ValueError(
-                f"bound_demon: requires effective Bind Demon skill >= 1, got {effective_bind_level}"
-            )
-        follower_payload = resolve_bound_demon(
-            bound_demon_spec,
-            FIXTURES_DIR,
-            effective_bind_level=effective_bind_level,
-        )
-
+    # Resolve follower/golem payload blocks once outside the phase loop. The
+    # payloads are identical across phases; None means preserve or omit.
+    follower_payload = resolve_bound_demon_payload(char_def)
     iron_golem_payload = resolve_iron_golem_payload(char_def)
 
     try:

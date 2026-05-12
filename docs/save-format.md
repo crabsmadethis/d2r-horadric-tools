@@ -1,28 +1,22 @@
 ---
 status: compatibility-pointer
 canonical: docs/d2s_format.md
-last_updated: 2026-05-09
+last_updated: 2026-05-12
 ---
 
-# D2R `.d2s` Save Format Reference
+# D2R Save Format Reference
 
-`docs/d2s_format.md` is the authoritative public save-format reference for
-this repo.
+The canonical public `.d2s` format reference is
+[docs/d2s_format.md](d2s_format.md).
 
-This file is kept only for older links and agent prompts that still mention
-`docs/save-format.md`. Do not add new format knowledge here; update
-`docs/d2s_format.md` instead.
+This file remains for older links, search results, and agent prompts that still
+refer to `docs/save-format.md`. Do not add new binary-format notes here. Put
+format facts, writer invariants, open raw fields, and follower-payload details
+in `docs/d2s_format.md` instead.
 
-The former duplicate reference was retired because it overlapped with the
-canonical document and carried stale version, follower-tail, and merc-status
-wording. The current material that was still useful has been folded into
-`docs/d2s_format.md`, especially:
+Related public references:
 
-- item bit-order and item-record invariants
-- socketed sub-item counting rules
-- item property-list encoding rules
-- checksum and write invariants
-- current follower, bound-demon, merc-status, and Iron Golem findings
-
-For validation and live-save safety rules, also read `AGENTS.md`, `CLAUDE.md`,
-and the hub docs under `../docs/`.
+- [Manual save validation](manual-save-validation.md) for reusable local
+  scan/promote/save/scan workflows.
+- [Bound demon template recipes](bound-demon-template-recipes.md) for
+  template-derived bound-demon authoring.

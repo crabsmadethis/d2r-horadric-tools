@@ -5,36 +5,44 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform: Linux](https://img.shields.io/badge/platform-Linux%20%7C%20Steam%20Deck-orange.svg)](#platform-support)
 
-Horadric Tools is a Python toolkit for offline Diablo II: Resurrected modding
-and save-file workflows. It turns YAML into `.d2s` characters, builds data mods
-from declarative patches, inspects save files before you load them, and exposes
-the same tools through an MCP server for Claude Code, Codex, Cursor, and other
-agent clients.
+Horadric Tools is a Python toolkit for offline Diablo II: Resurrected save and
+data-mod workflows. It builds `.d2s` characters from YAML, scans save files
+before they are loaded, builds data mods from declarative patches, and exposes
+the same operations through an MCP server.
 
-The project is Linux / Steam Deck first, with Windows path detection included
-but not heavily tested. It does not ship Blizzard game data, private save files,
-or Battle.net automation.
+The repository is Linux / Steam Deck first. Windows path detection exists but
+needs more testing. The repo does not ship Blizzard game data, private save
+files, memory captures, or Battle.net automation.
 
-## What It Does
+## Toolkit Scope
 
-- Build offline `.d2s` characters from YAML.
-- Encode equipment, runewords, charms, stats, skills, merc gear, Iron Golems,
-  and experimental template-derived bound demons.
-- Scan saves for structural problems before you try them in game.
-- Extract local D2R data into generated Python lookup tables.
-- Build and deploy data mods from YAML overlays and JSON string patches.
-- Provide 23 MCP tools for game-data lookup, save inspection, chargen, and mod
-  pipeline automation.
+Horadric Tools provides:
 
-## What It Is Not
+- `d2r-chargen`: YAML-to-`.d2s` character generation, import, diff, validation,
+  and scanning.
+- `d2r-mod`: local data extraction, overlay builds, JSON string patches, CASC
+  deploy helpers, diffs, audits, and cleanup commands.
+- `d2r_mcp`: 23 MCP tools for lookup, save inspection, character generation,
+  and mod-pipeline automation.
+- Public diagnostics in `tools/` for corpus scans, follower payload inspection,
+  model-row comparison, and repo hygiene checks.
 
-- Not an online-play tool.
-- Not a trainer, bot, maphack, or memory editor.
-- Not a bundle of extracted D2R data.
-- Not a promise that every generated save is safe to load without scanning.
+Character generation currently covers equipment, runewords, charms, stats,
+skills, mercenary gear, Iron Golems, and experimental template-derived bound
+demons. Bound-demon template recipes are documented in
+[docs/bound-demon-template-recipes.md](docs/bound-demon-template-recipes.md);
+they keep source affixes separate from Bind Demon skill affixes and do not
+treat template-derived support as template-free synthesis.
 
-For save-file work, the core rule is simple: build or edit in staging, scan the
-result, then promote it only if validation passes.
+## Non-Goals
+
+- Online play, ladder play, or Battle.net automation.
+- Trainers, bots, maphacks, or live memory editors.
+- Committed extracted D2R data, raw save corpora, or machine-local fixtures.
+- Loading generated saves without first running the scanner.
+
+For `.d2s` work, the expected loop is: write to staging, recompute size and
+checksum, scan, then promote only scanner-clean output.
 
 ## Quickstart
 
@@ -72,12 +80,14 @@ d2r-chargen build ExamplePaladin --force
 d2r-chargen scan ExamplePaladin
 ```
 
+D2R caches saves at startup, so fully exit and relaunch the game after changing
+a local save file.
+
 ## Character YAML
 
-The public repo ships only curated example characters in `chars/`. Keep local,
-disposable, or validation-specific character drafts outside the tracked repo
-and point the tools at them with `D2R_CHARS=/path/to/chars`. A small character
-definition looks like:
+The tracked `chars/` directory contains curated examples only. Keep disposable
+or validation-specific character drafts outside the repo and point the tools at
+them with `D2R_CHARS=/path/to/chars`.
 
 ```yaml
 schema_version: 1
@@ -116,7 +126,8 @@ inventory:
           life: 40
 ```
 
-See [chars/ExamplePaladin.yaml](chars/ExamplePaladin.yaml) for a fuller example.
+See [chars/ExamplePaladin.yaml](chars/ExamplePaladin.yaml) for a fuller
+example.
 
 Supported class names:
 
@@ -144,6 +155,11 @@ d2r-chargen import <name> [--force]
 d2r-chargen diff <file1> <file2>
 ```
 
+`validate` checks YAML and binary encoding without writing a save, including
+bound-demon and Iron Golem payloads when the YAML requests them. `build` writes
+through the safety pipeline and should be followed by `scan` before the result
+is loaded in game.
+
 ### `d2r-mod`
 
 ```bash
@@ -157,6 +173,9 @@ d2r-mod audit [--skills] [--items]
 d2r-mod clean
 d2r-mod update
 ```
+
+Commands that read or write game data need a detected D2R install or an
+explicit `--game-dir` / `D2R_GAME_DIR`.
 
 ## Data Mod Overlays
 
@@ -194,19 +213,19 @@ entries:
     value: "Heart of the Mountain"
 ```
 
-After `d2r-mod build`, patched JSONs land in
+After `d2r-mod build`, patched JSON files are written to
 `build/data/local/lng/strings/`. D2R caches strings at startup, so fully exit
 and relaunch to see changes.
 
 ## MCP Server
 
-Horadric Tools ships an [MCP](https://modelcontextprotocol.io) server for agent
-clients. It exposes game-data lookups, save inspection, character generation,
-and mod pipeline commands as typed tools.
+Horadric Tools ships an [MCP](https://modelcontextprotocol.io) server with 23
+tools across lookup, save inspection, chargen, and mod-pipeline categories.
 
-Install the MCP SDK before launching the server:
+Install the package and the MCP SDK before launching the server:
 
 ```bash
+pip install -e .
 pip install mcp
 ```
 
@@ -236,34 +255,39 @@ Generic MCP config:
 }
 ```
 
-See [d2r_mcp/README.md](d2r_mcp/README.md) for the full tool catalog.
+See [d2r_mcp/README.md](d2r_mcp/README.md) for the full tool catalog and safety
+notes.
 
 ## Safety Model
 
 The save-file workflow is intentionally conservative:
 
-1. Start from an existing valid `.d2s` template where possible.
+1. Start from an existing valid `.d2s` template when possible.
 2. Write changes to a temp or staging file.
 3. Recompute size and checksum.
 4. Run `d2r-chargen scan <name>`.
 5. Promote only scanner-clean files.
 
-Scanner hard errors are treated as deployment blockers unless there is
-bit-level evidence that the scanner is wrong. The detailed save-format notes
-live in [docs/d2s_format.md](docs/d2s_format.md).
+Scanner hard errors are deployment blockers unless there is bit-level evidence
+that the scanner is wrong. Detailed save-format notes live in
+[docs/d2s_format.md](docs/d2s_format.md).
 
 ## Repository Map
 
 ```text
-d2r_chargen/    YAML character builder, save writer, scanner, import/diff tools
+d2r_chargen/    Character YAML parser, save writer, scanner, importer, diff
 d2r_mod/        Data extraction, overlays, CASC read/write, deploy pipeline
-d2r_mcp/        MCP server and tool definitions
-chars/          Example character YAML files
-examples/       Overlay examples
-docs/           Save-format notes and manual validation guidance
-tools/          Standalone diagnostics and hygiene checks
-plugin/         Optional Claude Code plugin commands and skills
+d2r_mcp/        MCP server, tool wrappers, response envelope, MCP docs
+chars/          Curated example character YAML
+examples/       Public overlay examples
+docs/           Save-format notes, validation docs, public research writeups
+tools/          Standalone diagnostics, corpus tools, hygiene checks
+plugin/         Optional Claude Code plugin commands
+tests/          Unit, MCP, scanner, mod-pipeline, and fixture-gated tests
 ```
+
+Generated data, build output, local evidence, and extracted game files should
+stay untracked.
 
 ## Platform Support
 
@@ -276,9 +300,9 @@ plugin/         Optional Claude Code plugin commands and skills
 ## Requirements
 
 - Python 3.11+
-- PyYAML
-- Diablo II: Resurrected for data extraction
-- MCP SDK for agent integration (`pip install mcp`)
+- PyYAML, installed by the package
+- Diablo II: Resurrected for data extraction and live game use
+- MCP SDK for MCP server use (`pip install mcp`)
 
 ## Contributing
 

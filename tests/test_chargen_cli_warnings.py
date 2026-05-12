@@ -9,6 +9,65 @@ pytest.importorskip("d2r_chargen.data.item_stat_cost",
 from d2r_chargen.character import validate_char_def
 
 
+def _base_warlock_char_def():
+    return {
+        'schema_version': 1,
+        'name': 'TestWarlock',
+        'class': 'warlock',
+        'level': 20,
+        'stats': {'strength': 10, 'dexterity': 10, 'vitality': 10, 'energy': 10},
+        'skills': {'Bind Demon': 1},
+        'equipment': [],
+    }
+
+
+def test_warn_bound_demon_source_affixes_need_template_context(capsys):
+    char_def = _base_warlock_char_def()
+    char_def['bound_demon'] = {
+        'template': 'black_lancer_example',
+        'source_affixes': ['Fanaticism', 'Cursed'],
+        'skill_affixes': 'auto',
+    }
+
+    validate_char_def(char_def)
+    captured = capsys.readouterr()
+    output = captured.err or captured.out
+
+    assert 'bound_demon.source_affixes' in output
+    assert 'compatible template source context' in output
+    assert 'tools/d2s_demon_template_inspect.py' in output
+    assert 'docs/bound-demon-template-recipes.md' in output
+
+
+def test_no_bound_demon_source_warning_without_source_affixes(capsys):
+    char_def = _base_warlock_char_def()
+    char_def['bound_demon'] = {
+        'template': 'black_lancer_example',
+        'skill_affixes': 'auto',
+    }
+
+    validate_char_def(char_def)
+    captured = capsys.readouterr()
+    output = captured.err or captured.out
+
+    assert 'bound_demon.source_affixes' not in output
+
+
+def test_no_bound_demon_source_warning_for_empty_source_affixes(capsys):
+    char_def = _base_warlock_char_def()
+    char_def['bound_demon'] = {
+        'template': 'black_lancer_example',
+        'source_affixes': [],
+        'skill_affixes': 'auto',
+    }
+
+    validate_char_def(char_def)
+    captured = capsys.readouterr()
+    output = captured.err or captured.out
+
+    assert 'bound_demon.source_affixes' not in output
+
+
 def test_warn_redundant_unique_properties_matches_canonical(capsys):
     """When a unique item's properties: block exactly matches canonical,
     chargen should warn that it's redundant."""
