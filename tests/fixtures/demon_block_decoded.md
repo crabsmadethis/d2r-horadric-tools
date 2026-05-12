@@ -19,13 +19,13 @@
 | +32..+43 | 12B | zeros | zeros | same | Reserved / padding block. |
 | +44 | u32 | 100           | 100           | same | Invariant — likely **HP percent** (full health ⇒ 100). Will probably change in a damaged-demon fixture (Phase 0.3). |
 | +48 | u32 | 100           | 100           | same | Invariant — paired with +44. **Mana/MP percent** OR max-HP-cap normalized to 100. |
-| +52 | u32 | 7             | 7             | same | **Bind Demon skill level** of the player at bind time. Matches user's lvl 7 in Bind Demon. |
+| +52 | u32 | 7             | 7             | same | **Persisted bind metadata**. Completed binds have repeatedly saved `7`; this is not the effective Bind Demon skill level. |
 | +56 | u32 | 2             | 2             | same | Invariant — possibly tier counter. |
 | +60 | u32 | 3             | 3             | same | Invariant — possibly affix-tier count (3 = Strong/Fast/Spectral active at this skill level). |
 | +64..+71 | 8B | zeros | `00 00 00 00 00 01 00 01` | diff | Bitfield — turned ON in B. Possibly affix-applied flags or champion-rolled flags. |
 | +72..+79 | 8B | zeros | `01 00 00 00 00 00 00 00` | diff | Bitfield — bit 0 of byte 0 set in B. Possibly status/state byte. |
-| +80..+84 | 5B | `1b 1e 05 1c 06` | `19 06 05 1b 1e` | diff | **Affix indices** (refer to MonUMod.txt). Both contain `5` (Strong), `1B` (Spectral Hit), `1E` (Aura Enchanted) — the par2/par3/par4/par5 mandatory affixes from Skills.txt:384. The 5th byte is the per-roll random affix: A=`1c` (28), B=`06` (Fast). Order is roll order, not declaration order. |
-| +85..+87 | 3B | zeros | zeros | same | Padding. |
+| +80..+86 | 7B | `1b 1e 05 1c 06 00 00` | `19 06 05 1b 1e 00 00` | diff | **Affix indices** (refer to MonUMod.txt). Both contain `5` (Strong), `1B` (Spectral Hit), `1E` (Aura Enchanted) — the par2/par3/par4/par5 mandatory affixes from Skills.txt:384. The 6th/7th bytes are extra MonUMod slots that are zero in these old fixtures. Order is roll order, not declaration order. |
+| +87 | 1B | zero | zero | same | Padding. |
 | +88 | u32 | 0xFED42200    | 0x03B8C400    | diff | Looks like a checksum or hash. Both have a non-zero high-entropy value. |
 | +92..+93 | 2B | `gf`         | `gf`         | same | Embedded payload data, not a section delimiter. Live 2026-05-08 rewrites kept the save ending immediately after the 116-byte demon payload, so decoders must not split on these bytes. |
 | +94 | u8  | 0x06          | 0x06          | same | Byte after `gf`. In vanilla D2 this is `has_golem` (0/1). Here it's 6 — **NOT a vanilla golem flag**. Could be a count, a follower-state byte, or a RotW-specific opcode. |
@@ -35,8 +35,8 @@
 
 - `+4 u16` → **monster_hcidx** (matches MonStats.txt row index)
 - `+6 u32` → **monster_seed** (4-byte LE random instance seed)
-- `+52 u32` → **bind_demon_level** (player's skill level at bind time)
-- `+80..+84` → **affix_indices** (5 bytes, MonUMod.txt indices)
+- `+52 u32` → **bind_demon_level** / persisted bind metadata (not effective skill level)
+- `+80..+86` → **affix_indices** (7 bytes, MonUMod.txt indices)
 - `+92..+93` → embedded ASCII `gf` payload bytes, not a structural marker
 
 ## Medium-confidence (need more fixtures)
@@ -58,6 +58,6 @@ The plan's Phase 3.1 (round-trip preserve) only needs to copy bytes verbatim —
 
 ## Cross-reference
 
-- Skills.txt:384 (Bind Demon) — par2..par5 affix indices: `(lvl>=5)?5:0`, `(lvl>=10)?6:0`, `(lvl>=15)?27:0`, `(lvl>=20)?30:0`. With the user at level 7, par2=5 (Strong) is active but par3..par5 should NOT be (lvl < 10/15/20). Yet bytes 0x1B (27) and 0x1E (30) appear in both fixtures. **Implication**: the par-table in Skills.txt may not directly map to bind-time affix selection — affixes may be skill-level-gated *and* random-rolled, with the par values acting as eligibility thresholds. Worth cross-referencing the actual roll engine if we ever do v2.
+- Skills.txt:384 (Bind Demon) — par2..par5 affix indices: `(lvl>=5)?5:0`, `(lvl>=10)?6:0`, `(lvl>=15)?27:0`, `(lvl>=20)?30:0`. Later natural-bind tests confirmed these threshold affixes derive from effective Bind Demon level, while payload `+52` remains bind metadata rather than the current effective level.
 - monpet.txt — `bindchancecalc` is fixture-irrelevant (only affects whether the bind succeeds, not what's stored).
 - MonUMod.txt — affix index → name mapping (Phase 1.3 builds the lookup table).

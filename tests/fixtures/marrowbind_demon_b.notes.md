@@ -6,9 +6,9 @@
 
 **Bound demon:** Fallen (per user — "I bound a fallen"). Decoded `monster_hcidx` at +4 = 20 = `fallen2` per `vanilla/data/global/excel/MonStats.txt` row 22.
 
-**Bind Demon skill level:** 7 (decoded at +52 of demon block)
+**Bind metadata:** 7 (decoded at +52 of demon block; later evidence shows this is not the effective Bind Demon skill level)
 
-**Affix indices (decoded at +80..+84):** `19 06 05 1b 1e` = 25 (?), 6 (Extra Fast), 5 (Extra Strong), 27 (Spectral Hit), 30 (Aura Enchanted)
+**Affix indices (decoded at +80..+86):** `19 06 05 1b 1e 00 00` = 25 (?), 6 (Extra Fast), 5 (Extra Strong), 27 (Spectral Hit), 30 (Aura Enchanted), none, none
 
 **Notes:**
 

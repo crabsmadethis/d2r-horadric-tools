@@ -34,7 +34,7 @@ except ImportError:
     RUNEWORDS = None
     _HAS_DATA = False
 from d2r_chargen.data.monumod_affixes import affix_name
-from d2r_chargen.follower_block import decode_follower_block
+from d2r_chargen.follower_block import DEMON_PAYLOAD_LEN, decode_follower_block
 from d2r_chargen.iron_golem import decode_iron_golem_block
 
 # ============================================================
@@ -55,6 +55,30 @@ STOR = {0:'equip',1:'inv',2:'belt',3:'?',4:'cube',5:'stash'}
 # ============================================================
 # Utility Functions
 # ============================================================
+def print_bound_demon_block(fb):
+    """Print bound-demon details when a complete follower payload is present."""
+    if not fb.has_follower:
+        return
+
+    print(f"  BOUND DEMON:")
+    if fb.payload_len != DEMON_PAYLOAD_LEN:
+        print(
+            f"    incomplete payload = {fb.payload_len}B "
+            f"(expected {DEMON_PAYLOAD_LEN}B)"
+        )
+        print(f"    raw_payload = {fb.payload.hex(' ')}")
+        return
+
+    print(f"    monster_hcidx = {fb.monster_hcidx}")
+    print(f"    monster_seed  = 0x{fb.monster_seed:08X}")
+    print(f"    bind_demon_lv = {fb.bind_demon_level}")
+    affix_names = [affix_name(b) for b in fb.affix_indices]
+    print(f"    affixes       = {', '.join(affix_names)}")
+    print(f"    raw_unknown_slices:")
+    for name, raw in fb.unknown_slices.items():
+        print(f"      {name} = {raw.hex(' ')}")
+
+
 def bits_at(data, sb, c):
     val=0
     for i in range(c):
@@ -910,16 +934,7 @@ def scan_characters(target, all_files, ghost_chars):
 
         # Bound-demon (warlock follower) block \u2014 Task 2.1
         fb = decode_follower_block(bytes(data))
-        if fb.has_follower:
-            print(f"  BOUND DEMON:")
-            print(f"    monster_hcidx = {fb.monster_hcidx}")
-            print(f"    monster_seed  = 0x{fb.monster_seed:08X}")
-            print(f"    bind_demon_lv = {fb.bind_demon_level}")
-            affix_names = [affix_name(b) for b in fb.affix_indices]
-            print(f"    affixes       = {', '.join(affix_names)}")
-            print(f"    raw_unknown_slices:")
-            for name, raw in fb.unknown_slices.items():
-                print(f"      {name} = {raw.hex(' ')}")
+        print_bound_demon_block(fb)
 
         # Encoding issues
         if wrong_ext:

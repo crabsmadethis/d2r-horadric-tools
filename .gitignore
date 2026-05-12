@@ -21,6 +21,10 @@ vanilla/
 build/
 .live-evidence/
 
+# Local/disposable character drafts belong outside the public example set.
+chars/*.yaml
+!chars/ExamplePaladin.yaml
+
 # Test/IDE
 .pytest_cache/
 .venv/

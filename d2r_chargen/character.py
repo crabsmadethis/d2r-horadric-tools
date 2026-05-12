@@ -13,8 +13,9 @@ from d2r_chargen.config import (
     SAVES, CHARS_DIR, FIXTURES_DIR, SLOT_MAP, CLASS_DEFS, CHARM_DIMS,
 )
 from d2r_chargen.resolve import (
-    resolve_property_name, resolve_skills, resolve_unique,
-    resolve_progression, resolve_bound_demon,
+    encode_skill_tab_param, resolve_properties, resolve_property_name,
+    resolve_runeword, resolve_skills, resolve_unique, resolve_progression,
+    resolve_bound_demon,
 )
 from d2r_chargen.items import (
     build_equipment_item, build_charm, build_merc_item, build_iron_golem_item,
@@ -61,6 +62,10 @@ _STASH_ROWS = 8
 
 _REQUIRED_FIELDS = ('name', 'class', 'level', 'stats', 'equipment')
 _REQUIRED_STATS = ('strength', 'dexterity', 'vitality', 'energy')
+
+_BIND_DEMON_SKILL_ID = 382
+_BIND_DEMON_SKILL_TAB = encode_skill_tab_param(21)
+_ACTIVE_SKILL_EQUIPMENT_EXCLUDES = {'switch_weapon', 'switch_shield'}
 
 
 def load_character_yaml(path):
@@ -747,6 +752,135 @@ def _expand_charms(charms):
     return expanded
 
 
+def _normalized_skill_key(name):
+    return str(name).lower().replace('_', ' ').replace(' ', '')
+
+
+def _hard_bind_demon_level(char_def):
+    for key, value in char_def.get('skills', {}).items():
+        if _normalized_skill_key(key) == 'binddemon':
+            try:
+                return int(value)
+            except (TypeError, ValueError):
+                return 0
+    return 0
+
+
+def _merge_bonus_properties(base_props, extra_props):
+    extra_stat_ids = {prop[0] for prop in extra_props}
+    merged = [prop for prop in base_props if prop[0] not in extra_stat_ids]
+    merged.extend(extra_props)
+    return merged
+
+
+def _item_skill_bonus_properties(item_def):
+    """Return resolved item properties relevant to skill bonus calculation."""
+    for charm_key in ('magic_small_charm', 'magic_large_charm', 'magic_grand_charm'):
+        charm_info = item_def.get(charm_key)
+        if isinstance(charm_info, dict):
+            return resolve_properties(charm_info.get('properties', {}))
+
+    base_props = []
+    has_canonical = False
+    if 'unique' in item_def:
+        base_props = resolve_unique(item_def['unique']).get('properties', [])
+        has_canonical = True
+    elif 'runeword' in item_def:
+        base_code = item_def.get('base')
+        if base_code:
+            base_props = resolve_runeword(
+                item_def['runeword'],
+                base_code,
+            ).get('properties', [])
+            has_canonical = True
+
+    if 'properties' in item_def:
+        user_props = resolve_properties(item_def['properties'])
+        if has_canonical:
+            return _merge_bonus_properties(base_props, user_props)
+        return user_props
+    if 'extra_properties' in item_def:
+        extra_props = resolve_properties(item_def['extra_properties'])
+        if has_canonical:
+            return _merge_bonus_properties(base_props, extra_props)
+        return extra_props
+    return base_props
+
+
+def _iter_player_skill_bonus_items(char_def):
+    for item_def in char_def.get('equipment', []) or []:
+        if not isinstance(item_def, dict):
+            continue
+        slot = item_def.get('slot')
+        if slot in _ACTIVE_SKILL_EQUIPMENT_EXCLUDES:
+            continue
+        yield item_def
+
+    inventory = char_def.get('inventory', {})
+    charms = inventory.get('charms', []) if isinstance(inventory, dict) else []
+    for charm_def in _expand_charms(charms):
+        if isinstance(charm_def, dict):
+            yield charm_def
+
+
+def _bind_demon_item_skill_bonuses(char_def):
+    all_class_tab_bonus = 0
+    specific_bonus = 0
+    warlock_class_id = CLASS_DEFS['warlock']['id']
+    stat_all_skills = STAT_BY_NAME['item_allskills']
+    stat_class_skills = STAT_BY_NAME['item_addclassskills']
+    stat_skill_tab = STAT_BY_NAME['item_addskill_tab']
+    stat_nonclass_skill = STAT_BY_NAME['item_nonclassskill']
+    stat_single_skill = STAT_BY_NAME.get('item_singleskill')
+
+    for item_def in _iter_player_skill_bonus_items(char_def):
+        for prop in _item_skill_bonus_properties(item_def):
+            if len(prop) < 2:
+                continue
+            stat_id = prop[0]
+            param = prop[2] if len(prop) >= 3 else None
+            if stat_id not in (
+                stat_all_skills,
+                stat_class_skills,
+                stat_skill_tab,
+                stat_nonclass_skill,
+                stat_single_skill,
+            ):
+                continue
+            value = int(prop[1])
+            if stat_id == stat_all_skills:
+                all_class_tab_bonus += value
+            elif (
+                stat_id == stat_class_skills
+                and param is not None
+                and int(param) == warlock_class_id
+            ):
+                all_class_tab_bonus += value
+            elif (
+                stat_id == stat_skill_tab
+                and param is not None
+                and int(param) == _BIND_DEMON_SKILL_TAB
+            ):
+                all_class_tab_bonus += value
+            elif (
+                stat_id in (stat_nonclass_skill, stat_single_skill)
+                and param is not None
+                and int(param) == _BIND_DEMON_SKILL_ID
+            ):
+                specific_bonus += value
+
+    return all_class_tab_bonus, specific_bonus
+
+
+def _effective_bind_demon_level(char_def):
+    """Return hard Bind Demon level plus active player-carried item bonuses."""
+    hard_level = _hard_bind_demon_level(char_def)
+    general_bonus, specific_bonus = _bind_demon_item_skill_bonuses(char_def)
+    if hard_level <= 0:
+        return specific_bonus
+    return hard_level + general_bonus + specific_bonus
+
+
 def _calculate_charm_positions(charms):
     """Calculate inventory grid positions for a list of charms.
 
@@ -1093,11 +1227,6 @@ def build_all_items(char_def):
         if bw.has_warnings():
             bw.dump()
 
-
-def _normalized_skill_key(name):
-    return str(name).lower().replace('_', ' ').replace(' ', '')
-
-
 def resolve_iron_golem_payload(char_def):
     """Resolve a YAML `iron_golem:` block to one JM-less item payload.
 
@@ -1358,22 +1487,26 @@ def deploy_character(char_name, phase=4, force=False):
             raise ValueError(
                 f"bound_demon: requires class=warlock, got {char_def['class']!r}"
             )
-        # 2. Bind Demon skill level must be >= 1. YAML uses the canonical
-        #    skill name 'Bind Demon' (matching _SKILL_NAME_TO_ID); accept
-        #    common case variants for friendliness. A character without
-        #    the skill can't bind a demon in-game, so pre-loading one is
-        #    meaningless (and probably a copy-paste bug).
-        skills = char_def.get('skills', {})
-        bind_demon_lvl = 0
-        for k, v in skills.items():
-            if k.lower().replace('_', ' ') == 'bind demon':
-                bind_demon_lvl = v
-                break
-        if bind_demon_lvl < 1:
+        # 2. Effective Bind Demon level must be >= 1. Hard points unlock
+        #    normal +skill bonuses; direct item skill grants can also make the
+        #    skill available. `bound_demon.effective_bind_level` may override
+        #    this value for player-authored saves that mirror an in-game state
+        #    chargen cannot infer, such as binding on weapon swap.
+        effective_bind_level = _effective_bind_demon_level(char_def)
+        if isinstance(bound_demon_spec, dict) and 'effective_bind_level' in bound_demon_spec:
+            try:
+                effective_bind_level = int(bound_demon_spec['effective_bind_level'])
+            except (TypeError, ValueError):
+                effective_bind_level = 0
+        if effective_bind_level < 1:
             raise ValueError(
-                f"bound_demon: requires Bind Demon skill >= 1, got {bind_demon_lvl}"
+                f"bound_demon: requires effective Bind Demon skill >= 1, got {effective_bind_level}"
             )
-        follower_payload = resolve_bound_demon(bound_demon_spec, FIXTURES_DIR)
+        follower_payload = resolve_bound_demon(
+            bound_demon_spec,
+            FIXTURES_DIR,
+            effective_bind_level=effective_bind_level,
+        )
 
     iron_golem_payload = resolve_iron_golem_payload(char_def)
 

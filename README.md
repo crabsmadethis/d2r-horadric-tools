@@ -74,7 +74,10 @@ d2r-chargen scan ExamplePaladin
 
 ## Character YAML
 
-Characters live in `chars/*.yaml`. A small character definition looks like:
+The public repo ships only curated example characters in `chars/`. Keep local,
+disposable, or validation-specific character drafts outside the tracked repo
+and point the tools at them with `D2R_CHARS=/path/to/chars`. A small character
+definition looks like:
 
 ```yaml
 schema_version: 1

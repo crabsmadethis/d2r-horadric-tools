@@ -1,7 +1,7 @@
 # D2R `.d2s` Save File Format
 
-> **Status:** canonical public save-format reference. Last updated 2026-05-09;
-> includes public-safe live findings from 2026-05-08. Cross-reference for
+> **Status:** canonical public save-format reference. Last updated 2026-05-12;
+> includes public-safe live findings through 2026-05-12. Cross-reference for
 > `d2r_chargen/` parsers + writers. Compatibility links may still point to
 > `docs/save-format.md`, but new format knowledge belongs here.
 >
@@ -282,10 +282,10 @@ High-confidence fields parsed by `d2r_chargen/follower_block.py`:
 | Offset (rel) | Size | Field             | Notes |
 |--------------|------|-------------------|-------|
 | `+0`         | u16  | section/follower-kind tag | invariant `0x0018` across binds; likely "bound demon" type marker |
-| `+4`         | u16  | `monster_hcidx`   | MonStats.txt row index (e.g. `20` = `fallen2`) |
+| `+4`         | u16  | `monster_hcidx`   | zero-based MonStats.txt row index (e.g. `20` = `fallen2`); not the separate MonStats `*hcIdx` column |
 | `+6`         | u32  | `monster_seed`    | random instance seed; rerolls every bind |
 | `+52`        | u32  | `bind_demon_level`| persisted bind metadata; not the effective Bind Demon skill level |
-| `+80..+84`   | 5B   | `affix_indices`   | MonUMod.txt indices, raw bytes (NOT a u32) |
+| `+80..+86`   | 7B   | `affix_indices`   | MonUMod.txt indices, raw bytes (NOT a u32) |
 | `+92..+93`   | 2B   | ASCII `gf`        | **DATA, not a section marker.** Same byte position in both fixtures. The decoder must use a fixed 116B length, not a `gf`-terminated slice. |
 
 Per-byte decode of all 116 bytes (including medium and
@@ -302,13 +302,165 @@ Repeated reload/save checks show that payload bytes `+89..+91` are volatile.
 They can change to or from `00 00 00`, so zero is not a canonical endpoint.
 High-confidence identity fields persisted across the same checks.
 
-A high-property capture showed visible properties that were not all present in
-the five decoded MonUMod bytes at `+80..+84`. That means some visible
-properties are monster-specific, stored in other payload bytes, or omitted from
-the persisted bound-demon affix list.
+Same-model one-slice mutation tests on a bound Fallen kept the demon visible
+and preserved `follower_count=1` after save/exit. In that case D2R rewrote a
+zeroed `+89..+91` volatile slice, preserved a donor variant in `+64..+79`, and
+accepted a donor `+95..+115` post-`gf` tail while rewriting `+96/+97` and
+preserving donor `+101/+102`. Treat these as Fallen same-model evidence, not
+global synthesis rules.
+
+Further same-model Fallen probes showed D2R can rewrite zeroed `+24..+31` to
+`00 00 00 00 01 00 00 00`, preserve a nonzero `+44..+51` pattern, and
+canonicalize `+88` back to `00`. Changing `+94` from `06` to `00` is unsafe for
+the current fixed-length bound-demon parser: the character joined once, but
+save/exit changed the follower-kind tag and wrote a 121-byte post-`lf` payload
+shape. Keep `+94 == 06` for known 116-byte bound-demon payloads.
+
+Zeroing the whole `+64..+79` bitfield slice was accepted and preserved for a
+same-model Fallen. Zeroing the entire `+95..+115` post-`gf` tail froze or
+failed during join, so that tail is not discardable as a whole and must be
+split into smaller fields before synthesis.
+
+Narrower same-model Fallen tail probes showed `+96/+97`,
+`+104/+105/+106`, and `+109/+111/+112` can be zeroed before load and D2R will
+rewrite them to canonical bytes on save/exit. Zeroing `+101/+102` is unsafe
+even though it can look normal in-game: save/exit wrote `follower_count=1` with
+only 106 payload bytes. Zeroing the final `+114/+115` pair froze during join,
+and zeroing only `+115` while preserving `+114 == f0` also froze during join.
+Zeroing only `+114` while preserving `+115 == 1f` loaded without a visible
+demon and saved back as `follower_count=0` with no payload. Treat the final
+`+114/+115` bytes as a fixed `f0 1f` terminator in same-model Fallen payloads
+until a future original capture proves a broader rule.
+
+A natural over-cap capture showed the persisted MonUMod vector is seven bytes
+at `+80..+86`, not five bytes at `+80..+84`. The first five bytes are the
+common primary slots, while `+85/+86` can carry overflow affixes such as
+Spectral Hit and Aura Enchanted. Visible source-affix activation can still
+depend on compatible context bytes such as `+64..+79`, so the seven-byte tuple
+is necessary but not the whole visible-property system.
+
+Same-family Fallen model-swap probes show that `monster_hcidx` alone is not a
+complete model identity. Changing only `monster_hcidx` from `20` to `19`
+produced a visible demon during live play but saved back as `follower_count=0`
+with no payload. Changing only `monster_hcidx` from `20` to `21` preserved a
+valid 116-byte payload after save/exit but did not show a visible demon. Future
+model generation needs original captures or decoded model-specific companion
+fields, not just a hcIdx edit.
+
+For the first Fallen-family comparison (`19` Fallen, `20` Carver, `21`
+Devilkin), selected MonStats2 body and animation fields were identical aside
+from row id, while MonStats differed across transform level, AI params, speed,
+levels, HP/damage/to-hit/block, and elemental flavor. This does not prove the
+companion bytes yet, but it makes MonStats-derived state the stronger next
+hypothesis than MonStats2 body-component data for these three variants.
+
+Corpus stratification can now report `model_candidate_offsets`: bytes that are
+fixed within each `monster_hcidx` group and differ across model groups after
+excluding known high-confidence fields. An earlier clean Fallen (`20`) versus
+Council Member (`347`) comparison flagged `+85/+86`, but the seven-slot decode
+reclassifies those as affix overflow slots. The remaining candidate companion
+offsets from that comparison are `+24`, `+28`, `+95`, `+100`, `+103`, `+105`,
+`+110`, `+111`, and `+112`. These are hypothesis bytes only; a generated model
+still needs live load/save proof before they become writer semantics.
+
+The first Council Member-style model-companion probe was live-positive: it
+joined with a visible Council-style demon and saved back with
+`follower_count=1`, a 116-byte payload, and `monster_hcidx=347`. The post-save
+payload preserved `+24`, `+28`, `+100`, `+103`, `+105`, `+110`, `+111`, and
+`+112`. D2R rewrote the monster seed, volatile bytes, affix-overflow bytes
+`+85/+86`, `+95`, and `+97`, so those bytes should not be treated as required
+stable model-companion authoring fields from that probe alone.
+
+A second reduced Council Member-style probe copied only the preserved candidate
+offsets (`+24`, `+28`, `+100`, `+103`, `+105`, `+110`, `+111`, `+112`). It also
+joined with a visible Council-style demon and saved back with
+`follower_count=1`, a 116-byte payload, and `monster_hcidx=347`. D2R again
+canonicalized seed, volatile bytes, `+95`, and `+97`, while preserving the
+reduced copied set. This proves the earlier rewritten candidates are not needed
+for this target, but it still does not prove whether all eight preserved bytes
+are required.
+
+The next reduction showed that, for Council Member target `347`, even those
+eight bytes are not required: hcIdx-only, stats-only (`+24/+28`), and tail-only
+(`+100/+103/+105/+110/+111/+112`) variants all joined visibly and saved back
+with `follower_count=1`, 116-byte payloads, and `monster_hcidx=347`. The
+hcIdx-only save retained the original Fallen unknown slices aside from normal
+seed and volatile rewrites. Treat this as target-specific confidence, not proof
+that every monster identity is hcIdx-only safe.
+
+The Black Lancer follow-up exposed an important lookup rule: payload
+`monster_hcidx` is the zero-based MonStats row index, not the MonStats `*hcIdx`
+column. A probe using payload value `723` loaded and saved cleanly but produced
+`cr_archer8` / DarkArcher because row index `723` is that archer row. The
+corresponding Black Lancer row for `cr_lancer9` is payload value `724`; tools
+that compare monster rows must select by row index.
+
+The corrected Black Lancer row-index probe (`monster_hcidx=724`) was
+live-positive: it joined as a monster named Black Lancer and saved back with
+`follower_count=1`, a 116-byte payload, empty affixes, and `monster_hcidx=724`.
+This is target-specific proof that `cr_lancer9` can be generated from the
+current clean Fallen shell with hcIdx-only editing.
+
+A direct Black Lancer affix-package edit on the level-1 generated shell loaded
+with a visible demon but no visible affixes. On save/exit, D2R preserved the
+Black Lancer payload but rewrote the authored MonUMod bytes from
+`25 07 1c 05 06 00 00` (Fanaticism, Cursed, Stone Skin, Extra Strong,
+Extra Fast, none, none) to all zeroes. Direct source-affix bytes need more than
+a bare level-1 generated shell for this target.
+
+The natural hard Bind Demon 20 shell fixed that missing context for
+skill-granted affixes. A probe changed only the model to Black Lancer row
+`724` while preserving natural affix bytes `05 06 1b 1e 00 00 00`, and D2R
+displayed Extra Strong, Extra Fast, Spectral Hit, and Aura Enchanted.
+Save/exit preserved `monster_hcidx=724`, the 116-byte payload, and those affix
+bytes.
+
+The same natural skill-affix shell did not make arbitrary source-style affixes
+visible by byte replacement alone. A follow-up changed the MonUMod vector to
+`25 07 1c 05 06 00 00` (Fanaticism, Cursed, Stone Skin, Extra Strong,
+Extra Fast, none, none). The save joined and preserved those bytes after
+save/exit, but Fanaticism, Cursed, and Stone Skin were not visible to the
+tester. This separates byte persistence from visible affix activation and
+suggests source-affix context lives outside `+80..+86`.
+
+Copying the natural source-affix `+64..+79` bitfield context into that Black
+Lancer shell activated normal source-style affixes. A control with natural
+Cursed, Lightning, Cold Enchanted, Extra Strong, and Extra Fast displayed those
+labels on Black Lancer. A second control with Fanaticism, Cursed, Stone Skin,
+Extra Strong, and Extra Fast displayed Cursed, Stone Skin, Extra Strong, and
+Extra Fast, but not Fanaticism. Copying the natural post-`gf` tail in addition
+to the bitfield did not change the visible result. This makes
+`bitfields_64_79` the current source-affix activation context for normal
+unique-style labels.
+
+A targeted aura-context batch then separated the aura switch from the aura
+flavor. A Black Lancer with Aura Enchanted plus normal source-style labels did
+not show an Aura Enchanted label to the tester. A Black Lancer with both
+Fanaticism (`0x25`) and Aura Enchanted (`0x1e`) did show Aura Enchanted with
+Fanaticism, plus Stone Skin, Extra Strong, and Extra Fast. A champion-style
+bitfield borrowed from a Ghostly capture did not change the nameplate color for
+the tested bound demon. All three saves preserved their authored affix bytes
+after save/exit. Treat Fanaticism as a separate source/aura-flavor input that
+needs Aura Enchanted to expose the visible aura path, not as a Bind Demon
+threshold affix by itself.
+
+The final Black Lancer tradeoff batch confirmed that this two-byte aura path
+composes cleanly with three more visible labels. `lankil` displayed
+Fanaticism/Aura Enchanted, Cursed, Stone Skin, and Extra Strong; `lanspd`
+displayed Fanaticism/Aura Enchanted, Cursed, Stone Skin, and Extra Fast; and
+`lanwar` displayed Fanaticism/Aura Enchanted, Cursed, Extra Strong, and Extra
+Fast. All three saved back with `follower_count=1`, `monster_hcidx=724`, a
+116-byte payload, the authored affix tuple preserved, and only the known
+volatile `+89..+91` runtime slice changed.
+
+The generated seven-slot Black Lancer package was live-positive too. The tester
+reported a Black Lancer named Pit Poison with Fanaticism/Aura Enchanted,
+Cursed, Stone Skin, Extra Strong, Extra Fast, and Spectral Hit; the Fanaticism
+aura was active. Save/exit preserved the follower payload exactly, with
+`monster_hcidx=724` and affix bytes `25 1e 07 1c 05 06 1b`.
 
 Targeted template-derived edits to high-confidence fields are accepted and
-preserved: zeroing the five MonUMod bytes removes visible extra affixes,
+preserved: zeroing the MonUMod affix vector removes visible extra affixes,
 changing `monster_hcidx` can change the visible model, and changing
 `bind_demon_level` persists, but natural live binds at hard skill levels 1, 5,
 10, and 20 all saved this field as `7`; do not treat it as the effective skill
@@ -318,9 +470,15 @@ Enchanted byte `03` can persist without necessarily displaying as a Lightning
 Enchanted label for the tested bound demon.
 
 Experimental chargen support now allows template-derived overrides for
-`monster_hcidx`, `monster_seed`, `bind_level` / `bind_demon_level`, and up to
-five MonUMod affixes. This is not full synthesis: the unknown runtime slices
-still come from a live template payload.
+`monster_hcidx`, `monster_seed`, `bind_level` / `bind_demon_level`, and the
+seven MonUMod affix bytes. Player-facing YAML should prefer `source_affixes`
+plus `skill_affixes: auto`; the latter derives Extra Strong, Extra Fast,
+Spectral Hit, and Aura Enchanted from effective Bind Demon level instead of
+payload `+52`. `template_path` can point at a local `.d2s` template kept
+outside tracked public fixtures. When Fanaticism and Aura Enchanted are both
+requested through the player-facing composer, chargen keeps them adjacent as
+`Fanaticism, Aura Enchanted`. This is not full synthesis: the unknown runtime
+slices still come from a live template payload.
 
 ### Cross-class behavior
 
@@ -551,18 +709,28 @@ public-safe fixture or manual validation gives bit-level evidence for a narrower
 meaning.
 
 1. **Demon payload `+24..+31`** — runtime stats vs monster-derived
-   constants is still undecoded. A damaged-demon fixture may distinguish
-   current HP from monster-base data. See `demon_block_decoded.md` open
-   questions section.
+   constants is still undecoded. Same-model Fallen mutation accepted zeroes
+   and rewrote the second u32 to `1`, but the field meaning is still raw. A
+   damaged-demon fixture may distinguish current HP from monster-base data.
 2. **Demon payload `+64..+79` bitfields** — what triggers them? Champion
-   roll, paragon, affix-application stage? Both fixtures differ in
-   these bytes despite both being lvl-7 fallen-class binds.
+   roll, paragon, affix-application stage? Same-model Fallen mutation can
+   preserve donor and zeroed variants, but cross-model meaning is still
+   unknown.
 3. **Demon payload `+88..+91`** — volatile/runtime-like bytes. Multiple
-   2026-05-08 no-combat reloads changed `+89..+91`; whether the four-byte
-   range is a checksum, hash, seed, or independent runtime data is unknown.
-4. **Demon payload `+95..+115`** — variable data after the embedded `gf`
-   payload bytes. The embedded `gf` at `+92..+93` is confirmed payload data,
-   not a structural marker; the meaning of `+95..+115` is still raw.
+   2026-05-08 no-combat reloads changed `+89..+91`; same-model mutation also
+   rewrote zeroed `+89..+91` bytes on save/exit. A same-model probe rewrote
+   `+88` from `ff` to `00`.
+4. **Demon payload `+94..+115`** — variable data around and after the embedded
+   `gf` payload bytes. The embedded `gf` at `+92..+93` is confirmed payload
+   data, not a structural marker. Same-model mutation rewrote `+96/+97` while
+   preserving donor `+101/+102`; later live tests showed zeroing `+101/+102`
+   can create an invalid 106-byte follower payload on save/exit. This region
+   needs smaller subfields.
+   The `+94` byte appears structural for known 116-byte payloads and should be
+   preserved as `06` until a variable-length follower record is decoded. Fully
+   zeroing `+95..+115` blocks live join; narrower tests show the final
+   `+114/+115` bytes should be preserved as `f0 1f` for same-model Fallen
+   payloads.
 5. **NPC introduction region** — the bytes between the `WS`
    waypoint section and the `gf` stats marker have not been decoded.
    chargen does not edit them; `validate_template` does not check
