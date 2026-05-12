@@ -29,9 +29,10 @@ EXPECTED_TAIL_BRIDGE = b'\x01\x00'  # bytes immediately before trailing `lf`
 # omitted — silently-wrong parsers are worse than missing parsers.
 _OFF_MONSTER_HCIDX = 4   # u16 LE — MonStats.txt row index
 _OFF_MONSTER_SEED = 6    # u32 LE — random instance seed
-_OFF_BIND_DEMON_LEVEL = 52  # u32 LE — Bind Demon skill level at bind time
-_OFF_AFFIX_INDICES = 80  # 5 raw bytes — MonUMod.txt indices (NOT a u32)
-_AFFIX_LEN = 5
+_OFF_BIND_DEMON_LEVEL = 52  # u32 LE — persisted bind metadata, not effective skill level
+_OFF_AFFIX_INDICES = 80  # 7 raw bytes — MonUMod.txt indices (NOT a u32)
+_AFFIX_PRIMARY_LEN = 5
+_AFFIX_LEN = 7
 
 # Raw slices that are useful for live research but not yet safe to interpret as
 # writer inputs. Names are intentionally cautious: these bytes are evidence, not
@@ -128,11 +129,13 @@ def mutate_demon_payload(
         struct.pack_into('<I', out, _OFF_BIND_DEMON_LEVEL, bind_level)
 
     if affix_indices is not None:
-        if len(affix_indices) != _AFFIX_LEN:
+        if len(affix_indices) not in (_AFFIX_PRIMARY_LEN, _AFFIX_LEN):
             raise ValueError(
-                f'affix_indices must be {_AFFIX_LEN} bytes, got {len(affix_indices)}'
+                f'affix_indices must be {_AFFIX_PRIMARY_LEN} or {_AFFIX_LEN} '
+                f'bytes, got {len(affix_indices)}'
             )
-        out[_OFF_AFFIX_INDICES:_OFF_AFFIX_INDICES + _AFFIX_LEN] = affix_indices
+        end = _OFF_AFFIX_INDICES + len(affix_indices)
+        out[_OFF_AFFIX_INDICES:end] = affix_indices
 
     if zero_volatile:
         out[89:92] = b'\x00\x00\x00'

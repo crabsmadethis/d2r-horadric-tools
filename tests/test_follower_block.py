@@ -98,7 +98,7 @@ def test_parse_demon_payload_fixture_a():
     assert parsed.monster_hcidx == 42
     assert parsed.monster_seed == 0x000A5BDA
     assert parsed.bind_demon_level == 7
-    assert parsed.affix_indices == bytes([27, 30, 5, 28, 6])
+    assert parsed.affix_indices == bytes([27, 30, 5, 28, 6, 0, 0])
 
 
 def test_parse_demon_payload_fixture_b():
@@ -116,7 +116,7 @@ def test_parse_demon_payload_fixture_b():
     assert parsed.monster_hcidx == 20
     assert parsed.monster_seed == 0x0018281B
     assert parsed.bind_demon_level == 7
-    assert parsed.affix_indices == bytes([25, 6, 5, 27, 30])
+    assert parsed.affix_indices == bytes([25, 6, 5, 27, 30, 0, 0])
 
 
 def test_demon_payload_unknown_slices_fixture_b():
@@ -143,7 +143,7 @@ def test_followerblock_exposes_demon_fields_from_save():
     assert block.monster_hcidx == 20
     assert block.monster_seed == 0x0018281B  # see test_parse_demon_payload_fixture_b
     assert block.bind_demon_level == 7
-    assert block.affix_indices == bytes([25, 6, 5, 27, 30])
+    assert block.affix_indices == bytes([25, 6, 5, 27, 30, 0, 0])
     assert block.unknown_slices['volatile_runtime_89_91'] == block.payload[89:92]
 
 

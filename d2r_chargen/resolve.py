@@ -460,16 +460,27 @@ _DEMON_AFFIX_ALIASES = {
     'fire': 9,
     'cursed': 7,
     'lightning enchanted': 3,
-    'lightning': 3,
+    'lightning': 17,
     'cold enchanted': 18,
     'cold': 18,
     'stone skin': 28,
     'stone': 28,
+    'fanaticism': 37,
+    'fanat': 37,
     'teleportation': 26,
     'teleport': 26,
     'multiple shots': 29,
     'multishot': 29,
 }
+
+_BIND_DEMON_SKILL_AFFIX_THRESHOLDS = (
+    (5, 5),    # Extra Strong
+    (10, 6),   # Extra Fast
+    (15, 27),  # Spectral Hit
+    (20, 30),  # Aura Enchanted
+)
+
+_DEMON_AFFIX_SLOT_COUNT = 7
 
 
 def _parse_int_token(value, field_name):
@@ -501,27 +512,124 @@ def _parse_demon_affix(value):
     return idx
 
 
-def _resolve_demon_affixes(value):
+def _resolve_demon_affix_list(value, field_name):
     if value is None:
-        return None
+        return []
     if isinstance(value, str):
         raw_values = [part.strip() for part in value.split(',') if part.strip()]
     elif isinstance(value, (list, tuple)):
         raw_values = list(value)
     else:
-        raise ValueError('bound_demon.affixes must be a list or comma string')
-    if len(raw_values) > 5:
-        raise ValueError('bound_demon.affixes supports at most 5 entries')
-    resolved = [_parse_demon_affix(item) for item in raw_values]
-    resolved.extend([0] * (5 - len(resolved)))
+        raise ValueError(
+            f'bound_demon.{field_name} must be a list or comma string'
+        )
+    if len(raw_values) > _DEMON_AFFIX_SLOT_COUNT:
+        raise ValueError(
+            f'bound_demon.{field_name} supports at most '
+            f'{_DEMON_AFFIX_SLOT_COUNT} entries'
+        )
+    return [_parse_demon_affix(item) for item in raw_values]
+
+
+def _resolve_demon_affixes(value):
+    if value is None:
+        return None
+    resolved = _resolve_demon_affix_list(value, 'affixes')
+    resolved.extend([0] * (_DEMON_AFFIX_SLOT_COUNT - len(resolved)))
     return bytes(resolved)
 
 
-def resolve_bound_demon(spec, fixtures_dir):
+def bind_demon_skill_affixes(effective_bind_level):
+    """Return Bind Demon threshold affix ids for an effective skill level."""
+    level = _parse_int_token(effective_bind_level, 'effective_bind_level')
+    if level < 0:
+        raise ValueError(f'effective_bind_level must be >= 0, got {level}')
+    return [
+        affix_id
+        for threshold, affix_id in _BIND_DEMON_SKILL_AFFIX_THRESHOLDS
+        if level >= threshold
+    ]
+
+
+def _resolve_skill_affix_spec(value, effective_bind_level):
+    if value is None or value is False:
+        return []
+    if value is True:
+        if effective_bind_level is None:
+            raise ValueError(
+                'bound_demon.skill_affixes=auto requires effective Bind Demon level'
+            )
+        return bind_demon_skill_affixes(effective_bind_level)
+    if isinstance(value, str):
+        normalized = value.lower().replace('_', ' ').replace('-', ' ')
+        normalized = ' '.join(normalized.split())
+        if normalized in ('auto', 'effective', 'skill', 'skill level', 'derived'):
+            if effective_bind_level is None:
+                raise ValueError(
+                    'bound_demon.skill_affixes=auto requires effective Bind Demon level'
+                )
+            return bind_demon_skill_affixes(effective_bind_level)
+        if normalized in ('', 'none', 'no', 'false', 'off'):
+            return []
+    return _resolve_demon_affix_list(value, 'skill_affixes')
+
+
+def _compose_demon_affixes(source_affixes, skill_affixes):
+    resolved = []
+    for idx in list(source_affixes) + list(skill_affixes):
+        if idx == 0 or idx in resolved:
+            continue
+        resolved.append(idx)
+    if 37 in resolved and 30 in resolved:
+        resolved = [37, 30] + [
+            idx for idx in resolved
+            if idx not in (37, 30)
+        ]
+    if len(resolved) > _DEMON_AFFIX_SLOT_COUNT:
+        raise ValueError(
+            'bound_demon source_affixes plus skill_affixes produce '
+            f'{len(resolved)} entries; demon payload supports at most '
+            f'{_DEMON_AFFIX_SLOT_COUNT}'
+        )
+    resolved.extend([0] * (_DEMON_AFFIX_SLOT_COUNT - len(resolved)))
+    return bytes(resolved)
+
+
+def _resolve_bound_demon_template_path(spec, fixtures_dir):
+    """Return the local .d2s template path for a bound_demon spec."""
+    from pathlib import Path
+
+    if not isinstance(spec, dict):
+        raise ValueError(
+            "bound_demon must specify 'template' or 'template_path'"
+        )
+
+    template = spec.get('template')
+    template_path = spec.get('template_path')
+    if template and template_path:
+        raise ValueError(
+            "bound_demon must not specify both 'template' and 'template_path'"
+        )
+    if template_path:
+        path = Path(template_path).expanduser()
+        if not path.is_absolute():
+            path = Path.cwd() / path
+        return path, str(template_path)
+    if template:
+        return Path(fixtures_dir) / f'{template}.d2s', str(template)
+    raise ValueError(
+        "bound_demon must specify 'template' (fixture name without .d2s) "
+        "or 'template_path' (local .d2s path)"
+    )
+
+
+def resolve_bound_demon(spec, fixtures_dir, *, effective_bind_level=None):
     """Resolve a YAML `bound_demon:` block to its 116-byte demon payload.
 
     The safe baseline is `template: NAME`, which extracts the demon payload
     verbatim from `<fixtures_dir>/NAME.d2s` via decode_follower_block.
+    For local/private templates, `template_path: PATH` may point at a .d2s
+    outside the tracked fixtures directory.
 
     Experimental template-derived overrides may change fields that have live
     evidence behind them:
@@ -529,12 +637,18 @@ def resolve_bound_demon(spec, fixtures_dir):
       - monster_hcidx: u16 at +4
       - monster_seed: u32 at +6
       - bind_level / bind_demon_level: u32 at +52
-      - affixes: up to five MonUMod entries at +80..+84, padded with zeroes
+      - affixes / raw_affixes: exact MonUMod entries at +80..+86
+      - source_affixes + skill_affixes: player-facing composition where
+        source monster affixes are followed by skill-granted Bind Demon
+        threshold affixes derived from effective_bind_level
 
     Args:
         spec: The dict under `bound_demon:` in the char YAML.
-            Must include a `template` key naming a fixture (without .d2s).
+            Must include either a `template` key naming a fixture (without
+            .d2s) or `template_path` pointing at a local .d2s.
         fixtures_dir: Path to the directory holding template .d2s files.
+        effective_bind_level: Resolved effective Bind Demon level from the
+            character build, used when skill_affixes is "auto".
 
     Returns:
         The 116-byte demon payload bytes from the named template.
@@ -544,15 +658,10 @@ def resolve_bound_demon(spec, fixtures_dir):
             has no follower block to copy from.
         FileNotFoundError: Template file not found in fixtures_dir.
     """
-    from pathlib import Path
-
-    template = spec.get('template') if isinstance(spec, dict) else None
-    if not template:
-        raise ValueError(
-            "bound_demon must specify 'template' (fixture name without .d2s)"
-        )
-
-    fixture_path = Path(fixtures_dir) / f'{template}.d2s'
+    fixture_path, template_label = _resolve_bound_demon_template_path(
+        spec,
+        fixtures_dir,
+    )
     if not fixture_path.exists():
         raise FileNotFoundError(
             f'Bound demon template not found: {fixture_path}'
@@ -566,7 +675,7 @@ def resolve_bound_demon(spec, fixtures_dir):
     block = decode_follower_block(fixture_data)
     if not block.has_follower:
         raise ValueError(
-            f'Template {template!r} has no follower block — '
+            f'Template {template_label!r} has no follower block — '
             f'pick a fixture with an active demon'
         )
 
@@ -586,9 +695,51 @@ def resolve_bound_demon(spec, fixtures_dir):
     elif 'bind_demon_level' in spec:
         bind_level = _parse_int_token(spec['bind_demon_level'], 'bind_demon_level')
 
-    affix_indices = _resolve_demon_affixes(spec.get('affixes'))
+    spec_effective_level = spec.get('effective_bind_level')
+    if spec_effective_level is not None:
+        effective_bind_level = _parse_int_token(
+            spec_effective_level,
+            'effective_bind_level',
+        )
+
+    raw_affix_key = None
+    if 'affixes' in spec:
+        raw_affix_key = 'affixes'
+    if 'raw_affixes' in spec:
+        if raw_affix_key is not None:
+            raise ValueError(
+                'bound_demon must not specify both affixes and raw_affixes'
+            )
+        raw_affix_key = 'raw_affixes'
+
+    has_composed_affixes = any(
+        key in spec
+        for key in ('source_affixes', 'skill_affixes', 'effective_bind_level')
+    )
+    if raw_affix_key and has_composed_affixes:
+        raise ValueError(
+            'bound_demon.affixes/raw_affixes is a raw seven-slot override; '
+            'use source_affixes with skill_affixes instead of combining them'
+        )
+
+    if raw_affix_key:
+        affix_indices = _resolve_demon_affixes(spec[raw_affix_key])
+    elif has_composed_affixes:
+        source_affixes = _resolve_demon_affix_list(
+            spec.get('source_affixes'),
+            'source_affixes',
+        )
+        skill_affixes = _resolve_skill_affix_spec(
+            spec.get('skill_affixes', 'auto'),
+            effective_bind_level,
+        )
+        affix_indices = _compose_demon_affixes(source_affixes, skill_affixes)
+    else:
+        affix_indices = None
+
     has_override = any(
-        value is not None for value in (monster_hcidx, monster_seed, bind_level, affix_indices)
+        value is not None
+        for value in (monster_hcidx, monster_seed, bind_level, affix_indices)
     )
     zero_volatile = bool(spec.get('zero_volatile', has_override))
 

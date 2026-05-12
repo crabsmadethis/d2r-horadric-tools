@@ -19,7 +19,12 @@ CHECK_PATHS = [
     "plugin",
     "d2r_mcp",
     "tests/fixtures",
+    "chars",
 ]
+
+ALLOWED_PUBLIC_CHAR_FILES = {
+    "chars/ExamplePaladin.yaml",
+}
 
 FORBIDDEN_FILES = {
     "docs/github-cleanup-agent-plan.md": "internal cleanup plan",
@@ -74,6 +79,14 @@ def main() -> int:
     for rel, reason in FORBIDDEN_FILES.items():
         if (ROOT / rel).exists():
             failures.append(f"{rel}: forbidden public file ({reason})")
+
+    for path in (ROOT / "chars").glob("*.yaml"):
+        rel = path.relative_to(ROOT).as_posix()
+        if rel not in ALLOWED_PUBLIC_CHAR_FILES:
+            failures.append(
+                f"{rel}: local/disposable character YAML must not live in the public chars folder; "
+                "keep it outside the repo with D2R_CHARS or add an explicit public-example allowlist entry"
+            )
 
     compiled = [(re.compile(pattern, re.IGNORECASE), reason) for pattern, reason in PATTERNS]
     for path in iter_files():

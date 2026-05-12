@@ -16,11 +16,18 @@ Supported public behavior:
 
 - Preserve or strip an existing follower block.
 - Clone one known 116-byte template payload.
+- Clone one local `.d2s` template payload by fixture name or `template_path`.
 - Experimentally override proven template-derived fields:
   - `monster_hcidx`
   - `monster_seed`
   - `bind_level` / `bind_demon_level`
-  - up to five MonUMod affix bytes
+  - raw `affixes` / `raw_affixes` for up to seven MonUMod bytes
+  - player-facing `source_affixes` plus `skill_affixes: auto`, where the
+    skill-granted affixes derive from effective Bind Demon level and
+    source-affix visibility still depends on compatible template context such
+    as the observed `bitfields_64_79` slice
+  - Fanaticism/Aura Enchanted pairing in the composed affix writer, so the
+    live-positive aura flavor path stays adjacent in the seven MonUMod slots
 
 Still blocked:
 
@@ -34,6 +41,8 @@ Writer policy:
 - Write `follower_count=1` only with exactly one 116-byte payload.
 - Preserve unknown bytes from the template base.
 - Treat bytes `+89..+91` as volatile runtime data.
+- Treat payload `+52` as persisted bind metadata, not effective skill level.
+- Do not combine raw `affixes` with `source_affixes` / `skill_affixes`.
 
 ## Iron Golem
 
