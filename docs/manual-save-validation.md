@@ -55,6 +55,8 @@ Good public examples:
   payload.
 - D2R rewrote a volatile follower-payload slice on save/exit.
 - A scanner-clean multi-follower shape failed to join game.
+- A `template_path` build re-extracted the same 116-byte bound-demon payload
+  after scanner-clean generation.
 
 Avoid:
 

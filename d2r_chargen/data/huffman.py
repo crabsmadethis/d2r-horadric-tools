@@ -1,7 +1,7 @@
 """Huffman encoding/decoding tables for D2R item type codes.
 
 Sources:
-- Encode table (HUFFMAN): from d07RiV's D2R reverse engineering
+- Encode table (HUFFMAN): from d07RiV's published D2R format notes
 - Decode tree (HUFFMAN_TREE): nested list, 0=left 1=right, leaf=char
 - Rune names: rXX codes to human-readable names
 """

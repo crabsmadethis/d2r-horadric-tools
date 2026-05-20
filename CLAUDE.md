@@ -75,7 +75,7 @@ stored == calc_checksum(result)
 - Keep committed files public-safe.
 - Do not commit personal saves, extracted game data, raw save corpora, raw
   memory captures, machine-local paths, account identifiers, private notes, or
-  live validation logs.
+  local validation logs.
 - Document stable behavior, public commands, sanitized format findings, and
   repeatable validation procedures.
 

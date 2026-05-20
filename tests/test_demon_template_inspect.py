@@ -6,7 +6,12 @@ from pathlib import Path
 
 import pytest
 
-from tools.d2s_demon_template_inspect import build_report, format_report_text
+from tools.d2s_demon_template_inspect import (
+    _yaml_snippet,
+    build_report,
+    extract_payload,
+    format_report_text,
+)
 
 
 def _payload(
@@ -87,7 +92,7 @@ def test_template_inspect_reports_yaml_fields_without_path_or_seed(tmp_path):
     assert "Payload monster_hcidx is a zero-based MonStats row index" in rendered
 
 
-def test_template_inspect_can_include_private_values_on_request(tmp_path):
+def test_template_inspect_can_include_local_values_on_request(tmp_path):
     path = tmp_path / "template.bin"
     path.write_bytes(_payload())
 
@@ -157,3 +162,33 @@ def test_template_inspect_accepts_d2s_with_single_follower(tmp_path):
     assert report["input_kind"] == "d2s-save"
     assert report["follower_count"] == 1
     json.dumps(report, sort_keys=True)
+
+
+def test_template_inspect_extracts_raw_payload_template(tmp_path):
+    path = tmp_path / "template.d2s"
+    output = tmp_path / "local-template.bin"
+    payload = _payload(monster_hcidx=724)
+    path.write_bytes(_save_with_single_follower(payload))
+
+    result = extract_payload(path, output)
+
+    assert output.read_bytes() == payload
+    assert result["payload_length"] == 116
+    assert result["monster_hcidx"] == 724
+    assert "local template output" in result["privacy_note"]
+
+
+def test_template_inspect_formats_extraction_yaml_snippet(tmp_path):
+    path = tmp_path / "template.bin"
+    output = tmp_path / "local-template.bin"
+    path.write_bytes(_payload(monster_hcidx=724))
+
+    report = build_report(path)
+    report["extraction"] = extract_payload(path, output)
+    report["yaml_snippet"] = _yaml_snippet(str(output), 724)
+
+    rendered = format_report_text(report)
+    assert "extraction:" in rendered
+    assert f"template_path: {output}" in rendered
+    assert "monster_hcidx: 724" in rendered
+    assert "skill_affixes: auto" not in rendered

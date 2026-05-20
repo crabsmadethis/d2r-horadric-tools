@@ -91,3 +91,115 @@ bound_demon:
     fields = parse_demon_payload(observed["payload"])
     assert fields.monster_hcidx == 724
     assert fields.affix_indices == bytes([7, 0, 0, 0, 0, 0, 0])
+
+
+def test_validate_binary_scan_includes_validated_bound_demon_package(
+    tmp_path,
+    monkeypatch,
+):
+    chars_dir = tmp_path / "chars"
+    saves_dir = tmp_path / "saves"
+    chars_dir.mkdir()
+    saves_dir.mkdir()
+
+    (chars_dir / "Synthlock.yaml").write_text(
+        """
+schema_version: 1
+name: Synthlock
+class: warlock
+level: 20
+stats:
+  strength: 10
+  dexterity: 10
+  vitality: 10
+  energy: 10
+skills:
+  Bind Demon: 1
+equipment: []
+bound_demon:
+  mode: synthesis_validated
+  package_id: row724-black-lancer-seedg-holy-shock-v1
+""".lstrip()
+    )
+
+    monkeypatch.setattr("d2r_chargen.config.CHARS_DIR", str(chars_dir))
+    monkeypatch.setattr("d2r_chargen.config.SAVES", str(saves_dir))
+
+    observed = {}
+
+    def fake_scan(path):
+        block = decode_follower_block(Path(path).read_bytes())
+        observed["payload"] = block.payload
+        return {
+            "errors": [],
+            "warnings": [],
+            "item_count": 0,
+            "checksum_ok": True,
+        }
+
+    monkeypatch.setattr("d2r_chargen.scanner.scan_character_data", fake_scan)
+
+    from d2r_chargen.cli import cmd_validate
+
+    cmd_validate(argparse.Namespace(name="Synthlock", yaml_only=False))
+
+    fields = parse_demon_payload(observed["payload"])
+    assert fields.monster_hcidx == 724
+    assert fields.monster_seed == 0x0008F2C8
+    assert fields.affix_indices == bytes.fromhex("25 1e 07 1c 05 06 1b")
+
+
+def test_validate_blocks_validated_package_when_scanner_reports_error(
+    tmp_path,
+    monkeypatch,
+    capsys,
+):
+    chars_dir = tmp_path / "chars"
+    saves_dir = tmp_path / "saves"
+    chars_dir.mkdir()
+    saves_dir.mkdir()
+
+    (chars_dir / "Scanfail.yaml").write_text(
+        """
+schema_version: 1
+name: Scanfail
+class: warlock
+level: 20
+stats:
+  strength: 10
+  dexterity: 10
+  vitality: 10
+  energy: 10
+skills:
+  Bind Demon: 1
+equipment: []
+bound_demon:
+  mode: synthesis_validated
+  package_id: row724-black-lancer-seedg-holy-shock-v1
+""".lstrip()
+    )
+
+    monkeypatch.setattr("d2r_chargen.config.CHARS_DIR", str(chars_dir))
+    monkeypatch.setattr("d2r_chargen.config.SAVES", str(saves_dir))
+
+    def fake_scan(path):
+        block = decode_follower_block(Path(path).read_bytes())
+        assert block.has_follower
+        return {
+            "errors": ["synthetic scanner hard error"],
+            "warnings": [],
+            "item_count": 0,
+            "checksum_ok": True,
+        }
+
+    monkeypatch.setattr("d2r_chargen.scanner.scan_character_data", fake_scan)
+
+    from d2r_chargen.cli import cmd_validate
+
+    with pytest.raises(SystemExit) as exc:
+        cmd_validate(argparse.Namespace(name="Scanfail", yaml_only=False))
+
+    assert exc.value.code == 1
+    output = capsys.readouterr().out
+    assert "SCANNER ERRORS" in output
+    assert "synthetic scanner hard error" in output

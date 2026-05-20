@@ -489,6 +489,7 @@ def validate_runeword(type_code, runeword_id):
 def build_item(type_code, col, row, storage,
                quality=2, ilvl=99, item_id=None,
                socketed=False, num_sockets=0,
+               socket_filler_count=None,
                unique_id=0, set_id=0,
                defense=0, max_dur=0, cur_dur=0,
                location=0, bodyloc=0,
@@ -520,6 +521,8 @@ def build_item(type_code, col, row, storage,
         item_id: 32-bit unique item ID (random if None)
         socketed: True if item has sockets
         num_sockets: Number of sockets (0-6, 4 bits)
+        socket_filler_count: Number of following socket filler records. Defaults
+            to the number of rune_codes for existing runeword callers.
         unique_id: 12-bit unique item UID (quality=7)
         set_id: 12-bit set item ID (quality=5)
         defense: Base defense value (11 bits, for items with base & 4)
@@ -715,7 +718,11 @@ def build_item(type_code, col, row, storage,
     # Reference: d2r-editor/item_injector.py lines 17-33
     # Reference: d2rdoctor.md lines 132-135
     # ==========================================================
-    nr_socketed = len(rune_codes) if rune_codes else 0
+    nr_socketed = (
+        int(socket_filler_count)
+        if socket_filler_count is not None
+        else len(rune_codes) if rune_codes else 0
+    )
     w.write_bits(nr_socketed, 3)  # 3 bits: nr_of_items_in_sockets
     w.write_bits(item_id, 32)   # 32 bits: unique item ID
     w.write_bits(ilvl, 7)       # 7 bits: item level

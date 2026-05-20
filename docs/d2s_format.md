@@ -182,8 +182,10 @@ The current body contains three `JM` lists in order:
 2. Dead-body items, usually count zero in generated output.
 3. Merc items.
 
-After the dead-body list, the file carries a `jf` corpse marker before the merc
-item list.
+After the dead-body list, generated files carry a `jf` corpse marker before the
+merc item list. Corpus saves prove that `jf` can be absent in some no-merc and
+no-follower tails, so parsers must tolerate absence. Writers should preserve
+`jf` when it is present and continue emitting it for new generated saves.
 
 ### Iron Golem
 
@@ -191,14 +193,37 @@ The iron golem section starts with `kf` and a one-byte flag:
 
 ```text
 kf 00
-kf 01 <JM-less item bitstream>
+kf 01 <JM-less item payload>
 ```
 
-When the flag is one, the payload is an encoded item record without a `JM`
-list prefix. Current support can preserve existing active golem payloads and
-write supported generated normal or magic golem items for Necromancers with
-Iron Golem available. Broader item families require validation before they
-become part of the stable YAML contract.
+When the flag is one, the payload is encoded item data without a `JM` list
+prefix. Most supported golems are one parent item record. Runeword golems use
+the same JM-less block, but the parent is followed immediately by its socket
+filler records:
+
+```text
+kf 01 <runeword parent> <socket filler 0> ... <socket filler n> 01 00 lf ...
+```
+
+Current support can preserve existing active golem payloads and write supported
+generated normal, magic, ethereal, set, rare, crafted, socketed-normal, and
+runeword golem items for Necromancers with Iron Golem available. Unique parent
+payloads are supported only with explicit canonicalization opt-in because D2R
+rewrites some bytes on save/exit. Runeword payloads have passed Offline
+validation for Insight and Strength: D2R preserved the block length and filler
+records while canonicalizing parent bytes. The public-writer Insight runeword
+golem was visually confirmed with the expected aura. A magic single-parent
+golem carrying `item_aura` Meditation has also joined, saved/exited, preserved
+its golem payload, and been visually confirmed, so aura properties can also be
+viable without a runeword.
+
+Current scanner output splits golem payloads into record boundaries. The
+validated runeword cases canonicalized only the parent record: Insight changed
+parent-relative offsets `+20..+44`, Strength changed parent-relative offsets
+`+23..+28`, and their socket filler records were byte-identical after
+save/exit. The current unique opt-in fixture for The Gnasher changed only
+parent-relative offsets `+20..+27`; keep unique payloads
+canonicalization-aware rather than byte-preservation promises.
 
 The bridge bytes `01 00` follow the iron-golem flag or item payload. Warlock
 bound demons still use `kf 00`, then the bridge, then the `lf` follower block.
@@ -340,11 +365,18 @@ Current public generation is template-derived. A local template provides the
 unknown runtime slices and seed state. The public writer may override
 high-confidence fields such as monster row, bind metadata, and affix bytes
 when that target has validation behind it. This is not template-free synthesis.
+`template_path` may point either at a `.d2s` file with one bound-demon follower
+or at an extracted raw 116-byte payload produced by
+`tools/d2s_demon_template_inspect.py --extract-payload`.
 
 Known stable rules:
 
 - Preserve the fixed 116-byte payload length for known bound-demon records.
 - Preserve the embedded `gf` bytes as payload data.
+- Preserve template `monster_seed` by default. Same-row/same-affix seed
+  evidence shows seed changes can change the visible generated name and may
+  change Aura Enchanted flavor, so seed/name/aura authoring remains
+  unsupported unless a named validated package owns those fields.
 - Treat `+89..+91` as volatile runtime bytes.
 - Preserve `+94 == 06` for known 116-byte payloads until variable-length
   follower records are decoded.
@@ -354,17 +386,17 @@ Known stable rules:
 - Fanaticism is source/aura-flavor input; it is not a Bind Demon threshold
   affix by itself.
 
-Known live-positive examples are target-specific, not universal model-synthesis
+Known accepted examples are target-specific, not universal model-synthesis
 proofs:
 
 - Council Member row `347` worked from the current clean Fallen shell with
   `monster_hcidx` only.
 - Black Lancer row `724` worked from the current clean Fallen shell with
   `monster_hcidx` only for an empty-affix payload.
-- Visible source-style labels on Black Lancer required compatible context
-  bytes, currently represented by the `+64..+79` bitfield slice.
-- Fanaticism plus Aura Enchanted exposed the visible aura path in the tested
-  Black Lancer context.
+- Visible source-style labels on Black Lancer required compatible template
+  context.
+- Fanaticism plus Aura Enchanted exposed the visible aura path only for the
+  documented support set.
 
 ## Iron Golem And Bound Demon Interaction
 
@@ -376,9 +408,10 @@ Current evidence covers normal single-class cases:
 - A non-Warlock save can carry a structurally valid Warlock follower block
   without immediate rejection, but D2R does not instantiate the borrowed demon
   and strips it back to `follower_count=0` on save/exit.
+- Cross-class Iron Golem acceptance is not supported; the public writer keeps
+  generated `iron_golem:` authoring on the Necromancer-only path.
 
-Whether D2R can write both an active iron golem and a bound demon for one
-character is not confirmed.
+Combined `kf 01` plus bound-demon authoring remains unsupported.
 
 ## Checksum And Write Invariants
 
@@ -439,9 +472,10 @@ manual validation result narrows their meaning.
 | Header `0xa7..0xa8` | Opaque merc status bitfield. Observed values include `0`, `1`, `3`, `5`, `9`, `10`, `11`, `13`, `15`, `16`, `18`, `21`, and `50`. |
 | Header version | Version 105 is current; pre-105 behavior is out of scope. |
 | Demon `+24..+31` | Runtime stats or monster-derived constants; not decoded. |
+| Demon `+44/+48` | Writer-controllable player-count-shaped percent fields for one row-20 shell. Matched p1/p4/p8 captures produced `0`, `150`, and `350`, but healthy runtime replays and isolates did not prove these bytes control visible HP, damage, AR, defense, or survivability by themselves. |
 | Demon `+64..+79` | Bitfield/context slice; source-affix activation evidence exists, but individual bits are not decoded. |
-| Demon `+88..+91` | Volatile/runtime-like bytes. |
-| Demon `+94..+115` | Post-`gf` payload bytes. Some subranges are known risky, but the region is not fully decoded. |
+| Demon `+88..+91` | Volatile/runtime-like bytes; copied values can be rewritten and should not be authored. |
+| Demon `+94..+115` | Post-`gf` payload bytes. Some subranges are health-like or context-like, but current isolates do not prove a standalone visible-strength control. |
 
 ## Code And Fixture Cross-References
 

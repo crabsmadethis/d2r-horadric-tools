@@ -6,7 +6,11 @@ import struct
 import pytest
 
 from d2r_chargen.follower_block import decode_follower_block
-from d2r_chargen.iron_golem import decode_iron_golem_block
+from d2r_chargen.iron_golem import (
+    compare_iron_golem_payloads,
+    decode_iron_golem_block,
+    split_iron_golem_payload_records,
+)
 from d2r_chargen.save import calc_checksum, rebuild_items
 
 
@@ -49,6 +53,67 @@ def test_decode_active_golem_payload():
     assert block.bridge_ok is True
     assert block.payload_len == len(GOLEM_PAYLOAD)
     assert block.item_payload == GOLEM_PAYLOAD
+
+
+def test_split_single_parent_golem_payload():
+    records = split_iron_golem_payload_records(GOLEM_PAYLOAD)
+
+    assert len(records) == 1
+    assert records[0].role == "parent"
+    assert records[0].offset == 0
+    assert records[0].length == len(GOLEM_PAYLOAD)
+
+
+def test_split_runeword_golem_payload_records():
+    pytest.importorskip(
+        "d2r_chargen.data.runewords",
+        reason="game data not extracted (run 'd2r-mod extract')",
+    )
+    from d2r_chargen.items import build_iron_golem_item
+
+    payload = build_iron_golem_item({"runeword": "Strength", "base": "flc"})
+    records = split_iron_golem_payload_records(payload)
+
+    assert [record.role for record in records] == [
+        "parent",
+        "socket_filler_0",
+        "socket_filler_1",
+    ]
+    assert [record.offset for record in records] == [0, 32, 43]
+    assert [record.length for record in records] == [32, 11, 11]
+    assert records[0].is_runeword
+    assert records[0].is_socketed
+    assert records[1].is_simple
+    assert records[1].location == 6
+    assert records[1].col == 0
+    assert records[2].location == 6
+    assert records[2].col == 1
+
+
+def test_compare_runeword_golem_payload_groups_parent_diffs():
+    pytest.importorskip(
+        "d2r_chargen.data.runewords",
+        reason="game data not extracted (run 'd2r-mod extract')",
+    )
+    from d2r_chargen.items import build_iron_golem_item
+
+    before = build_iron_golem_item({"runeword": "Strength", "base": "flc"})
+    after = bytearray(before)
+    after[23] ^= 0x01
+    after[27] ^= 0x02
+
+    comparison = compare_iron_golem_payloads(before, bytes(after))
+
+    assert comparison["same_length"] is True
+    assert comparison["diff_offsets"] == [23, 27]
+    assert comparison["record_groups"] == [{
+        "role": "parent",
+        "offset": 0,
+        "length": 32,
+        "diff_count": 2,
+        "diff_offsets": [23, 27],
+        "relative_offsets": [23, 27],
+    }]
 
 
 def test_follower_decoder_allows_active_golem_gap():

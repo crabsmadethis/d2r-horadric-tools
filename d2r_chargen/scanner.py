@@ -15,6 +15,7 @@ import sys
 import os
 import time
 import json
+from dataclasses import dataclass
 
 from d2r_chargen.data.huffman import HUFFMAN_TREE, RUNE_NAMES
 try:
@@ -35,7 +36,10 @@ except ImportError:
     _HAS_DATA = False
 from d2r_chargen.data.monumod_affixes import affix_name
 from d2r_chargen.follower_block import DEMON_PAYLOAD_LEN, decode_follower_block
-from d2r_chargen.iron_golem import decode_iron_golem_block
+from d2r_chargen.iron_golem import (
+    decode_iron_golem_block,
+    split_iron_golem_payload_records,
+)
 
 # ============================================================
 # Constants
@@ -50,6 +54,40 @@ STAT_DEFS = {
 }
 CLASSES = ["Amazon","Sorceress","Necromancer","Paladin","Barbarian","Druid","Assassin","Warlock"]
 STOR = {0:'equip',1:'inv',2:'belt',3:'?',4:'cube',5:'stash'}
+
+
+@dataclass(frozen=True)
+class ItemRecordSummary:
+    """Small public-safe item header summary used by socket grouping checks."""
+
+    pos: int
+    type_code: str
+    quality: int
+    uid: int | None
+    storage: int
+    col: int
+    row: int
+    bodyloc: int
+    location: int
+    ext: tuple[int, int, int]
+    flags32: int
+    nr_in_sockets: int
+
+    @property
+    def is_simple(self):
+        return bool(self.flags32 & (1 << 21))
+
+    @property
+    def is_socketed(self):
+        return bool(self.flags32 & (1 << 11))
+
+    @property
+    def is_runeword(self):
+        return bool(self.flags32 & (1 << 26))
+
+    @property
+    def is_socket_filler(self):
+        return self.location == 6
 
 
 # ============================================================
@@ -77,6 +115,46 @@ def print_bound_demon_block(fb):
     print(f"    raw_unknown_slices:")
     for name, raw in fb.unknown_slices.items():
         print(f"      {name} = {raw.hex(' ')}")
+
+
+def print_iron_golem_block(golem):
+    """Print decoded Iron Golem payload record boundaries."""
+    if not golem.has_golem:
+        return
+
+    bridge_status = "ok" if golem.bridge_ok else f"bad ({golem.bridge.hex(' ')})"
+    print("  IRON GOLEM:")
+    print(f"    payload = {golem.payload_len}B  bridge={bridge_status}")
+    if not golem.bridge_ok:
+        return
+
+    records = split_iron_golem_payload_records(golem.item_payload)
+    if not records:
+        print("    records = none")
+        return
+
+    for record in records:
+        flags = []
+        if record.is_runeword:
+            flags.append("runeword")
+        if record.is_socketed:
+            flags.append("socketed")
+        if record.is_simple:
+            flags.append("simple")
+        flag_text = ",".join(flags) if flags else "-"
+        type_code = record.type_code or "?"
+        quality = "?" if record.quality is None else str(record.quality)
+        location = "?" if record.location is None else str(record.location)
+        storage = "?" if record.storage is None else str(record.storage)
+        col = "?" if record.col is None else str(record.col)
+        row = "?" if record.row is None else str(record.row)
+        bodyloc = "?" if record.bodyloc is None else str(record.bodyloc)
+        print(
+            f"    {record.role}: +{record.offset}..+{record.end - 1} "
+            f"({record.length}B) type={type_code} q={quality} "
+            f"loc={location} storage={storage} col={col} row={row} "
+            f"bodyloc={bodyloc} flags={flag_text}"
+        )
 
 
 def bits_at(data, sb, c):
@@ -124,6 +202,86 @@ def decode_item_header(data, pos):
     uid=None
     if quality in (5,7): uid=bits_at(data,br,12)
     return itype,ilvl,quality,uid,storage,col,row,bodyloc,location,ext
+
+def decode_item_record_summary(data, pos):
+    """Decode a stable item header summary, including nr_in_sockets."""
+    flags32 = struct.unpack_from('<I', data, pos)[0]
+    b4 = data[pos + 4] if pos + 4 < len(data) else 0
+    ext = ((b4 & 1), (b4 >> 1) & 1, (b4 >> 2) & 1)
+    location = bits_at(data, pos * 8 + 35, 3)
+    bodyloc = bits_at(data, pos * 8 + 38, 4)
+    col = bits_at(data, pos * 8 + 42, 4)
+    row = bits_at(data, pos * 8 + 46, 3)
+    storage = bits_at(data, pos * 8 + 50, 3)
+    try:
+        itype, br = decode_huff4(data, pos * 8 + 53)
+    except Exception:
+        itype, br = '???', pos * 8 + 53
+    nr_in_sockets = bits_at(data, br, 3)
+    br += 3
+    br += 32
+    ilvl = bits_at(data, br, 7)
+    br += 7
+    quality = bits_at(data, br, 4)
+    br += 4
+    multi_pic = bits_at(data, br, 1)
+    br += 1
+    if multi_pic:
+        br += 3
+    class_spec = bits_at(data, br, 1)
+    br += 1
+    if class_spec:
+        br += 11
+    uid = None
+    if quality in (5, 7):
+        uid = bits_at(data, br, 12)
+    return ItemRecordSummary(
+        pos=pos,
+        type_code=itype,
+        quality=quality,
+        uid=uid,
+        storage=storage,
+        col=col,
+        row=row,
+        bodyloc=bodyloc,
+        location=location,
+        ext=ext,
+        flags32=flags32,
+        nr_in_sockets=nr_in_sockets,
+    )
+
+def summarize_socket_groups(data, item_positions):
+    """Group sequential socket filler records under their preceding parent."""
+    groups = []
+    current = None
+
+    for pos in item_positions:
+        record = decode_item_record_summary(data, pos)
+        if record.is_socket_filler:
+            if current is None:
+                groups.append({
+                    'parent': None,
+                    'fillers': [record],
+                    'expected': 0,
+                    'actual': 1,
+                    'mismatch': True,
+                })
+            else:
+                current['fillers'].append(record)
+                current['actual'] = len(current['fillers'])
+                current['mismatch'] = current['expected'] != current['actual']
+            continue
+
+        current = {
+            'parent': record,
+            'fillers': [],
+            'expected': record.nr_in_sockets,
+            'actual': 0,
+            'mismatch': record.nr_in_sockets != 0,
+        }
+        groups.append(current)
+
+    return groups
 
 def decode_stats(data):
     gf=data.find(b'gf')
@@ -778,6 +936,21 @@ def scan_characters(target, all_files, ghost_chars):
         elif filler_count > 0:
             print(f"  Items: {item_count} parents + {filler_count} socket fillers = {len(all_items)} total")
 
+        socket_groups = summarize_socket_groups(data, [pos for pos, *_ in all_items])
+        socket_mismatches = [
+            group for group in socket_groups
+            if group['parent'] is not None and group['mismatch']
+        ]
+        if socket_mismatches:
+            print(f"  \u26a0 SOCKET GROUP MISMATCHES ({len(socket_mismatches)} parents):")
+            for group in socket_mismatches:
+                parent = group['parent']
+                print(
+                    f"    @{parent.pos:#x} {parent.type_code.strip()}: "
+                    f"nr_in_sockets={group['expected']} "
+                    f"following_fillers={group['actual']}"
+                )
+
         # Zero-padding check: verify items whose property stream ends byte-aligned
         # actually have padding in the file (item size > expected unpadded size)
         if zero_pad_candidates:
@@ -931,6 +1104,8 @@ def scan_characters(target, all_files, ghost_chars):
             golem = decode_iron_golem_block(bytes(data))
             if gap != 5 and not (golem.has_golem and golem.bridge_ok):
                 print(f"  !! kf-lf GAP: {gap} bytes (expected no-golem gap 5 or active-golem item payload before 01 00 lf)")
+            if golem.has_golem:
+                print_iron_golem_block(golem)
 
         # Bound-demon (warlock follower) block \u2014 Task 2.1
         fb = decode_follower_block(bytes(data))
@@ -1378,6 +1553,7 @@ def scan_character_data(filepath):
     if jm >= 0:
         char_item_end = jf_marker if jf_marker > 0 else len(data) - 4
         runeword_flags = {}
+        item_positions = []
         pos = jm + 4
         while pos < char_item_end:
             b0, b2 = data[pos], data[pos + 2] if pos + 2 < len(data) else 0
@@ -1396,6 +1572,7 @@ def scan_character_data(filepath):
             if tc_check != '???' and tc_check not in ITEM_BASES_FULL:
                 pos += 1
                 continue
+            item_positions.append(pos)
             flags32 = struct.unpack_from('<I', data, pos)[0]
             if flags32 & (1 << 26):
                 runeword_flags[pos] = True
@@ -1429,6 +1606,20 @@ def scan_character_data(filepath):
                 except Exception as ex:
                     warnings.append(f"item@{pos:#x} ({tc}): property parse exception: {ex}")
             pos += 1
+
+        for group in summarize_socket_groups(data, item_positions):
+            parent = group['parent']
+            if parent is None:
+                warnings.append(
+                    f"socket filler@{group['fillers'][0].pos:#x}: no preceding parent"
+                )
+                continue
+            if group['mismatch']:
+                warnings.append(
+                    f"item@{parent.pos:#x} ({parent.type_code.strip()}): "
+                    f"nr_in_sockets={group['expected']} "
+                    f"following_fillers={group['actual']}"
+                )
 
     return {
         'name': char_name,
