@@ -3,7 +3,7 @@
 
 The default report is intentionally aggregate-only: it does not print local
 paths or raw payload byte values. Use --include-paths/--include-values for
-private, local investigation output.
+local-only investigation output.
 """
 
 from __future__ import annotations
@@ -420,12 +420,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--include-paths",
         action="store_true",
-        help="Include local source paths in the report. Keep this private.",
+        help="Include local source paths in the report. Keep this local/untracked.",
     )
     parser.add_argument(
         "--include-values",
         action="store_true",
-        help="Include raw byte values for byte/slice classifiers. Keep this private.",
+        help="Include raw byte values for byte/slice classifiers. Keep this local/untracked.",
     )
     return parser.parse_args(argv)
 

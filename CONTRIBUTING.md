@@ -13,7 +13,7 @@ install, and the commands documented here.
 - The repo supports CLI and MCP users. Treat command flags, tool schemas,
   error messages, and README examples as public interfaces.
 - Do not commit extracted game data, personal saves, raw save corpora, machine
-  paths, account identifiers, live validation logs, or private research notes.
+  paths, account identifiers, local validation logs, or private research notes.
 - `d2r_chargen/data/*.py` files are generated locally from a D2R install and
   are ignored, except for tracked template/support files already in the repo.
 

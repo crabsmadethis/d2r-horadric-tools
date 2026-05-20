@@ -161,20 +161,70 @@ def build_equipment_item(item_def, *, is_merc=False):
 def build_iron_golem_item(item_def):
     """Build one JM-less item payload for the Iron Golem `kf 01` tail.
 
-    V1 is intentionally narrow: generated normal or magic items only, no
-    sockets, runewords, fillers, uniques, sets, rares, or crafted items. The
-    payload uses the equipped-looking storage shape observed in live D2R golem
-    saves: storage=0, location=1, and col/bodyloc set to the selected slot.
+    The supported public surface includes payloads that passed Offline
+    save/exit validation: normal, magic, ethereal, set, rare, crafted,
+    socketed-normal, and runeword items with automatically generated rune
+    filler records. Unique parent payloads require an explicit opt-in because
+    live save/exit preserved their header shape but canonicalized bytes.
+
+    The payload uses the equipped-looking storage shape observed in live D2R
+    golem saves: storage=0, location=1, and col/bodyloc set to the selected
+    slot.
     """
     unsupported = {
-        'runeword', 'unique', 'set', 'rare', 'crafted',
-        'socketed', 'num_sockets', 'rune_codes',
+        'rune_codes', 'runes', 'fillers', 'jewels', 'socket_fillers',
     }
     present = sorted(k for k in unsupported if k in item_def)
     if present:
         raise ValueError(
-            f"iron_golem.item does not support {', '.join(present)} yet"
+            f"iron_golem.item does not support socket filler keys: {', '.join(present)}"
         )
+
+    item_def = dict(item_def)
+    item_def.setdefault('slot', 'weapon')
+    if 'runeword' in item_def:
+        socket_overrides = sorted(
+            key for key in ('socketed', 'num_sockets') if key in item_def
+        )
+        if socket_overrides:
+            raise ValueError(
+                "iron_golem.item runeword sockets are derived from the runeword; "
+                f"remove {', '.join(socket_overrides)}"
+            )
+        built = build_equipment_item(item_def, is_merc=True)
+        if len(built) < 2:
+            raise ValueError(
+                "iron_golem.item runewords must produce a parent plus socket fillers"
+            )
+        return b''.join(item_bytes for _, item_bytes in built)
+
+    quality_keys = [
+        key for key in ('unique', 'set', 'rare', 'crafted') if key in item_def
+    ]
+    if len(quality_keys) > 1:
+        raise ValueError(
+            "iron_golem.item must specify only one of unique, set, rare, or crafted"
+        )
+    if item_def.get('socketed') and quality_keys:
+        raise ValueError(
+            "iron_golem.item socketed support is limited to normal items"
+        )
+    if item_def.get('num_sockets') and not item_def.get('socketed'):
+        raise ValueError(
+            "iron_golem.item num_sockets requires socketed: true"
+        )
+    if 'unique' in item_def and not item_def.get('allow_canonicalized'):
+        raise ValueError(
+            "iron_golem.item unique payloads canonicalize on save/exit; "
+            "set allow_canonicalized: true to opt in"
+        )
+    if quality_keys:
+        built = build_equipment_item(item_def, is_merc=True)
+        if len(built) != 1:
+            raise ValueError(
+                "iron_golem.item supports only a single parent item payload"
+            )
+        return built[0][1]
 
     base_code = item_def.get('base')
     if not base_code:
@@ -199,6 +249,10 @@ def build_iron_golem_item(item_def):
     )
     if wants_normal and wants_magic:
         raise ValueError("iron_golem.item cannot be both normal and magic")
+    if item_def.get('socketed') and wants_magic:
+        raise ValueError(
+            "iron_golem.item socketed support is limited to normal items"
+        )
     if wants_normal and props:
         raise ValueError(
             "iron_golem.item normal items cannot specify properties; use magic"
@@ -224,6 +278,10 @@ def build_iron_golem_item(item_def):
         raise ValueError(
             "iron_golem.item quality 2 cannot specify properties; use magic"
         )
+    if item_def.get('socketed') and quality != 2:
+        raise ValueError(
+            "iron_golem.item socketed support is limited to normal quality"
+        )
 
     magic_prefix = 0
     magic_suffix = 0
@@ -234,6 +292,19 @@ def build_iron_golem_item(item_def):
             base_code,
             props,
         )
+
+    num_sockets = int(item_def.get('num_sockets', 0) or 0)
+    if item_def.get('socketed'):
+        if num_sockets <= 0:
+            raise ValueError(
+                "iron_golem.item socketed items must specify num_sockets > 0"
+            )
+        max_sockets = base_info.get('max_sockets', 0)
+        if num_sockets > max_sockets:
+            raise ValueError(
+                f"iron_golem.item base '{base_code}' supports at most "
+                f"{max_sockets} sockets, got {num_sockets}"
+            )
 
     return build_item(
         type_code=base_code,
@@ -251,6 +322,8 @@ def build_iron_golem_item(item_def):
         magic_prefix=magic_prefix,
         magic_suffix=magic_suffix,
         ethereal=item_def.get('ethereal', False),
+        socketed=bool(item_def.get('socketed')),
+        num_sockets=num_sockets,
     )
 
 

@@ -13,6 +13,8 @@ from d2r_chargen.config import (
     SAVES, CHARS_DIR, FIXTURES_DIR, SLOT_MAP, CLASS_DEFS, CHARM_DIMS,
 )
 from d2r_chargen.resolve import (
+    bound_demon_synthesis_support_error,
+    is_bound_demon_validated_package_request,
     encode_skill_tab_param, resolve_properties, resolve_property_name,
     resolve_runeword, resolve_skills, resolve_unique, resolve_progression,
     resolve_bound_demon,
@@ -368,6 +370,12 @@ def validate_char_def(char_def):
         else:
             _validate_item_def(item_def, errors)
 
+    bound_demon_error = bound_demon_synthesis_support_error(
+        char_def.get('bound_demon')
+    )
+    if bound_demon_error:
+        errors.append(bound_demon_error)
+
     if errors:
         raise ValueError(
             "Validation errors:\n  " + "\n  ".join(errors)
@@ -384,6 +392,7 @@ def validate_char_def(char_def):
         _warn_level_reqs(merc.get('equipment', []), merc_level, 'merc')
         _validate_merc_equipment(merc)
     _warn_bound_demon_source_context(char_def)
+    _note_bound_demon_validated_package(char_def)
 
 
 def _has_bound_demon_source_affixes(bound_demon_spec):
@@ -404,11 +413,31 @@ def _warn_bound_demon_source_context(char_def):
     if not _has_bound_demon_source_affixes(bound_demon_spec):
         return
     print(
-        "  WARNING: bound_demon.source_affixes depend on compatible template "
-        "source context; inspect the template with "
+        "  WARNING: bound_demon.source_affixes require template-derived or "
+        "validated package context; public chargen authors the seven MonUMod "
+        "bytes but does not synthesize arbitrary source effects, aura flavor, "
+        "generated names, or hidden support branches. Inspect the template with "
         "tools/d2s_demon_template_inspect.py and record validation in "
         "docs/bound-demon-template-recipes.md before treating this recipe as "
         "portable."
+    )
+
+
+def _note_bound_demon_validated_package(char_def):
+    bound_demon_spec = char_def.get('bound_demon')
+    if not is_bound_demon_validated_package_request(bound_demon_spec):
+        return
+
+    from d2r_chargen.bound_demon_registry import get_bound_demon_package
+
+    package = get_bound_demon_package(str(bound_demon_spec.get('package_id')))
+    if package is None:
+        return
+    unsupported = ", ".join(package.unsupported_dimensions) or "none"
+    print(
+        "  INFO: bound_demon.synthesis_validated "
+        f"{package.package_id}: {package.summary} Unsupported dimensions: "
+        f"{unsupported}."
     )
 
 

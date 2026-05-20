@@ -65,6 +65,27 @@ def _counter_key(value: Any) -> str:
     return str(value)
 
 
+def _hex(data: bytes) -> str:
+    return data.hex(" ")
+
+
+def _group_key(*values: Any) -> str:
+    return "|".join(_counter_key(value) for value in values)
+
+
+def _source_bucket(rel_path: str) -> str:
+    normalized = rel_path.replace("\\", "/")
+    if "BlizzardError/" in normalized:
+        return "blizzard_error"
+    if "/compatdata/" in normalized:
+        return "steam_compatdata"
+    if normalized.startswith("tests/fixtures/"):
+        return "repo_fixture"
+    if "/" not in normalized:
+        return "single_file_or_root"
+    return normalized.split("/", 1)[0]
+
+
 class CorpusSummary:
     def __init__(self, *, examples_limit: int = 0) -> None:
         self.examples_limit = examples_limit
@@ -157,6 +178,7 @@ def summarize_file(summary: CorpusSummary, root: Path, path: Path) -> None:
     if not size_ok or not checksum_ok:
         summary.add_example(summary.bad_headers, rel_path)
 
+    field_values: dict[str, Any] = {"source_bucket": _source_bucket(rel_path)}
     for name, offset, reader in (
         ("status", 0x14, _u8),
         ("progression", 0x15, _u8),
@@ -169,6 +191,7 @@ def summarize_file(summary: CorpusSummary, root: Path, path: Path) -> None:
     ):
         value = reader(data, offset)
         if value is not None:
+            field_values[name] = value
             summary.add_counter(name, value)
 
     gf = data.find(b"gf", 0x250)
@@ -210,7 +233,9 @@ def summarize_file(summary: CorpusSummary, root: Path, path: Path) -> None:
                     summary.add_counter("golem_item_location", header.location)
                     summary.add_counter("golem_item_bodyloc", header.bodyloc)
     if merc_jm >= 0 and merc_jm + 4 <= len(data):
-        summary.add_counter("merc_item_count", struct.unpack_from("<H", data, merc_jm + 2)[0])
+        merc_item_count = struct.unpack_from("<H", data, merc_jm + 2)[0]
+        summary.add_counter("merc_item_count", merc_item_count)
+        field_values["merc_item_count"] = merc_item_count
     if lf >= 0 and lf + 4 <= len(data):
         follower_count = struct.unpack_from("<H", data, lf + 2)[0]
         trailing_payload_bytes = len(data) - (lf + 4)
@@ -221,6 +246,122 @@ def summarize_file(summary: CorpusSummary, root: Path, path: Path) -> None:
         summary.add_counter("follower_payload_ok", follower_payload_ok)
         if not follower_payload_ok:
             summary.add_example(summary.invalid_followers, rel_path)
+            summary.add_counter(
+                "invalid_follower_by_source_bucket", field_values["source_bucket"]
+            )
+        field_values["follower_count"] = follower_count
+
+        if follower_payload_ok:
+            payload_start = lf + 4
+            for payload_index in range(follower_count):
+                start = payload_start + payload_index * DEMON_PAYLOAD_LEN
+                payload = data[start : start + DEMON_PAYLOAD_LEN]
+                summarize_follower_payload(summary, payload, field_values)
+
+    add_grouped_counters(summary, field_values, jf >= 0)
+
+
+def summarize_follower_payload(
+    summary: CorpusSummary, payload: bytes, field_values: dict[str, Any]
+) -> None:
+    """Add aggregate counters for one 116-byte bound-follower payload."""
+    if len(payload) != DEMON_PAYLOAD_LEN:
+        return
+
+    summary.add_counter("follower_payloads_decoded", True)
+
+    gf_offsets: list[str] = []
+    search_from = 0
+    while True:
+        offset = payload.find(b"gf", search_from)
+        if offset < 0:
+            break
+        gf_offsets.append(str(offset))
+        search_from = offset + 1
+    summary.add_counter("follower_payload_gf_offsets", ",".join(gf_offsets) or "none")
+    summary.add_counter("follower_payload_has_gf_at_92", payload[92:94] == b"gf")
+
+    for name, offset in (
+        ("follower_payload_kind_u16_0", 0),
+        ("follower_payload_generation_u16_2", 2),
+        ("follower_payload_monster_hcidx_u16_4", 4),
+        ("follower_payload_bind_level_u32_52", 52),
+    ):
+        reader = _u16 if name.endswith(("u16_0", "u16_2", "u16_4")) else _u32
+        value = reader(payload, offset)
+        if value is not None:
+            summary.add_counter(name, value)
+            add_follower_payload_grouped_counters(summary, name, value, field_values)
+
+    for name, offset in (
+        ("follower_payload_runtime_u32_24", 24),
+        ("follower_payload_runtime_u32_28", 28),
+        ("follower_payload_percent_u32_44", 44),
+        ("follower_payload_percent_u32_48", 48),
+        ("follower_payload_hashlike_u32_88", 88),
+    ):
+        value = _u32(payload, offset)
+        if value is not None:
+            summary.add_counter(name, value)
+            add_follower_payload_grouped_counters(summary, name, value, field_values)
+
+    for name, value in (
+        ("follower_payload_bitfield_64_79", _hex(payload[64:80])),
+        ("follower_payload_affixes_80_84", _hex(payload[80:85])),
+        ("follower_payload_post_gf_95_115", _hex(payload[95:116])),
+    ):
+        summary.add_counter(name, value)
+        add_follower_payload_grouped_counters(summary, name, value, field_values)
+
+
+def add_follower_payload_grouped_counters(
+    summary: CorpusSummary,
+    payload_field_name: str,
+    payload_value: Any,
+    field_values: dict[str, Any],
+) -> None:
+    group_fields = ("class_id", "progression", "hireling_id", "source_bucket")
+    for field_name in group_fields:
+        if field_name in field_values:
+            summary.add_counter(
+                f"{payload_field_name}_by_{field_name}",
+                _group_key(payload_value, field_values[field_name]),
+            )
+
+
+def add_grouped_counters(
+    summary: CorpusSummary, field_values: dict[str, Any], has_jf_before_merc_jm: bool
+) -> None:
+    merc_status = field_values.get("merc_status_u16_0xA7")
+    if merc_status is not None:
+        for field_name in (
+            "hireling_id",
+            "merc_item_count",
+            "class_id",
+            "progression",
+            "difficulty_current",
+        ):
+            if field_name in field_values:
+                summary.add_counter(
+                    f"merc_status_by_{field_name}",
+                    _group_key(merc_status, field_values[field_name]),
+                )
+
+    for field_name in (
+        "class_id",
+        "merc_item_count",
+        "follower_count",
+        "progression",
+        "status",
+        "header_level",
+        "difficulty_current",
+        "source_bucket",
+    ):
+        if field_name in field_values:
+            summary.add_counter(
+                f"jf_presence_by_{field_name}",
+                _group_key(has_jf_before_merc_jm, field_values[field_name]),
+            )
 
 
 def print_text(summary: CorpusSummary) -> None:

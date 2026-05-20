@@ -135,6 +135,36 @@ def cmd_scan(args):
     from d2r_chargen.scanner import run_scanner
     run_scanner(args.name.lower())
 
+
+def cmd_bound_demon_packages(args):
+    from d2r_chargen.bound_demon_registry import (
+        bound_demon_registry_public_report,
+        iter_bound_demon_packages,
+    )
+
+    if args.json:
+        import json
+
+        report = bound_demon_registry_public_report(enabled_only=not args.all)
+        json.dump(report, sys.stdout, indent=2, sort_keys=True)
+        sys.stdout.write("\n")
+        return
+
+    for package in iter_bound_demon_packages():
+        if not package.enabled and not args.all:
+            continue
+        status = "enabled" if package.enabled else "disabled"
+        print(f"  {package.package_id} [{status}]")
+        print(f"    {package.summary}")
+        print(f"    row: {package.semantic_claims.row}")
+        if package.semantic_claims.generated_name:
+            print(f"    generated_name: {package.semantic_claims.generated_name}")
+        if package.semantic_claims.aura:
+            print(f"    aura: {package.semantic_claims.aura}")
+        unsupported = ", ".join(package.unsupported_dimensions) or "none"
+        print(f"    unsupported: {unsupported}")
+
+
 def cmd_import(args):
     from d2r_chargen.importer import import_character, dict_to_yaml
     from d2r_chargen.config import SAVES
@@ -196,6 +226,22 @@ def main():
     p_scan = sub.add_parser('scan', help='Run d2rdoctor scanner')
     p_scan.add_argument('name')
     p_scan.set_defaults(func=cmd_scan)
+
+    p_demon_packages = sub.add_parser(
+        'bound-demon-packages',
+        help='List validated bound-demon synthesis package ids',
+    )
+    p_demon_packages.add_argument(
+        '--all',
+        action='store_true',
+        help='Include disabled documented packages',
+    )
+    p_demon_packages.add_argument(
+        '--json',
+        action='store_true',
+        help='Emit a machine-readable public package report',
+    )
+    p_demon_packages.set_defaults(func=cmd_bound_demon_packages)
 
     args = parser.parse_args()
     if not args.command:

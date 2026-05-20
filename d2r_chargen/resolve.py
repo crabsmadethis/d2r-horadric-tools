@@ -17,6 +17,183 @@ from d2r_chargen.data.skills import SKILLS
 # Use canonical expansion map from config.py
 _RW_BASE_EXPANSION = RW_BASE_CATEGORIES
 
+_BOUND_DEMON_TEMPLATE_MODES = {
+    'template',
+    'template_path',
+    'template derived',
+    'template_derived',
+}
+_BOUND_DEMON_VALIDATED_SYNTHESIS_MODES = {
+    'synthesis validated',
+    'synthesis_validated',
+    'validated synthesis',
+    'validated_synthesis',
+}
+_BOUND_DEMON_ALGORITHMIC_SYNTHESIS_MODES = {
+    'synthesis',
+}
+_BOUND_DEMON_SYNTHESIS_MODES = (
+    _BOUND_DEMON_VALIDATED_SYNTHESIS_MODES
+    | _BOUND_DEMON_ALGORITHMIC_SYNTHESIS_MODES
+)
+_BOUND_DEMON_SYNTHESIS_FLAGS = {
+    'synthesize',
+    'synthesis',
+    'synthesis_validated',
+}
+_BOUND_DEMON_SYNTHESIS_KEYS = {
+    'package_id',
+    'monster_seed',
+    'runtime_stats_24_31',
+    'percent_or_caps_44_51',
+    'bitfields_64_79',
+    'post_gf_tail_95_115',
+    'generated_name',
+    'aura',
+    'aura_context',
+    'source_context',
+    'pcount',
+    'combat_stats',
+}
+_BOUND_DEMON_VALIDATED_ALLOWED_KEYS = {
+    'mode',
+    'package_id',
+    'monster_hcidx',
+    'monster_seed',
+}
+
+
+def _normalize_bound_demon_mode(value):
+    if value is None:
+        return None
+    normalized = str(value).strip().lower().replace('-', '_')
+    return ' '.join(normalized.split())
+
+
+def _is_enabled_flag(value):
+    if value is None or value is False:
+        return False
+    if isinstance(value, str):
+        return value.strip().lower() not in ('', '0', 'false', 'no', 'off')
+    if isinstance(value, (int, float)):
+        return value != 0
+    return True
+
+
+def _validated_package_support_error(spec):
+    from d2r_chargen.bound_demon_registry import (
+        get_bound_demon_package,
+        list_bound_demon_package_ids,
+    )
+
+    package_id = spec.get('package_id')
+    if not package_id:
+        known = ", ".join(list_bound_demon_package_ids())
+        return (
+            "bound_demon.mode='synthesis_validated' requires a package_id "
+            f"from the validated registry. Available package ids: "
+            f"{known or '(none)'}"
+        )
+
+    package = get_bound_demon_package(str(package_id))
+    if package is None:
+        known = ", ".join(list_bound_demon_package_ids(enabled_only=False))
+        return (
+            f"Unknown bound_demon package_id={package_id!r}. "
+            f"Known package ids: {known or '(none)'}"
+        )
+    if not package.enabled:
+        return (
+            f"bound_demon package_id={package_id!r} is documented but not "
+            "enabled for public chargen"
+        )
+
+    extra_keys = sorted(set(spec) - _BOUND_DEMON_VALIDATED_ALLOWED_KEYS)
+    if extra_keys:
+        return (
+            f"bound_demon package_id={package_id!r} controls its own "
+            "row, seed, affix tuple, context slices, and semantic claims. "
+            "Remove unsupported synthesis field(s): "
+            f"{', '.join(extra_keys)}."
+        )
+
+    if 'monster_hcidx' in spec:
+        monster_hcidx = _parse_int_token(spec['monster_hcidx'], 'monster_hcidx')
+        if monster_hcidx != package.monster_hcidx:
+            return (
+                f"bound_demon package_id={package_id!r} supports "
+                f"monster_hcidx={package.monster_hcidx}; requested "
+                f"monster_hcidx={monster_hcidx}"
+            )
+    if 'monster_seed' in spec:
+        monster_seed = _parse_int_token(spec['monster_seed'], 'monster_seed')
+        if monster_seed != package.monster_seed:
+            return (
+                f"bound_demon package_id={package_id!r} supports "
+                f"monster_seed=0x{package.monster_seed:08x}; requested "
+                f"monster_seed=0x{monster_seed:08x}"
+            )
+    return None
+
+
+def is_bound_demon_validated_package_request(spec):
+    if not isinstance(spec, dict):
+        return False
+    mode = _normalize_bound_demon_mode(spec.get('mode'))
+    return mode in _BOUND_DEMON_VALIDATED_SYNTHESIS_MODES
+
+
+def bound_demon_synthesis_support_error(spec):
+    """Return a public-safe error for unsupported bound-demon synthesis YAML."""
+    if not isinstance(spec, dict):
+        return None
+
+    mode = _normalize_bound_demon_mode(spec.get('mode'))
+    if mode in _BOUND_DEMON_VALIDATED_SYNTHESIS_MODES:
+        return _validated_package_support_error(spec)
+    if mode in _BOUND_DEMON_ALGORITHMIC_SYNTHESIS_MODES:
+        return (
+            f"bound_demon.mode={spec.get('mode')!r} is a planned "
+            "algorithmic synthesis surface. Public chargen only supports "
+            "template/template_path authoring and exact "
+            "synthesis_validated package ids."
+        )
+    if mode is not None and mode not in _BOUND_DEMON_TEMPLATE_MODES:
+        return (
+            f"Unsupported bound_demon.mode={spec.get('mode')!r}; public "
+            "chargen supports template/template_path authoring or "
+            "synthesis_validated package ids."
+        )
+
+    if 'package_id' in spec:
+        return (
+            "bound_demon.package_id is only valid with "
+            "mode: synthesis_validated. Use a registry package id, or remove "
+            "package_id and use template/template_path."
+        )
+
+    enabled_flags = [
+        key for key in sorted(_BOUND_DEMON_SYNTHESIS_FLAGS)
+        if key in spec and _is_enabled_flag(spec.get(key))
+    ]
+    explicit_keys = [
+        key for key in sorted(_BOUND_DEMON_SYNTHESIS_KEYS)
+        if key in spec and _is_enabled_flag(spec.get(key))
+    ]
+    blocked = enabled_flags + [
+        key for key in explicit_keys
+        if key not in enabled_flags
+    ]
+    if blocked:
+        return (
+            "bound_demon uses synthesis-only field(s): "
+            f"{', '.join(blocked)}. These fields require a validated package "
+            "entry and are not accepted as raw YAML inputs; use "
+            "mode: synthesis_validated with a package_id, or use "
+            "template/template_path and preserve source context instead."
+        )
+    return None
+
 
 def encode_skill_tab_param(global_tab):
     """Convert a global skill tab index (0-23) to D2R binary encoding.
@@ -623,24 +800,51 @@ def _resolve_bound_demon_template_path(spec, fixtures_dir):
     )
 
 
+def _load_bound_demon_template_payload(path, template_label):
+    from d2r_chargen.follower_block import DEMON_PAYLOAD_LEN, decode_follower_block
+
+    data = path.read_bytes()
+    if len(data) == DEMON_PAYLOAD_LEN:
+        return data
+
+    block = decode_follower_block(data)
+    if not block.has_follower:
+        raise ValueError(
+            f'Template {template_label!r} has no follower block — '
+            f'pick a fixture with an active demon'
+        )
+    if len(block.payload) != DEMON_PAYLOAD_LEN:
+        raise ValueError(
+            f'Template {template_label!r} has follower payload length '
+            f'{len(block.payload)}; expected {DEMON_PAYLOAD_LEN}'
+        )
+    return block.payload
+
+
 def resolve_bound_demon(spec, fixtures_dir, *, effective_bind_level=None):
     """Resolve a YAML `bound_demon:` block to its 116-byte demon payload.
 
     The safe baseline is `template: NAME`, which extracts the demon payload
     verbatim from `<fixtures_dir>/NAME.d2s` via decode_follower_block.
-    For local/private templates, `template_path: PATH` may point at a .d2s
+    For local user-owned templates, `template_path: PATH` may point at a .d2s
     outside the tracked fixtures directory.
 
     Experimental template-derived overrides may change fields that have live
-    evidence behind them:
+    evidence behind them. Template-derived authoring preserves the source
+    monster_seed; explicit seed inputs are accepted only through exact
+    synthesis_validated registry packages.
 
       - monster_hcidx: u16 at +4
-      - monster_seed: u32 at +6
       - bind_level / bind_demon_level: u32 at +52
       - affixes / raw_affixes: exact MonUMod entries at +80..+86
       - source_affixes + skill_affixes: player-facing composition where
         source monster affixes are followed by skill-granted Bind Demon
         threshold affixes derived from effective_bind_level
+
+    Algorithmic synthesis modes and explicit context-slice fields are
+    intentionally rejected here unless the request names an enabled validated
+    package. This keeps template-derived authoring separate from unsupported
+    arbitrary source/effect or aura synthesis.
 
     Args:
         spec: The dict under `bound_demon:` in the char YAML.
@@ -658,6 +862,14 @@ def resolve_bound_demon(spec, fixtures_dir, *, effective_bind_level=None):
             has no follower block to copy from.
         FileNotFoundError: Template file not found in fixtures_dir.
     """
+    synthesis_error = bound_demon_synthesis_support_error(spec)
+    if synthesis_error:
+        raise ValueError(synthesis_error)
+    if is_bound_demon_validated_package_request(spec):
+        from d2r_chargen.bound_demon_registry import build_bound_demon_package_payload
+
+        return build_bound_demon_package_payload(str(spec['package_id']))
+
     fixture_path, template_label = _resolve_bound_demon_template_path(
         spec,
         fixtures_dir,
@@ -669,25 +881,17 @@ def resolve_bound_demon(spec, fixtures_dir, *, effective_bind_level=None):
 
     # Imported here (not at module top) to avoid a circular dep risk and
     # keep import time light when bound_demon isn't used.
-    from d2r_chargen.follower_block import decode_follower_block, mutate_demon_payload
+    from d2r_chargen.follower_block import mutate_demon_payload
 
-    fixture_data = fixture_path.read_bytes()
-    block = decode_follower_block(fixture_data)
-    if not block.has_follower:
-        raise ValueError(
-            f'Template {template_label!r} has no follower block — '
-            f'pick a fixture with an active demon'
-        )
-
+    template_payload = _load_bound_demon_template_payload(
+        fixture_path,
+        template_label,
+    )
     monster_hcidx = None
     if 'monster_hcidx' in spec:
         monster_hcidx = _parse_int_token(spec['monster_hcidx'], 'monster_hcidx')
     elif 'monster' in spec:
         monster_hcidx = _parse_int_token(spec['monster'], 'monster')
-
-    monster_seed = None
-    if 'monster_seed' in spec:
-        monster_seed = _parse_int_token(spec['monster_seed'], 'monster_seed')
 
     bind_level = None
     if 'bind_level' in spec:
@@ -739,14 +943,13 @@ def resolve_bound_demon(spec, fixtures_dir, *, effective_bind_level=None):
 
     has_override = any(
         value is not None
-        for value in (monster_hcidx, monster_seed, bind_level, affix_indices)
+        for value in (monster_hcidx, bind_level, affix_indices)
     )
     zero_volatile = bool(spec.get('zero_volatile', has_override))
 
     return mutate_demon_payload(
-        block.payload,
+        template_payload,
         monster_hcidx=monster_hcidx,
-        monster_seed=monster_seed,
         bind_level=bind_level,
         affix_indices=affix_indices,
         zero_volatile=zero_volatile,

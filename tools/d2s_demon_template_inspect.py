@@ -103,7 +103,10 @@ def _monstats_context(excel_dir: Path, monster_hcidx: int) -> dict[str, Any]:
     return {
         "row_index": monster_hcidx,
         "fields": fields,
-        "note": "payload monster_hcidx is this zero-based MonStats row index, not the *hcIdx column",
+        "note": (
+            "payload monster_hcidx is this zero-based MonStats row index, "
+            "not the *hcIdx column"
+        ),
     }
 
 
@@ -199,7 +202,10 @@ def build_report(
         "warnings": [
             "Template-free bound-demon synthesis remains blocked; preserve template bytes.",
             "Payload +52 is persisted bind metadata, not effective Bind Demon level.",
-            "Payload monster_hcidx is a zero-based MonStats row index, not the MonStats *hcIdx column.",
+            (
+                "Payload monster_hcidx is a zero-based MonStats row index, "
+                "not the MonStats *hcIdx column."
+            ),
         ],
     }
 
@@ -222,6 +228,33 @@ def build_report(
             compare_hcidx,
         )
     return report
+
+
+def extract_payload(input_path: Path, output_path: Path) -> dict[str, Any]:
+    payload, source = _load_payload(input_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_bytes(payload)
+    fields = parse_demon_payload(payload)
+    return {
+        "path": str(output_path),
+        "payload_length": len(payload),
+        "input_kind": source["input_kind"],
+        "monster_hcidx": fields.monster_hcidx,
+        "privacy_note": (
+            "local template output; keep outside tracked public fixtures unless "
+            "it is intentionally safe to publish"
+        ),
+    }
+
+
+def _yaml_snippet(template_path: str, monster_hcidx: int) -> str:
+    return "\n".join(
+        [
+            "bound_demon:",
+            f"  template_path: {template_path}",
+            f"  monster_hcidx: {monster_hcidx}",
+        ]
+    )
 
 
 def _format_affixes(rows: list[dict[str, Any]]) -> list[str]:
@@ -324,6 +357,22 @@ def format_report_text(report: dict[str, Any]) -> str:
 
     lines.extend([""])
     lines.extend(_format_unknown_slices(report["unknown_slices"]))
+
+    if "extraction" in report:
+        extraction = report["extraction"]
+        lines.extend(
+            [
+                "",
+                "extraction:",
+                f"  path: {extraction['path']}",
+                f"  payload_length: {extraction['payload_length']}",
+                f"  note: {extraction['privacy_note']}",
+            ]
+        )
+
+    if "yaml_snippet" in report:
+        lines.extend(["", "yaml_snippet:", report["yaml_snippet"]])
+
     lines.extend(["", "warnings:"])
     lines.extend(f"  - {warning}" for warning in report["warnings"])
     return "\n".join(lines)
@@ -356,12 +405,33 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--include-path",
         action="store_true",
-        help="Include the local input path. Keep this private.",
+        help="Include the local input path. Keep this local/untracked.",
     )
     parser.add_argument(
         "--include-values",
         action="store_true",
-        help="Include seed and raw unknown-slice bytes. Keep this private.",
+        help="Include seed and raw unknown-slice bytes. Keep this local/untracked.",
+    )
+    parser.add_argument(
+        "--extract-payload",
+        type=Path,
+        help=(
+            "Write the 116-byte follower payload to this local path. The "
+            "output is a local template; keep it untracked unless it is safe "
+            "to publish."
+        ),
+    )
+    parser.add_argument(
+        "--emit-yaml-snippet",
+        action="store_true",
+        help="Emit a template_path YAML snippet for the inspected/extracted payload.",
+    )
+    parser.add_argument(
+        "--snippet-template-path",
+        help=(
+            "Template path to place in the emitted YAML snippet. Defaults to "
+            "--extract-payload when extracting, otherwise a placeholder."
+        ),
     )
     return parser.parse_args(argv)
 
@@ -376,6 +446,20 @@ def main(argv: list[str] | None = None) -> int:
             include_path=args.include_path,
             include_values=args.include_values,
         )
+        if args.extract_payload:
+            report["extraction"] = extract_payload(
+                args.input,
+                args.extract_payload,
+            )
+        if args.emit_yaml_snippet or args.extract_payload:
+            snippet_path = (
+                args.snippet_template_path
+                or (str(args.extract_payload) if args.extract_payload else "<template_path>")
+            )
+            report["yaml_snippet"] = _yaml_snippet(
+                snippet_path,
+                report["monster_hcidx"],
+            )
     except Exception as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1

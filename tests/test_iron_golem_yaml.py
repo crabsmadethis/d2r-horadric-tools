@@ -39,6 +39,22 @@ def _necromancer_with_golem(item):
     }
 
 
+def _flags(payload: bytes) -> int:
+    return struct.unpack_from("<I", payload, 0)[0]
+
+
+def _flags_at(payload: bytes, offset: int) -> int:
+    return struct.unpack_from("<I", payload, offset)[0]
+
+
+def _bits_at(payload: bytes, bit_offset: int, width: int) -> int:
+    value = 0
+    for idx in range(width):
+        pos = bit_offset + idx
+        value |= ((payload[pos >> 3] >> (pos & 7)) & 1) << idx
+    return value
+
+
 def test_build_normal_iron_golem_item_header():
     payload = build_iron_golem_item({"normal": True, "base": "flc"})
     header = decode_iron_golem_item_header(payload)
@@ -49,6 +65,19 @@ def test_build_normal_iron_golem_item_header():
     assert header.storage == 0
     assert header.location == 1
     assert header.bodyloc == 4
+
+
+def test_build_ethereal_normal_iron_golem_item_sets_flag():
+    payload = build_iron_golem_item({
+        "normal": True,
+        "base": "flc",
+        "ethereal": True,
+    })
+    header = decode_iron_golem_item_header(payload)
+
+    assert header is not None
+    assert header.quality == 2
+    assert _flags(payload) & (1 << 22)
 
 
 def test_build_magic_iron_golem_item_header():
@@ -69,12 +98,162 @@ def test_build_magic_iron_golem_item_header():
     assert len(magic) > len(normal)
 
 
+@pytest.mark.parametrize(
+    ("item", "quality", "type_code"),
+    [
+        (
+            {"set": "Civerb's Cudgel", "properties": {"enhanced_dmg": 50}},
+            5,
+            "gsc",
+        ),
+        (
+            {
+                "rare": True,
+                "base": "flc",
+                "rare_first_name": 0,
+                "rare_last_name": 0,
+                "properties": {"fire_res": 10},
+            },
+            6,
+            "flc",
+        ),
+        (
+            {
+                "crafted": True,
+                "base": "flc",
+                "rare_first_name": 0,
+                "rare_last_name": 0,
+                "properties": {"fire_res": 10},
+            },
+            8,
+            "flc",
+        ),
+        (
+            {"unique": "The Gnasher", "allow_canonicalized": True},
+            7,
+            "hax",
+        ),
+    ],
+)
+def test_build_proven_single_parent_iron_golem_families(item, quality, type_code):
+    payload = build_iron_golem_item(item)
+    header = decode_iron_golem_item_header(payload)
+
+    assert header is not None
+    assert header.type_code == type_code
+    assert header.quality == quality
+    assert header.storage == 0
+    assert header.location == 1
+    assert header.col == header.bodyloc
+
+
+def test_build_socketed_normal_iron_golem_parent_without_fillers():
+    payload = build_iron_golem_item({
+        "normal": True,
+        "base": "flc",
+        "socketed": True,
+        "num_sockets": 1,
+    })
+    header = decode_iron_golem_item_header(payload)
+
+    assert header is not None
+    assert header.quality == 2
+    assert header.type_code == "flc"
+    assert _flags(payload) & (1 << 11)
+
+
 def test_normal_iron_golem_item_rejects_properties():
     with pytest.raises(ValueError, match="normal items cannot specify properties"):
         build_iron_golem_item({
             "normal": True,
             "base": "flc",
             "properties": {"fire_res": 10},
+        })
+
+
+def test_unique_iron_golem_requires_canonicalization_opt_in():
+    with pytest.raises(ValueError, match="allow_canonicalized"):
+        build_iron_golem_item({"unique": "The Gnasher"})
+
+
+def test_build_runeword_iron_golem_item_includes_socket_fillers():
+    payload = build_iron_golem_item({
+        "runeword": "Strength",
+        "base": "flc",
+    })
+    header = decode_iron_golem_item_header(payload)
+
+    assert header is not None
+    assert header.type_code == "flc"
+    assert header.quality == 2
+    assert header.storage == 0
+    assert header.location == 1
+    assert header.col == header.bodyloc
+    assert _flags(payload) & (1 << 11)
+    assert _flags(payload) & (1 << 26)
+
+    # Live validation proved the golem block expects a JM-less parent followed
+    # immediately by socket filler records before the `01 00 lf` bridge.
+    parent_len = 32
+    filler_len = 11
+    assert len(payload) == parent_len + (2 * filler_len)
+    for idx, offset in enumerate((parent_len, parent_len + filler_len)):
+        flags = _flags_at(payload, offset)
+        assert flags & (1 << 21)
+        assert _bits_at(payload, (offset * 8) + 35, 3) == 6
+        assert _bits_at(payload, (offset * 8) + 42, 4) == idx
+
+
+def test_runeword_iron_golem_rejects_manual_socket_overrides():
+    with pytest.raises(ValueError, match="sockets are derived"):
+        build_iron_golem_item({
+            "runeword": "Strength",
+            "base": "flc",
+            "socketed": True,
+            "num_sockets": 2,
+        })
+
+
+@pytest.mark.parametrize(
+    "key",
+    ["rune_codes", "runes", "fillers", "jewels", "socket_fillers"],
+)
+def test_iron_golem_rejects_manual_socket_filler_keys(key):
+    with pytest.raises(ValueError, match="socket filler keys"):
+        build_iron_golem_item({
+            "normal": True,
+            "base": "flc",
+            key: ["r01"],
+        })
+
+
+def test_socketed_magic_iron_golem_remains_blocked():
+    with pytest.raises(ValueError, match="socketed support is limited to normal"):
+        build_iron_golem_item({
+            "magic": True,
+            "base": "flc",
+            "socketed": True,
+            "num_sockets": 1,
+            "properties": {"fire_res": 10},
+        })
+
+
+def test_iron_golem_num_sockets_requires_socketed_flag():
+    with pytest.raises(ValueError, match="num_sockets requires socketed"):
+        build_iron_golem_item({
+            "normal": True,
+            "base": "flc",
+            "num_sockets": 1,
+        })
+
+
+def test_socketed_iron_golem_rejects_over_max_socket_count():
+    with pytest.raises(ValueError, match="supports at most"):
+        build_iron_golem_item({
+            "normal": True,
+            "base": "flc",
+            "socketed": True,
+            "num_sockets": 3,
         })
 
 

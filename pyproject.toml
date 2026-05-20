@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "d2r-tools"
-version = "1.1.0"
+version = "1.2.0"
 description = "D2R modding toolkit — YAML character builder and data pipeline"
 readme = "README.md"
 requires-python = ">=3.11"

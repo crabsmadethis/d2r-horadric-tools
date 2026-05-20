@@ -261,9 +261,12 @@ def _decode_single_item(data, pos):
     item_dict['_storage'] = storage
     item_dict['_bodyloc'] = bodyloc
     item_dict['_location'] = location
-    item_dict['_is_filler'] = is_simple and location == 6
+    item_dict['_is_filler'] = location == 6
 
-    if item_dict['_is_filler'] and tc in _RUNE_CODES:
+    if item_dict['_is_filler']:
+        item_dict['socket_index'] = col
+
+    if item_dict['_is_filler'] and is_simple and tc in _RUNE_CODES:
         rune_name = RUNE_CODE_TO_NAME.get(tc, tc)
         item_dict['rune'] = rune_name
         return item_dict

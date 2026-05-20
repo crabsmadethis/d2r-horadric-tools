@@ -17,6 +17,7 @@ CHECK_PATHS = [
     "docs",
     ".github",
     "plugin",
+    "tools",
     "d2r_mcp",
     "tests/fixtures",
     "chars",
@@ -38,12 +39,27 @@ PATTERNS = [
     (r"\brecovered-repos\b", "project-hub path"),
     (r"\bd2r-hyper\b|\bd2r-control\b|\bd2r_play\b", "private repo/module reference"),
     (r"\bprivate harness\b", "private harness reference"),
+    (r"\bmemory[- ]observation\b", "private observation wording"),
+    (r"\bruntime observation\b", "private observation wording"),
+    (
+        r"\bprivate (observer|runtime|report|candidate|mutation)\b",
+        "private observation wording",
+    ),
+    (r"\bcontrol harness\b", "private control-harness wording"),
+    (r"\breverse[- ]engineering\b", "reverse-engineering wording"),
     (r"Steam userdata|Proton compatdata|steamapps/compatdata", "machine-specific save path"),
     (r"/Users/|/home/[A-Za-z0-9_.-]+", "machine-specific absolute path"),
     (r"\bSK256\b|\.claude/file-history|docs/recovered-memory", "local recovery artifact"),
     (r"github-cleanup-agent-plan|Agent Topology|cleanup agents?", "internal agent plan"),
     (r"\bworker agents?\b|orchestrator owns", "internal agent plan"),
-    (r"\blive[- ]test\b|\blive D2R\b|\blive probe\b", "live-test scratchpad wording"),
+    (
+        r"\blive[- ]test\b|\blive D2R\b|\blive probe\b|\blive[- ]validation\b",
+        "live-test scratchpad wording",
+    ),
+    (
+        r"\bmxseed[a-z]*\b|\bsynth(?!esis|esize|etic)[a-z]+\b",
+        "disposable validation character name",
+    ),
     (
         r"\bD2SProbe\b|\bprobewldemon\b|\bprobesorc\b|\bprobenecro\b|"
         r"\bprobewlzero\b|\bprobewlalt\b|\bprobewltwo\b|\bprobewlmix\b|"
@@ -67,7 +83,8 @@ def iter_files() -> list[Path]:
                 p
                 for p in path.rglob("*")
                 if p.is_file()
-                and p.suffix.lower() in {".md", ".yml", ".yaml", ".txt"}
+                and p.name != "public_hygiene_check.py"
+                and p.suffix.lower() in {".md", ".py", ".yml", ".yaml", ".txt"}
                 and ".pytest_cache" not in p.parts
             )
     return sorted(set(files))

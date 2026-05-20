@@ -34,9 +34,53 @@ def test_warn_bound_demon_source_affixes_need_template_context(capsys):
     output = captured.err or captured.out
 
     assert 'bound_demon.source_affixes' in output
-    assert 'compatible template source context' in output
+    assert 'template-derived or validated package context' in output
+    assert 'does not synthesize arbitrary source effects' in output
     assert 'tools/d2s_demon_template_inspect.py' in output
     assert 'docs/bound-demon-template-recipes.md' in output
+
+
+def test_validate_accepts_validated_bound_demon_package(capsys):
+    char_def = _base_warlock_char_def()
+    char_def['bound_demon'] = {
+        'mode': 'synthesis_validated',
+        'package_id': 'row724-black-lancer-seedg-holy-shock-v1',
+        'monster_hcidx': 724,
+    }
+
+    validate_char_def(char_def)
+    captured = capsys.readouterr()
+    output = captured.err or captured.out
+    assert 'bound_demon.synthesis_validated' in output
+    assert 'row724-black-lancer-seedg-holy-shock-v1' in output
+
+
+def test_validate_rejects_algorithmic_bound_demon_synthesis_mode():
+    char_def = _base_warlock_char_def()
+    char_def['bound_demon'] = {
+        'mode': 'synthesis',
+        'monster': 'Black Lancer',
+    }
+
+    with pytest.raises(
+        ValueError,
+        match='algorithmic synthesis surface',
+    ):
+        validate_char_def(char_def)
+
+
+def test_validate_rejects_synthesis_only_context_fields():
+    char_def = _base_warlock_char_def()
+    char_def['bound_demon'] = {
+        'template': 'black_lancer_example',
+        'runtime_stats_24_31': '02 00 00 00 43 00 00 00',
+    }
+
+    with pytest.raises(
+        ValueError,
+        match='runtime_stats_24_31.*validated package',
+    ):
+        validate_char_def(char_def)
 
 
 def test_no_bound_demon_source_warning_without_source_affixes(capsys):
