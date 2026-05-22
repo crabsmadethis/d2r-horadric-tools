@@ -92,7 +92,7 @@ an expansion bit; in current evidence it is the died flag.
 
 ### Merc And Difficulty Overlap
 
-The public writer has to account for an overlapping header region:
+The writer has to account for an overlapping header region:
 
 - Softcore difficulty/act state uses `0xa8..0xaa` as a three-byte act tuple:
   `00 <act_index> 00`, where `act_index = difficulty * 5`.
