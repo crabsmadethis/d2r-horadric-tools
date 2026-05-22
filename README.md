@@ -5,14 +5,14 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform: Linux](https://img.shields.io/badge/platform-Linux%20%7C%20Steam%20Deck-orange.svg)](#platform-support)
 
-Horadric Tools is a Python toolkit for offline Diablo II: Resurrected save and
+Horadric Tools is a Python/MCP toolkit for offline Diablo II: Resurrected save and
 data-mod workflows. It builds `.d2s` characters from YAML, scans save files
-before they are loaded, builds data mods from declarative patches, and exposes
-the same operations through an MCP server.
+before they are loaded, builds data mods for single player, and exposes
+the same capabilities through an MCP server. 
 
 The repository is Linux / Steam Deck first. Windows path detection exists but
 needs more testing. The repo does not ship Blizzard game data, private save
-files, memory captures, or Battle.net automation.
+files, or Battle.net automation.
 
 ## Toolkit Scope
 
