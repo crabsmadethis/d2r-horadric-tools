@@ -441,7 +441,10 @@ class TestFreshnessGate(unittest.TestCase):
 
     def test_stale_import_blocks_deploy(self):
         """deploy_character returns False with stale checksum."""
-        import yaml
+        try:
+            import yaml  # type: ignore
+        except ModuleNotFoundError:
+            self.skipTest("PyYAML not installed")
         from d2r_chargen.character import deploy_character
 
         saves = SAVES
@@ -484,6 +487,10 @@ class TestFreshnessGate(unittest.TestCase):
 
     def test_no_import_metadata_skips_gate(self):
         """Hand-written YAML (no _imported_at) bypasses freshness check."""
+        try:
+            import yaml  # noqa: F401
+        except ModuleNotFoundError:
+            self.skipTest("PyYAML not installed")
         from d2r_chargen.character import load_character_yaml
         yaml_path = os.path.join(CHARS_DIR, 'Tempest.yaml')
         if not os.path.exists(yaml_path):
