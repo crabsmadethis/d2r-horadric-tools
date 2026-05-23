@@ -2,6 +2,15 @@ import hashlib
 
 import pytest
 
+pytest.importorskip(
+    "d2r_chargen.data.item_stat_cost",
+    reason="game data not extracted (run 'd2r-mod extract')",
+)
+pytest.importorskip(
+    "d2r_chargen.data.item_bases",
+    reason="game data not extracted (run 'd2r-mod extract')",
+)
+
 from d2r_chargen import items
 from d2r_chargen.data import magic_affixes
 from d2r_chargen.importer import _decode_rare_name_ids, _decode_single_item
