@@ -203,6 +203,15 @@ def _parse_rare_name_file(filename):
     return result
 
 
+def _build_rare_name_index(parsed):
+    """Build a case-insensitive rare display-name lookup."""
+    by_name = {}
+    for entries in parsed.values():
+        for row_id, name in entries:
+            by_name.setdefault(name.lower(), row_id)
+    return by_name
+
+
 # Parse at import time
 PREFIXES = _parse_affix_file('MagicPrefix.txt')
 SUFFIXES = _parse_affix_file('MagicSuffix.txt')
@@ -210,6 +219,7 @@ PREFIX_BY_NAME = _build_name_index(PREFIXES)
 SUFFIX_BY_NAME = _build_name_index(SUFFIXES)
 RARE_FIRST_NAMES = _parse_rare_name_file('RarePrefix.txt')
 RARE_LAST_NAMES = _parse_rare_name_file('RareSuffix.txt')
+RARE_DISPLAY_NAME_BY_NAME = _build_rare_name_index(RARE_LAST_NAMES)
 
 
 def _get_itypes(type_code):
@@ -438,10 +448,13 @@ def auto_select_rare_names(type_code, seed=0):
     if not itypes:
         return (0, 0)
 
-    # Collect candidate first names (from RarePrefix.txt)
+    # D2R v105 displays both rare/crafted name fields through RareSuffix.txt.
+    # RarePrefix.txt exists in the data files, but isolated Offline tooltip
+    # validation showed first-name values 1 and 40 as RareSuffix rows
+    # "bite" and "needle", not RarePrefix rows "Beast" and "Entropy".
     first_candidates = []
     for itype in itypes:
-        first_candidates.extend(RARE_FIRST_NAMES.get(itype, []))
+        first_candidates.extend(RARE_LAST_NAMES.get(itype, []))
     # Deduplicate by row_id
     seen = set()
     first_unique = []
@@ -450,7 +463,6 @@ def auto_select_rare_names(type_code, seed=0):
             seen.add(rid)
             first_unique.append((rid, name))
 
-    # Collect candidate last names (from RareSuffix.txt)
     last_candidates = []
     for itype in itypes:
         last_candidates.extend(RARE_LAST_NAMES.get(itype, []))
@@ -474,3 +486,11 @@ def auto_select_rare_names(type_code, seed=0):
         last_id = last_unique[idx][0]
 
     return (first_id, last_id)
+
+
+def resolve_rare_display_name(name):
+    """Resolve a RareSuffix.txt display name to an 8-bit rare name field."""
+    key = name.lower()
+    if key not in RARE_DISPLAY_NAME_BY_NAME:
+        raise ValueError(f"Unknown rare/crafted display name: {name}")
+    return RARE_DISPLAY_NAME_BY_NAME[key]

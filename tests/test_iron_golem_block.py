@@ -116,6 +116,100 @@ def test_compare_runeword_golem_payload_groups_parent_diffs():
     }]
 
 
+def test_compare_runeword_golem_payload_groups_socket_filler_diffs():
+    pytest.importorskip(
+        "d2r_chargen.data.runewords",
+        reason="game data not extracted (run 'd2r-mod extract')",
+    )
+    from d2r_chargen.items import build_iron_golem_item
+
+    before = build_iron_golem_item({"runeword": "Strength", "base": "flc"})
+    after = bytearray(before)
+    after[36] ^= 0x01
+    after[48] ^= 0x02
+
+    comparison = compare_iron_golem_payloads(before, bytes(after))
+
+    assert comparison["same_length"] is True
+    assert comparison["diff_offsets"] == [36, 48]
+    assert comparison["record_groups"] == [
+        {
+            "role": "socket_filler_0",
+            "offset": 32,
+            "length": 11,
+            "diff_count": 1,
+            "diff_offsets": [36],
+            "relative_offsets": [4],
+        },
+        {
+            "role": "socket_filler_1",
+            "offset": 43,
+            "length": 11,
+            "diff_count": 1,
+            "diff_offsets": [48],
+            "relative_offsets": [5],
+        },
+    ]
+
+
+def test_compare_unique_helm_golem_payload_groups_d2r_bodyloc_rewrite():
+    pytest.importorskip(
+        "d2r_chargen.data.item_bases",
+        reason="game data not extracted (run 'd2r-mod extract')",
+    )
+    from d2r_chargen.items import build_iron_golem_item
+
+    before = build_iron_golem_item({
+        "unique": "Tarnhelm",
+        "allow_canonicalized": True,
+    })
+    after = bytearray(before)
+    after[4] = 0x4D
+    after[5] = 0x04
+
+    comparison = compare_iron_golem_payloads(before, bytes(after))
+
+    assert comparison["same_length"] is True
+    assert comparison["diff_offsets"] == [4, 5]
+    assert comparison["record_groups"] == [{
+        "role": "parent",
+        "offset": 0,
+        "length": 28,
+        "diff_count": 2,
+        "diff_offsets": [4, 5],
+        "relative_offsets": [4, 5],
+    }]
+
+
+def test_compare_unique_axe_golem_payload_groups_d2r_canonicalization_rewrite():
+    pytest.importorskip(
+        "d2r_chargen.data.item_bases",
+        reason="game data not extracted (run 'd2r-mod extract')",
+    )
+    from d2r_chargen.items import build_iron_golem_item
+
+    before = build_iron_golem_item({
+        "unique": "The Gnasher",
+        "allow_canonicalized": True,
+    })
+    after = bytearray(before)
+    for offset in range(20, 28):
+        after[offset] ^= 0x01
+
+    comparison = compare_iron_golem_payloads(before, bytes(after))
+
+    assert comparison["same_length"] is True
+    assert comparison["diff_offsets"] == list(range(20, 28))
+    assert comparison["record_groups"] == [{
+        "role": "parent",
+        "offset": 0,
+        "length": len(before),
+        "diff_count": 8,
+        "diff_offsets": list(range(20, 28)),
+        "relative_offsets": list(range(20, 28)),
+    }]
+
+
 def test_follower_decoder_allows_active_golem_gap():
     payload = b"D" * 116
     data = _save_with_tail(

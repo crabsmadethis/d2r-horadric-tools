@@ -133,6 +133,11 @@ def test_build_magic_iron_golem_item_header():
             7,
             "hax",
         ),
+        (
+            {"unique": "Tarnhelm", "allow_canonicalized": True},
+            7,
+            "skp",
+        ),
     ],
 )
 def test_build_proven_single_parent_iron_golem_families(item, quality, type_code):

@@ -8,7 +8,6 @@ import shutil
 import struct
 import sys
 
-import yaml
 from d2r_chargen.config import (
     SAVES, CHARS_DIR, FIXTURES_DIR, SLOT_MAP, CLASS_DEFS, CHARM_DIMS,
 )
@@ -86,6 +85,13 @@ def load_character_yaml(path):
         ValueError: If schema_version is wrong or required fields are missing.
         FileNotFoundError: If the YAML file doesn't exist.
     """
+    try:
+        import yaml  # type: ignore
+    except ModuleNotFoundError as exc:
+        raise ModuleNotFoundError(
+            "PyYAML is required to load character YAML (install with 'pip install pyyaml')."
+        ) from exc
+
     with open(path, 'r') as f:
         char_def = yaml.safe_load(f)
 
@@ -257,6 +263,13 @@ def _resolve_merc_template(char_def):
     Loads the template from d2r_chars/merc_templates.yaml and merges it
     into the character definition.
     """
+    try:
+        import yaml  # type: ignore
+    except ModuleNotFoundError as exc:
+        raise ModuleNotFoundError(
+            "PyYAML is required to load merc templates (install with 'pip install pyyaml')."
+        ) from exc
+
     merc = char_def['merc']
     template_name = merc['template']
 
@@ -1384,6 +1397,13 @@ def deploy_character(char_name, phase=4, force=False):
     # Freshness gate: peek at raw YAML for import metadata before full validation.
     # This must happen before load_character_yaml (which requires 'equipment').
     if not force:
+        try:
+            import yaml  # type: ignore
+        except ModuleNotFoundError as exc:
+            raise ModuleNotFoundError(
+                "PyYAML is required to load character YAML (install with 'pip install pyyaml')."
+            ) from exc
+
         with open(yaml_path, 'r') as _f:
             _raw = yaml.safe_load(_f)
         if isinstance(_raw, dict) and '_imported_at' in _raw and '_imported_checksum' in _raw:

@@ -108,12 +108,12 @@ def get_base_flags(type_code):
     if info is None:
         return 0  # unknown type: no defense, no durability, no quantity
     flags = info['flags']
-    # Add book bit (8) if item is in the 'Book' category
+    # Add book bit (8) if item is in the tome/book category.
     # item_bases.py line 536: tbk has categories=['Book', 'Miscellaneous'], flags=1
     # item_bases.py line 537: ibk has categories=['Book', 'Miscellaneous'], flags=1
     # But binary format needs base & 8 check for the 5-bit book type field
     categories = info.get('categories', [])
-    if 'Book' in categories:
+    if 'Book' in categories or 'Tome' in categories:
         flags |= 8  # add book bit
     return flags
 
@@ -597,6 +597,17 @@ def build_item(type_code, col, row, storage,
         # 5. Quantity (9-bit field)
         if quantity > 511:
             wc.warn(tc, f"quantity={quantity} exceeds 9-bit max (511)")
+        # 5b. Quantity persistence caveats (non-fatal)
+        #
+        # These bases accept quantities at the byte level, but representative
+        # Offline save/exit pulls have shown D2R may clear the field on
+        # save/exit. Warn to reduce confusion without blocking fixture-level
+        # encoding work.
+        if quantity and tc in {"toa", "tes", "pk1", "xa1"}:
+            wc.warn(
+                tc,
+                "D2R may clear misc/quest item quantity on save/exit; treat as non-persistent",
+            )
 
         # 6. Property value overflow checks
         if properties:

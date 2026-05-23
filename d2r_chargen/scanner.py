@@ -163,6 +163,20 @@ def bits_at(data, sb, c):
         p=sb+i; val|=((data[p>>3]>>(p&7))&1)<<i
     return val
 
+
+def _item_base_flags(type_code):
+    if ITEM_BASES_FULL is None:
+        return 0
+    base_info = ITEM_BASES_FULL.get(type_code.strip())
+    if not base_info:
+        return 0
+    flags = base_info.get('flags', 0)
+    categories = base_info.get('categories', [])
+    if 'Book' in categories or 'Tome' in categories:
+        flags |= 8
+    return flags
+
+
 def decode_huff1(data, pos):
     node=HUFFMAN_TREE
     while isinstance(node,list):
@@ -347,8 +361,7 @@ def navigate_item_structure(data, pos, quality, is_runeword, is_socketed, flags3
     try:
         tc, br = decode_huff4(data, br)
         tc_stripped = tc.strip()
-        base_info = ITEM_BASES_FULL.get(tc_stripped)
-        base = base_info['flags'] if base_info else 0
+        base = _item_base_flags(tc_stripped)
     except Exception:
         return None, None
 
@@ -433,7 +446,7 @@ def validate_item_properties(data, pos, itype, quality, is_runeword, is_socketed
 
     tc = itype.strip()
     base_info = ITEM_BASES_FULL.get(tc)
-    base = base_info['flags'] if base_info else 0
+    base = _item_base_flags(tc)
     if base_info is None and quality >= 3:
         return True, None, 0  # M4: unknown base (not in item_bases.py 659 entries), skip
 

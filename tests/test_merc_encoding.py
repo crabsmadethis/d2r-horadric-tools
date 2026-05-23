@@ -37,13 +37,13 @@ needs_fixture = pytest.mark.skipif(
 EXPECTED_FILE_SIZE = 2208
 
 # Merc header offsets (plain LE integers, established 2026-04-19)
-OFFSET_SEED   = 0xA3   # u32
-OFFSET_A7     = 0xA7   # u8  (always 5 for active merc)
-OFFSET_ID     = 0xA9   # u16 Hireling.Id
-OFFSET_XP     = 0xAB   # u32
+OFFSET_SEED = 0xA3  # u32
+OFFSET_STATUS_U16 = 0xA7  # u16 (semantics unknown; keep as a raw field)
+OFFSET_ID = 0xA9  # u16 Hireling.Id
+OFFSET_XP = 0xAB  # u32
 
 EXPECTED_SEED = 0x178E4E32
-EXPECTED_A7   = 5
+EXPECTED_STATUS_U16 = 5
 EXPECTED_ID   = 34       # Haseen, Act2 Desert HolyFreeze merc
 EXPECTED_XP   = 123603480
 
@@ -68,9 +68,11 @@ class TestMercHeader:
         seed = struct.unpack_from("<I", save_bytes, OFFSET_SEED)[0]
         assert seed == EXPECTED_SEED, f"seed=0x{seed:08x}, want 0x{EXPECTED_SEED:08x}"
 
-    def test_a7_active_merc(self, save_bytes):
-        a7 = save_bytes[OFFSET_A7]
-        assert a7 == EXPECTED_A7, f"a7={a7}, want {EXPECTED_A7}"
+    def test_merc_status_u16_0xa7(self, save_bytes):
+        status = struct.unpack_from("<H", save_bytes, OFFSET_STATUS_U16)[0]
+        assert status == EXPECTED_STATUS_U16, (
+            f"merc_status_u16_0xA7={status}, want {EXPECTED_STATUS_U16}"
+        )
 
     def test_hireling_id(self, save_bytes):
         merc_id = struct.unpack_from("<H", save_bytes, OFFSET_ID)[0]
@@ -810,7 +812,7 @@ class TestMercLevelResolve:
 
     def test_end_to_end_via_load_character_yaml(self, tmp_path):
         """Full path: YAML file with merc.level → load → xp populated."""
-        import yaml
+        yaml = pytest.importorskip("yaml", reason="PyYAML is required for YAML loading")
         from d2r_chargen.character import load_character_yaml
         yaml_content = {
             'schema_version': 1,

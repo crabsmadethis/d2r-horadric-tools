@@ -7,6 +7,8 @@ All items are tagged with section='char'. Merc gear goes to stash (storage=5)
 in the char JM section -- NEVER to the merc JM section (Rule 6: pre-injected
 merc JM items cause Error:8).
 """
+import hashlib
+
 from d2r_chargen.build_lib import build_item, encode_socketed_rune
 from d2r_chargen.config import SLOT_MAP
 from d2r_chargen.resolve import (
@@ -14,7 +16,10 @@ from d2r_chargen.resolve import (
 )
 from d2r_chargen.data.item_bases import ITEM_BASES
 from d2r_chargen.data.magic_affixes import (
-    auto_select_affixes, resolve_affix_name, auto_select_rare_names,
+    auto_select_affixes,
+    resolve_affix_name,
+    auto_select_rare_names,
+    resolve_rare_display_name,
 )
 
 def _resolve_magic_affixes(prefix_val, suffix_val, type_code, resolved_props):
@@ -51,11 +56,36 @@ def _resolve_magic_affixes(prefix_val, suffix_val, type_code, resolved_props):
     return (prefix_val, suffix_val)
 
 
+def _stable_rare_seed(type_code, props):
+    """Return a deterministic seed for automatic rare/crafted names."""
+    h = hashlib.blake2s(digest_size=8)
+    h.update(type_code.encode('ascii', errors='replace'))
+    for prop in props:
+        h.update(b'\0')
+        h.update(repr(prop).encode('ascii', errors='replace'))
+    return int.from_bytes(h.digest(), 'little') & 0x7FFFFFFF
+
+
+def _resolve_rare_name_value(value, *, is_first, type_code):
+    if isinstance(value, str):
+        return resolve_rare_display_name(value)
+    if value is None:
+        return 0
+    if not isinstance(value, int):
+        label = "rare_first_name" if is_first else "rare_last_name"
+        raise ValueError(f"{label} must be an integer row id or name string")
+    if value < 0 or value > 0xFF:
+        label = "rare_first_name" if is_first else "rare_last_name"
+        raise ValueError(f"{label} must fit in 8 bits, got {value}")
+    return value
+
+
 def _resolve_rare_names(first_val, last_val, type_code, props):
     """Resolve rare item first/last name values to numeric IDs.
 
     Supports:
       - int > 0: used as-is (explicit row ID)
+      - str: resolved by RareSuffix.txt display name (e.g., "bite", "grip")
       - 0 or missing: auto-selected based on item type
 
     Args:
@@ -67,9 +97,14 @@ def _resolve_rare_names(first_val, last_val, type_code, props):
     Returns:
         (first_name_id, last_name_id) tuple of ints
     """
+    first_val = _resolve_rare_name_value(
+        first_val, is_first=True, type_code=type_code
+    )
+    last_val = _resolve_rare_name_value(
+        last_val, is_first=False, type_code=type_code
+    )
     if not first_val or not last_val:
-        # Use a deterministic seed from type_code + properties for variety
-        seed = hash((type_code, tuple(str(p) for p in props))) & 0x7FFFFFFF
+        seed = _stable_rare_seed(type_code, props)
         auto_first, auto_last = auto_select_rare_names(type_code, seed)
         if not first_val:
             first_val = auto_first
@@ -137,6 +172,11 @@ def build_equipment_item(item_def, *, is_merc=False):
     Returns:
         List of (section, bytes) tuples. Section is always 'char'.
     """
+    if 'socket_fillers' in item_def:
+        raise ValueError(
+            "socket_fillers are currently supported only for normal stash_items"
+        )
+
     slot_name = item_def['slot']
     slot = SLOT_MAP[slot_name]
 
@@ -215,8 +255,9 @@ def build_iron_golem_item(item_def):
         )
     if 'unique' in item_def and not item_def.get('allow_canonicalized'):
         raise ValueError(
-            "iron_golem.item unique payloads canonicalize on save/exit; "
-            "set allow_canonicalized: true to opt in"
+            "iron_golem.item unique payloads canonicalize family-specific bytes on "
+            "save/exit (e.g. The Gnasher rewrites parent offsets +20..+27; "
+            "Tarnhelm rewrites +4/+5); set allow_canonicalized: true to opt in"
         )
     if quality_keys:
         built = build_equipment_item(item_def, is_merc=True)
@@ -616,6 +657,11 @@ def build_merc_item(item_def, stash_col, stash_row):
     Returns:
         List of (section, bytes) tuples. Section is always 'char'.
     """
+    if 'socket_fillers' in item_def and 'normal' not in item_def:
+        raise ValueError(
+            "socket_fillers are currently supported only for normal stash_items"
+        )
+
     if 'runeword' in item_def:
         return _build_merc_runeword(item_def, stash_col, stash_row)
     elif 'unique' in item_def:
@@ -797,6 +843,33 @@ def _build_merc_normal(item_def, col, row):
         raise ValueError("Normal items must specify 'base' code.")
 
     base_info = ITEM_BASES[base_code]
+    quantity = _resolve_normal_item_quantity(item_def, base_code, base_info)
+    fillers = _build_socket_fillers(item_def)
+    num_sockets = int(item_def.get('num_sockets', 0) or 0)
+
+    if fillers:
+        if not item_def.get('socketed'):
+            raise ValueError("socket_fillers require socketed: true")
+        if num_sockets != len(fillers):
+            raise ValueError(
+                "normal socketed stash_items require num_sockets to match "
+                f"socket_fillers count ({len(fillers)})"
+            )
+    elif item_def.get('socketed') and num_sockets <= 0:
+        raise ValueError("socketed normal stash_items require num_sockets > 0")
+
+    if fillers and len(fillers) != 1:
+        raise ValueError(
+            "normal socketed stash_items currently support exactly one "
+            "validated socket filler"
+        )
+    if num_sockets:
+        max_sockets = base_info.get('max_sockets', 0)
+        if num_sockets > max_sockets:
+            raise ValueError(
+                f"stash_items base '{base_code}' supports at most "
+                f"{max_sockets} sockets, got {num_sockets}"
+            )
 
     item_bytes = build_item(
         type_code=base_code,
@@ -807,5 +880,92 @@ def _build_merc_normal(item_def, col, row):
         defense=base_info.get('max_ac', 0),
         max_dur=base_info.get('durability', 0),
         cur_dur=base_info.get('durability', 0),
+        quantity=quantity,
+        socketed=bool(item_def.get('socketed')),
+        num_sockets=num_sockets,
+        socket_filler_count=len(fillers) if fillers else None,
     )
-    return [('char', item_bytes)]
+    return [('char', item_bytes)] + [('char', filler) for filler in fillers]
+
+
+def _resolve_normal_item_quantity(item_def, base_code, base_info):
+    quantity = item_def.get('quantity', 0)
+    if quantity in (None, 0):
+        return 0
+    if not isinstance(quantity, int):
+        raise ValueError("normal stash_items quantity must be an integer")
+    if quantity < 0 or quantity > 0x1FF:
+        raise ValueError(
+            f"normal stash_items quantity must fit in 9 bits, got {quantity}"
+        )
+    if not (base_info.get('flags', 0) & 1):
+        raise ValueError(
+            f"normal stash_items base '{base_code}' does not support quantity"
+        )
+    return quantity
+
+
+def _build_socket_fillers(parent_def):
+    fillers = parent_def.get('socket_fillers') or []
+    if not fillers:
+        return []
+    if not isinstance(fillers, list):
+        raise ValueError("socket_fillers must be a list")
+    return [
+        _build_socket_filler(filler_def, socket_idx=idx)
+        for idx, filler_def in enumerate(fillers)
+    ]
+
+
+def _build_socket_filler(filler_def, *, socket_idx):
+    if not isinstance(filler_def, dict):
+        raise ValueError("socket filler entries must be mappings")
+    if filler_def.get('base') not in (None, 'jew', 'cjw'):
+        raise ValueError(
+            "socket_fillers currently support only magic 'jew' or unique 'cjw'"
+        )
+    if 'unique' in filler_def:
+        resolved = resolve_unique(filler_def['unique'])
+        if resolved['type_code'] != 'cjw' or resolved['unique_id'] != 421:
+            raise ValueError(
+                "unique socket fillers are limited to the validated "
+                "Guardian's Thunder 'cjw' jewel"
+            )
+        props = _resolve_final_properties(
+            filler_def, resolved['properties'], has_canonical=True
+        )
+        return build_item(
+            type_code=resolved['type_code'],
+            col=socket_idx, row=0, storage=0,
+            location=6, bodyloc=0,
+            quality=7,
+            ilvl=filler_def.get('ilvl', 99),
+            unique_id=resolved['unique_id'],
+            properties=props,
+        )
+
+    unsupported = [key for key in ('rare', 'crafted', 'runeword', 'set') if key in filler_def]
+    if unsupported:
+        raise ValueError(
+            "socket_fillers currently support only magic 'jew' or unique 'cjw'"
+        )
+    if filler_def.get('base') == 'cjw':
+        raise ValueError("unique 'cjw' socket fillers require a unique name")
+
+    props = resolve_properties(filler_def.get('properties', {}))
+    prefix, suffix = _resolve_magic_affixes(
+        filler_def.get('magic_prefix', 0),
+        filler_def.get('magic_suffix', 0),
+        'jew',
+        props,
+    )
+    return build_item(
+        type_code='jew',
+        col=socket_idx, row=0, storage=0,
+        location=6, bodyloc=0,
+        quality=4,
+        ilvl=filler_def.get('ilvl', 99),
+        properties=props,
+        magic_prefix=prefix,
+        magic_suffix=suffix,
+    )

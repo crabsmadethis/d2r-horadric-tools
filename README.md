@@ -137,10 +137,9 @@ magic, ethereal, set, rare, crafted, socketed-normal, and runeword payloads.
 Runeword golems are written as a JM-less parent followed by generated rune
 filler records inside the golem block. Unique payloads require explicit
 canonicalization opt-in because D2R rewrites some bytes on save/exit. Manual
-socket filler authoring and broad jewel-filler authoring remain gated; current
-live proof covers only the narrow character-item shape for a normal parent plus
-one magic `jew` or unique `cjw` filler, and that YAML surface is not exposed
-yet.
+Iron Golem socket filler authoring and broad jewel-filler authoring remain
+gated; character `stash_items` expose only the narrow live-positive normal
+parent shape with one magic `jew` or validated unique `cjw` filler.
 
 ```yaml
 class: necromancer
@@ -214,6 +213,42 @@ d2r-chargen scan MyWarlock
 The public template catalog currently documents Black Lancer, Mauler,
 Lister-style/Baal Subject 5, and Hephasto-family entries in
 [docs/bound-demon-template-recipes.md](docs/bound-demon-template-recipes.md).
+
+`stash_items` can also build the narrow socketed-normal parent shape that has
+passed Offline validation: exactly one magic `jew` filler, or the validated
+unique `Guardian's Thunder` `cjw`, under a normal parent. Broader jewel
+families and socketed magic/rare parents are still research-gated.
+
+```yaml
+stash_items:
+  - normal: true
+    base: flc
+    socketed: true
+    num_sockets: 1
+    socket_fillers:
+      - base: jew
+        magic: true
+        properties:
+          fire_res: 5
+```
+
+Normal `stash_items` may also carry explicit stack quantities for misc and
+quest-style bases that use the D2R quantity field. This is fixture-backed for
+representative tokens, essences, keys, Worldstone shards, and tomes; live
+validation should still be run before promising a new quest-item family.
+
+```yaml
+stash_items:
+  - normal: true
+    base: toa
+    quantity: 1
+  - normal: true
+    base: pk1
+    quantity: 4
+  - normal: true
+    base: tbk
+    quantity: 20
+```
 
 ### `d2r-mod`
 

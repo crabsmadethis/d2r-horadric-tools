@@ -66,6 +66,45 @@ Avoid:
 - Screenshots, unpublished save bytes, or local payload corpora.
 - Narrative notes such as who clicked what or when a machine was restarted.
 
+## Bound-Demon Semantic Snapshot (Public-Safe)
+
+Byte-level scan/diff evidence can prove persistence, but nameplates, labels, aura
+state, and runtime HP are game-behavior facts. When an open question needs
+semantic proof, collect a single snapshot and record only the stable fields
+below.
+
+Use the runtime snapshot rung in `docs/validation-ladder.md` to capture
+the data during an in-game window, then transcribe only this public-safe record
+shape into a public doc. Do not commit observer output, entity JSON, or
+any local paths.
+
+Public-safe record template:
+
+```text
+Finding: Bound-demon semantic snapshot
+Scenario id: <case-id>
+Lane: runtime snapshot (public-safe transcription)
+
+Preconditions:
+- Pre-promotion validation: scanner passed on the staged save
+- Expected save payload: monster_hcidx=<row-index>
+- Expected runtime selector: txtfileno=<unitany-txtfileno> (if known)
+
+Snapshot:
+- Display name: <in-game nameplate text>
+- Visible labels: <comma-separated affix/label words or "none">
+- Aura state: <none | "<aura name>" level <n> | unknown>
+- HP: <current>/<max>
+- Location: <act/area + coarse location; avoid exact coordinates>
+
+Post-save validation:
+- Save/exit performed: <yes/no>
+- Post-save scan: <passed | failed with public-safe reason>
+
+Limitation: this is a point-in-time semantic read; it does not prove derived
+seed/name algorithms, full stat tables, or combat scaling.
+```
+
 ## Promotion Checklist
 
 Before promoting a staged save:

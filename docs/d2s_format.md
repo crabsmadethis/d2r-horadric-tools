@@ -221,9 +221,11 @@ Current scanner output splits golem payloads into record boundaries. The
 validated runeword cases canonicalized only the parent record: Insight changed
 parent-relative offsets `+20..+44`, Strength changed parent-relative offsets
 `+23..+28`, and their socket filler records were byte-identical after
-save/exit. The current unique opt-in fixture for The Gnasher changed only
-parent-relative offsets `+20..+27`; keep unique payloads
-canonicalization-aware rather than byte-preservation promises.
+save/exit. Unique opt-in evidence is family-specific: The Gnasher changed only
+parent-relative offsets `+20..+27`, while Tarnhelm preserved its 28-byte
+single-parent payload shape and changed only parent-relative offsets `+4/+5`
+to D2R's helm body-location form. Keep unique payloads canonicalization-aware
+rather than byte-preservation promises.
 
 The bridge bytes `01 00` follow the iron-golem flag or item payload. Warlock
 bound demons still use `kf 00`, then the bridge, then the `lf` follower block.
@@ -323,6 +325,24 @@ Important differences from character stats:
   then runeword bonus properties.
 - Merc runewords use the canonical biased id form: low 12 bits are
   `runeword_id + 27`; high 4 bits are `5`.
+- Misc and quest-style normal items that carry the base quantity flag write a
+  1-bit quantity-present marker followed by a 9-bit quantity. Tome bases such
+  as `tbk` and `ibk` also carry the 5-bit book field before the extended-body
+  flag; parsers and scanners must account for it before reading quantity or
+  properties. Offline validation batches accepted Token of Absolution, Key of
+  Terror, Town Portal tome, Twisted Essence of Suffering, and Western Worldstone
+  Shard saves and scanned clean after save/exit, but D2R cleared every tested
+  non-tome quantity field while preserving the tome quantity `20`. Treat
+  non-tome misc/quest quantity preservation as D2R-canonicalized unless a future
+  family-specific live result proves otherwise. A representative organ placement
+  run accepted normal Mephisto's Brain (`mbr`), Baal's Eye (`bey`), and Diablo's
+  Horn (`dhn`) records in stash, preserving their item codes and placement
+  through save/exit. The public importer also round-trips those organ stash
+  records back to the same base codes and stash columns in YAML-compatible
+  output. Synthetic scanner/import coverage also accepts quest weapon/reward
+  bases Horadric Malus (`hdm`), Staff of Kings (`msf`), Horadric Staff (`hst`),
+  Khalim's Flail (`qf1`), and Scroll of Resistance (`tr2`) as normal stash
+  records.
 
 ### Socketed Sub-Items
 
@@ -331,6 +351,13 @@ They are byte-aligned after the parent item, count toward the parent's
 `nr_in_sockets`, and do not count toward the surrounding `JM` parent count.
 Generated simple socket fillers should be at least 11 bytes after padding;
 shorter fillers are a known rejection risk.
+
+The public writer exposes only the currently validated character-item subset:
+a normal `stash_items` parent with `socketed: true`, `num_sockets: 1`, and one
+`socket_fillers` entry. The supported filler entries are a magic `jew` or the
+validated unique `Guardian's Thunder` `cjw`; rare jewels, other unique jewel
+variants, socketed magic/rare parents, and Iron Golem jewel fillers remain
+separate validation targets.
 
 ## Bound-Demon Follower Payload
 
