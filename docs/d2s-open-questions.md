@@ -1,49 +1,101 @@
 # D2S Research Status
 
 This page tracks public `.d2s` findings that still shape tooling decisions.
-Answered questions belong in the confirmed table with their current limitation;
-open questions must name the next proof method.
+Confirmed findings belong below with their current limitation. Open questions
+must name the next proof method.
 
 For release sequencing, see `docs/d2s-version-roadmap.md`.
 
 ## Confirmed Findings
 
-| Area | Public finding | Tooling consequence |
-| --- | --- | --- |
-| Follower payload shape | Known bound-demon saves use `lf<u16:follower_count>` followed by exactly `count * 116` payload bytes. D2R accepts one known Warlock bound demon and rejects tested count-2 saves. A 2026-05-13 aggregate pass decoded 102 valid follower payloads and found 2 `follower_count=1` saves with missing payload bytes. | Writers support at most one bound demon and scanners reject count/payload mismatches. Corpus tooling should report follower payload counters without exposing raw saves. |
-| Embedded payload markers | `payload[92:94] == b"gf"` is payload data, not a stats-section marker. The 2026-05-13 aggregate pass found exactly one embedded `gf` at payload offset `92` in every decoded follower payload. | Parsers must not split the save at the embedded byte pair. |
-| Template-derived authoring | Template-derived edits can preserve `monster_hcidx`, persisted bind metadata, and seven MonUMod affix bytes. Incompatible/default seeds can zero authored source-affix bytes or strip the follower on save/exit. A narrow row-724 Black Lancer true-synthesis proof shows compatible seed-only payloads can preserve the seven-affix tuple and validated visible generated names without copying a template payload. A seed-only aura read did not preserve the earlier context-rich aura flavor for the same seed; a single-slice follow-up restored that aura when the validated `runtime_stats_24_31` context slice was included, and the resulting package was user-validated with the expected generated name and a lightning aura. | Keep the v1.2 player surface template-derived and preserve seeds/unknown slices by default. Treat explicit `monster_seed` and aura-context slices as future synthesis inputs only when they have been validated or the seed/name/aura derivation is decoded. |
-| Row-index identity | Payload `monster_hcidx` values are zero-based MonStats row indexes, not the MonStats `*hcIdx` column. Value `723` produced Dark Archer; corrected value `724` produced Black Lancer. | Inspection and model tools must use row indexes and should expose row-context comparisons before validation. |
-| Bind Demon thresholds | Effective Bind Demon level grants Extra Strong at 5, Extra Fast at 10, Spectral Hit at 15, and Aura Enchanted at 20. Payload `+52` remained persisted metadata and is not the effective skill level. Source monster affixes can carry through separately. | YAML separates `source_affixes` from `skill_affixes: auto`; skill-granted affixes derive from effective Bind Demon level. |
-| Seven-slot affix vector | The persisted MonUMod vector is seven bytes at `+80..+86`; `+85/+86` are overflow affix slots, not model-candidate bytes. | Writers and scanners should handle seven slots and avoid five-slot assumptions. |
-| Source-affix context | Some visible source-style labels require compatible context outside the seven MonUMod bytes. Black Lancer source-label work showed `bitfields_64_79` can be sufficient for Cursed and Stone Skin, while copied post-`gf` tail bytes did not change that result. Older visible-label context showed Fanaticism plus Aura Enchanted exposing the visible aura path while Aura Enchanted alone did not show that label; newer compact runtime summaries show Aura Enchanted alone is sufficient for selected aura skill/level selection across the tested row-724 seed ladder. Sanitized source-effect summaries classify compact Stone Skin as raw selected `damageresist` growth, and row-724 Cursed-only exposes a hidden Fanaticism-shaped branch that corrected row-188 Cursed-only does not repeat. The hidden branch matches known Aura Enchanted-only Fanaticism level-11 source-slice references, but user visual validation shows the row-724 Cursed-only case is just Cursed with no aura, so it is an internal effect-family collision, not generic Cursed support. Nonzero Cursed-only source-slice controls route normally with no selected modifier branch, making the hidden branch a zero-source-slice row-724 support-set behavior. | Recipes must record source-context requirements. Fanaticism is source/aura flavor, not a Bind Demon threshold affix. Cursed-only hidden-branch behavior can be diagnosed in validated support records, but should not be exposed as arbitrary public authoring. |
-| Same-model unknown slices | Same-model Fallen probes classify several slices as D2R-rewritten or structural. `+89..+91`, `+24..+31`, `+88`, `+96/+97`, `+104/+105/+106`, and `+109/+111/+112` can be rewritten; `+94` should remain `06`; `+101/+102` can save as an invalid 106-byte payload; `+114/+115` should be preserved as `f0 1f` for same-model Fallen. | Unknown slices stay template-owned unless a narrow target-specific probe proves otherwise. |
-| Model identity | Model behavior is target-dependent. Fallen-family row-index-only swaps are not solved; Council Member `347` and Black Lancer `724` are proven from the current Fallen control. Mauler row `188`, alternate Mauler row `620`, and Baal Subject 5 row `572` preserve valid seven-affix payloads from the current compatible shell and have user-confirmed visible labels, while Hephasto row `409` saves back with no follower across both tested seeds. | Template-derived model recipes may be documented for proven targets, but arbitrary `monster: NAME` synthesis stays blocked; new source-label claims need documented semantic evidence or user validation. |
-| Bound-demon name and aura seed | Same-row/same-affix probes show `monster_seed` participates in visible generated-name selection, and seed-only synthesis preserved two validated visible generated names. The current seed ladder also produced different Aura Enchanted flavor observations with the same row, affix tuple, and source context; a direct seed-only aura read did not match the earlier context-rich aura flavor for the same seed. The current row-724 isolator restored that aura with `runtime_stats_24_31` alone, while bitfields-only and post-`gf`-tail-only controls stayed at the seed-only aura. Additional genuine source slices changed the same seedc2 Aura Enchanted branch to Fanaticism levels 10 and 11, including two 6b-family slices that both decoded as level 11, so `runtime_stats_24_31` is aura level/context state rather than a binary nonzero flag. The aura-preserving package has user-visible confirmation for the same generated name plus a lightning aura. Tested names were not stored as plain ASCII in the payload or full save. | Preserve template seeds and context slices by default. Do not expose generated-name or aura-flavor authoring until the table/RNG/context derivation is decoded. Explicit seed-backed synthesis can be planned as a gated surface for validated seeds plus validated aura-context slices. |
-| Template inspection | `tools/d2s_demon_template_inspect.py` inspects one raw 116-byte payload or `.d2s` template without printing local paths, seed values, or raw unknown-slice bytes by default. It reports row index, bind metadata, labeled affix slots, unknown-slice posture, optional MonStats context, and candidate row comparisons. | Template inspection is the first v1.2 recipe step and the first step before a model-identity hypothesis. |
-| Template recipes | `docs/bound-demon-template-recipes.md` defines the public recipe contract for template-derived packages without committing local template saves. Chargen validation warns when `bound_demon.source_affixes` is non-empty because source-style labels depend on compatible template source context, and binary validation scans requested follower/golem payloads in a temporary save. | Document reusable packages as validation-gated recipes, not as probe diaries, and make source-context requirements visible before build. |
-| Cross-class followers | A structurally valid borrowed follower block can load on a non-Warlock save but is stripped back to `follower_count=0` on save/exit. | Do not expose cross-class follower payloads as normal chargen behavior. |
-| Cross-class Iron Golem | Existing live Iron Golem evidence supports Necromancer-only authoring. Forced Warlock `kf 01` probes were scanner-clean locally but failed the live launch/join/exit gate, and a forced Warlock golem-plus-bound-demon probe also failed that gate. This is separate from the cross-class follower stripping result. | Keep generated `iron_golem:` authoring Necromancer-only. |
-| Optional `jf` marker | Corpus saves prove `jf` can be absent in some no-merc/no-follower tails, but a live no-`jf` non-Warlock probe bounced from Hell load back to character select and remained byte-for-byte unchanged. A cross-class follower rewrite preserved `jf`. | Parsers should tolerate missing `jf`; writers should preserve it when present and keep emitting it for generated saves. Do not remove `jf` as a normalization step. |
-| Iron Golem block | Iron Golem data lives in `kf` before `lf` as a JM-less item payload. Normal, magic, ethereal, set, rare, crafted, and socketed-normal single-parent payloads preserved through Offline save/exit. A magic single-parent payload with `item_aura` Meditation joined, saved/exited, preserved its golem payload, and was visually confirmed. Unique parent payloads loaded and saved with the same header shape but canonicalized at the byte level; the current Gnasher fixture rewrites only parent offsets `+20..+27`. Runeword parent-only payloads failed the live gate, but Insight and Strength passed when the parent was followed by socket filler records inside `kf 01`; D2R preserved fillers and canonicalized only parent bytes. Scanner output now names parent and socket-filler records, and the hub loop groups golem diffs by those records. Public-writer Insight was visually confirmed with the expected aura. | Public YAML supports proven single-parent families, aura properties on magic parents, unique parent opt-in, and generated runeword parent-plus-filler payloads. Manual socket fillers and jewels remain blocked. |
-| Character socketed magic jewel filler | A generated normal `flc` parent followed by one extended magic `jew` filler passed Offline launch/join/save-exit/pullback scan on 2026-05-17. The parent reported one socket filler, the following filler used `location=6`, the surrounding `JM` count excluded the filler, and the post-save scan preserved the one-parent/one-filler relationship with no socket-group mismatch. | Scanner/importer may group extended `location=6` fillers under the preceding parent. Public YAML authoring still needs a product surface and regression tests before exposure. Do not infer rare jewels, unique jewels, socketed magic/rare parents, or Iron Golem jewel fillers from this single normal-parent magic-jewel proof. |
-| Character socketed Warlock-expansion unique jewel filler | A generated normal `flc` parent followed by one unique Colossal Jewel filler (`Guardian's Thunder`, `cjw`, UID 421) passed Offline launch/join/save-exit/pullback scan on 2026-05-17. The post-save preserved quality 7, UID 421, `location=6`, and the one-parent/one-filler relationship with no socket-group mismatch; D2R canonicalized the filler item level from 110 to 99. | Public YAML authoring should document D2R-owned filler item-level canonicalization. Do not infer all unique jewel variants, rare jewels, socketed magic/rare parents, or Iron Golem jewel fillers from this single `cjw` proof. |
+### Bound demon payload shape
+
+- Finding: known bound-demon saves use `lf<u16:follower_count>` followed by exactly
+  `count * 116` payload bytes.
+- Consequence: writers support at most one bound demon; scanners reject
+  follower_count/payload mismatches; corpus tooling should report aggregate counters.
+
+### Embedded payload markers
+
+- Finding: `payload[92:94] == b"gf"` is payload data, not a stats-section marker.
+- Consequence: parsers must not split at the embedded byte pair.
+
+### Template-derived authoring (current public surface)
+
+- Finding: template-derived edits can preserve `monster_hcidx`, bind metadata, and the
+  seven-slot MonUMod vector; incompatible/default seeds can zero authored source-affix
+  bytes or strip the follower on save/exit.
+- Consequence: keep the player surface template-derived by default; treat explicit seed
+  and context-slice authoring as validation-gated future work.
+
+### Row identity
+
+- Finding: payload `monster_hcidx` values are zero-based MonStats row indexes (not `*hcIdx`).
+- Consequence: inspection/model tools should treat them as row indexes and expose row
+  context comparisons before validation.
+
+### Bind Demon thresholds
+
+- Finding: effective Bind Demon level grants Extra Strong at 5, Extra Fast at 10, Spectral
+  Hit at 15, and Aura Enchanted at 20; payload `+52` is persisted metadata, not the
+  effective skill level.
+- Consequence: YAML keeps `source_affixes` separate from `skill_affixes: auto`.
+
+### Seven-slot affix vector
+
+- Finding: the persisted MonUMod vector is seven bytes at `+80..+86` (`+85/+86` are
+  overflow slots, not model-candidate bytes).
+- Consequence: writers/scanners must support seven slots (not five).
+
+### Source-affix context
+
+- Finding: visible source-style labels can require compatible context outside the seven
+  MonUMod bytes; treat Fanaticism as source/aura flavor, not a Bind Demon threshold affix.
+- Consequence: recipes must record source-context requirements; do not expose arbitrary
+  public authoring that depends on unvalidated context slices.
+
+### Same-model unknown slices (Fallen controls)
+
+- Finding: several slices are D2R-rewritten or structural for same-model Fallen probes,
+  including `+89..+91`, `+24..+31`, `+88`, `+96/+97`, `+104/+105/+106`, and `+109/+111/+112`.
+  `+94` should remain `06`, and `+114/+115` should preserve `f0 1f` for same-model Fallen.
+- Consequence: unknown slices remain template-owned/preserve-first unless a proof says
+  otherwise.
+
+### Expansion quest and misc items (single-item stash persistence matrix)
+
+- Finding: some quest/reward bases persist as a single stash item through Offline load/save,
+  while others are removed on save/exit even when the save loads and scans clean.
+- Status: closed enough for `v1.3` as a mixed preservation/removal limitation; only run
+  another single-item ladder if it would change what the public writer can promise.
+- Current single-item matrix (scanner-clean staging, post-save stash inspection):
+  - Preserved: `leg`, `tr1`, `tr2`, `qf1`, `qf2`, `j34`
+  - Removed: `hdm`, `msf`, `hst`, `qhr`, `bbb`
+- Consequence: keep this family-by-family. Do not infer quest usability, turn-in behavior,
+  or general persistence from a single base code. Run another single-item ladder only if it
+  would change what the public writer can promise.
 
 ## Open Questions
 
-| Question | Why it matters | Next proof method |
-| --- | --- | --- |
-| General template-free bound-demon synthesis | A narrow seed-backed row-724 Black Lancer initializer is live-positive, but arbitrary synthesis still requires knowing which bytes are fixed, generated, model-derived, volatile, source-context, or rejected across rows and affix packages. | Continue the synthesis ladder in `docs/bound-demon-chargen-roadmap.md`: treat explicit validated seed-backed synthesis as the next narrow surface, then expand across rows only after same-family and cross-family model swaps pass. |
-| Bound-demon name/aura generation algorithm | Recipe users will see generated demon names and Aura Enchanted flavors. Seed participation is now confirmed for names, but aura flavor is not seed-only in the current proof set; `runtime_stats_24_31` is sufficient for the current row-724 aura-context restoration, but the prefix/suffix/appellation and general aura derivation are not decoded. | For synthesis work, expand or model the same-row seed ladder against the unique-prefix, unique-suffix, unique-appellation, context slices, and aura-flavor evidence, then decide whether any seed/name/aura authoring belongs in a public writer. |
-| Bound-demon player-count stat scaling | Demons bound on higher `/players` counts can be stronger than demons bound on lower counts. Matched row-20 captures preserved the same row and affixes while payload `+44/+48` formed a p1/p4/p8 ladder of repeated decimal `0`, `150`, and `350`, matching `50 * (players - 1)`. Controlled edits preserved authored pcount-shaped values through load/save, but healthy runtime replays for actual p1/p4/p8 all kept HP/maxHP `32768/32768` in the currently decoded branches. Context isolates for p8 bitfields, post-`gf` tail bytes, and volatile `+88..+91` did not turn these bytes into a standalone visible-strength knob. These fields are not yet decoded as max HP, damage, AR, defense, or level. | For template recipes, preserve captured pcount/context bytes and document the limitation. For template-free synthesis, collect combat-state runtime evidence from actual p1/p8 demons, or extend the observer to find combat HP/damage/AR/defense outside the currently decoded healthy stat branches. |
-| Bound-demon semantic inspection | Byte-level scan/diff evidence now answers persistence, but names, labels, aura state, HP, and damage are game-behavior facts. | Add a repeatable public-safe evidence recipe that records the target row, display name, labels, aura state, current/max HP, and location without committing local artifacts. |
-| Broader model identity | Some targets are row-index-only from the current control, while same-family Fallen swaps are not. | Inspect candidate templates with `tools/d2s_demon_template_inspect.py --excel-dir <extracted-excel-dir> --compare-hcidx <target-row-index>`, compare rows with `tools/d2s_monster_model_compare.py`, then validate one documented row-index or companion-offset hypothesis at a time. |
-| Merc status at `0xA7..0xA8` | The field has more observed values than the writer currently understands. Aggregate grouping found values such as `0`, `1`, `3`, `5`, `9`, `11`, `15`, `16`, `18`, `21`, and `50`, with correlations to hireling id, merc item count, progression, and difficulty, but not a decoded semantic. | Preserve the field by default; only change it with fixture-backed writer intent or live proof for a specific hireling state. |
-| Unique Iron Golem canonicalization | Unique parent payloads load and save, but D2R rewrites some bytes. The current The Gnasher opt-in fixture rewrites only parent offsets `+20..+27`; broader unique-family behavior is not mapped. | Keep unique support opt-in and canonicalization-aware; add more unique families before making byte-for-byte or all-unique promises. |
-| Rare item naming | Rare and crafted items carry first-name and last-name row ids separate from stat affixes. | Add fixture-backed name-resolution and import tests, then manually validate one deterministic rare per major item class. |
-| Broader socketed jewels through chargen | The narrow generated magic-`jew` and unique-`cjw` filler cases are live-positive, but rare jewels, other unique jewel variants, socketed magic/rare parents, Iron Golem jewel fillers, and game-authored import comparison are not yet proven. | Productize the proven normal-parent YAML surface first, then validate each broader family separately with fixture-backed scanner/importer tests plus one representative Offline save/exit/pullback scan. |
-| Shared stash support | Shared stash files are outside the character `.d2s` and have a larger blast radius. | Decode disposable Offline profile stash files into public-safe structure notes, then create a separate backup/edit/scan/restore ladder before writer support. |
-| Expansion quest and misc items | Misc item bases exist, but stack counts, quest flags, usability, placement, and acceptance are not broadly proven. | Expand synthetic fixtures by family, verify quantity/stack behavior, then manually validate one representative per family. |
+### Merc status at `0xA7..0xA8`
+
+- Current state: the field has more observed values than the writer understands; the
+  committed fixture corpus currently observes only `0` and `1` (1 committed `.d2s` under
+  `tests/fixtures/`).
+- Next proof (public-safe): run an external-corpus aggregate grouping pass and share only
+  aggregate-only JSON output:
+  - `python3 tools/d2s_corpus_scan.py <roots...> --report merc-status-context --json > merc-status-report.json`
+- Boundary: this does not decode semantics; it only groups observed values against other
+  parsed fields.
+- Tooling rule: preserve the field by default and treat it as a raw `u16` status field; only
+  change it with fixture-backed writer intent or live proof for a specific hireling state.
+
+### Shared stash support
+
+- Current state: shared stash files are outside the character `.d2s` and have a larger blast
+  radius than per-character writes.
+- Next proof: `v1.4` safety ladder (disposable profile decode + backup/edit/scan/restore) with
+  public-safe structure notes before any writer support.
 
 ## Recording Rules
 

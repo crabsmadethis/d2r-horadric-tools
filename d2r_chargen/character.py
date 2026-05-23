@@ -8,7 +8,6 @@ import shutil
 import struct
 import sys
 
-import yaml
 from d2r_chargen.config import (
     SAVES, CHARS_DIR, FIXTURES_DIR, SLOT_MAP, CLASS_DEFS, CHARM_DIMS,
 )
@@ -86,6 +85,13 @@ def load_character_yaml(path):
         ValueError: If schema_version is wrong or required fields are missing.
         FileNotFoundError: If the YAML file doesn't exist.
     """
+    try:
+        import yaml  # type: ignore
+    except ModuleNotFoundError as exc:
+        raise ModuleNotFoundError(
+            "PyYAML is required to load character YAML (install with 'pip install pyyaml')."
+        ) from exc
+
     with open(path, 'r') as f:
         char_def = yaml.safe_load(f)
 

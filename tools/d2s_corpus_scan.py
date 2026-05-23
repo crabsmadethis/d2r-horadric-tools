@@ -340,12 +340,33 @@ def add_grouped_counters(
             "class_id",
             "progression",
             "difficulty_current",
+            "header_level",
+            "merc_xp",
         ):
             if field_name in field_values:
                 summary.add_counter(
                     f"merc_status_by_{field_name}",
                     _group_key(merc_status, field_values[field_name]),
                 )
+
+        if "progression" in field_values and "difficulty_current" in field_values:
+            summary.add_counter(
+                "merc_status_by_progression_difficulty",
+                _group_key(
+                    merc_status,
+                    field_values["progression"],
+                    field_values["difficulty_current"],
+                ),
+            )
+        if "hireling_id" in field_values and "merc_item_count" in field_values:
+            summary.add_counter(
+                "merc_status_by_hireling_id_merc_item_count",
+                _group_key(
+                    merc_status,
+                    field_values["hireling_id"],
+                    field_values["merc_item_count"],
+                ),
+            )
 
     for field_name in (
         "class_id",
@@ -382,6 +403,140 @@ def print_text(summary: CorpusSummary) -> None:
                 print(f"  {value}")
 
 
+def _sorted_group_counter(counter: dict[str, int]) -> list[tuple[str, int]]:
+    return sorted(counter.items(), key=lambda pair: (-pair[1], pair[0]))
+
+
+def render_merc_status_report(summary: CorpusSummary, *, top: int = 15) -> list[str]:
+    """Render a focused report for the merc-status open question.
+
+    This is intentionally aggregate-only and uses the same grouped counters that
+    are already collected into the summary JSON.
+    """
+    data = summary.as_dict()
+    counters = data["counters"]
+    lines: list[str] = []
+    lines.append("merc status report (aggregate)")
+    lines.append(f"valid_d2s={data['valid_d2s']}")
+
+    merc_status = counters.get("merc_status_u16_0xA7")
+    if not merc_status:
+        lines.append("merc_status: (none)")
+        return lines
+
+    lines.append("merc_status:")
+    for value, count in _sorted_group_counter(merc_status)[:top]:
+        lines.append(f"  {value}: {count}")
+
+    for field_name in (
+        "hireling_id",
+        "merc_item_count",
+        "progression",
+        "difficulty_current",
+        "class_id",
+        "header_level",
+        "merc_xp",
+        "source_bucket",
+    ):
+        grouped = counters.get(f"merc_status_by_{field_name}")
+        if not grouped:
+            continue
+        lines.append(f"merc_status_by_{field_name}:")
+        for value, count in _sorted_group_counter(grouped)[:top]:
+            lines.append(f"  {value}: {count}")
+    return lines
+
+
+def _report_rows(counter: dict[str, int], *, top: int) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for value, count in _sorted_group_counter(counter)[:top]:
+        rows.append({"value": value, "count": count})
+    return rows
+
+
+def render_merc_status_report_payload(
+    summary: CorpusSummary, *, top: int = 15, context: bool = False
+) -> dict[str, Any]:
+    """Render a JSON-safe payload for the merc-status open question.
+
+    This intentionally emits aggregate-only counters and omits filename examples
+    to keep it safe for sharing in public issues or pastebins.
+    """
+    data = summary.as_dict()
+    counters = data["counters"]
+    payload: dict[str, Any] = {
+        "report": "merc-status-context" if context else "merc-status",
+        "valid_d2s": data["valid_d2s"],
+        "sections": {},
+    }
+
+    merc_status = counters.get("merc_status_u16_0xA7")
+    if not merc_status:
+        payload["sections"]["merc_status"] = []
+        return payload
+
+    payload["sections"]["merc_status"] = _report_rows(merc_status, top=top)
+
+    if context:
+        for field_name in (
+            "merc_status_by_progression_difficulty",
+            "merc_status_by_hireling_id_merc_item_count",
+        ):
+            grouped = counters.get(field_name)
+            if grouped:
+                payload["sections"][field_name] = _report_rows(grouped, top=top)
+    else:
+        for field_name in (
+            "hireling_id",
+            "merc_item_count",
+            "progression",
+            "difficulty_current",
+            "class_id",
+            "header_level",
+            "merc_xp",
+            "source_bucket",
+        ):
+            grouped = counters.get(f"merc_status_by_{field_name}")
+            if grouped:
+                payload["sections"][f"merc_status_by_{field_name}"] = _report_rows(
+                    grouped, top=top
+                )
+    return payload
+
+
+def render_merc_status_context_report(
+    summary: CorpusSummary, *, top: int = 15
+) -> list[str]:
+    """Render a merc-status report with additional combined groupings."""
+    data = summary.as_dict()
+    counters = data["counters"]
+    lines: list[str] = []
+    lines.append("merc status report (aggregate+context)")
+    lines.append(f"valid_d2s={data['valid_d2s']}")
+
+    merc_status = counters.get("merc_status_u16_0xA7")
+    if not merc_status:
+        lines.append("merc_status: (none)")
+        return lines
+
+    lines.append("merc_status:")
+    for value, count in _sorted_group_counter(merc_status)[:top]:
+        lines.append(f"  {value}: {count}")
+
+    for field_name in (
+        "merc_status_by_progression_difficulty",
+        "merc_status_by_hireling_id_merc_item_count",
+    ):
+        grouped = counters.get(field_name)
+        if not grouped:
+            continue
+        lines.append(f"{field_name}:")
+        for value, count in _sorted_group_counter(grouped)[:top]:
+            lines.append(f"  {value}: {count}")
+
+    return lines
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -402,13 +557,48 @@ def main() -> int:
         action="store_true",
         help="Exit non-zero if any save has follower_count/payload mismatch.",
     )
+    parser.add_argument(
+        "--report",
+        choices=("merc-status", "merc-status-context"),
+        help="Emit a focused aggregate report instead of the full counter dump.",
+    )
+    parser.add_argument(
+        "--top",
+        type=int,
+        default=15,
+        help="Limit report rows per section (used with --report).",
+    )
     args = parser.parse_args()
 
     summary = CorpusSummary(examples_limit=args.examples)
     for root, path in iter_d2s_candidates(args.roots):
         summarize_file(summary, root, path)
 
-    if args.json:
+    if args.report == "merc-status":
+        if args.json:
+            print(
+                json.dumps(
+                    render_merc_status_report_payload(summary, top=args.top, context=False),
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+        else:
+            for line in render_merc_status_report(summary, top=args.top):
+                print(line)
+    elif args.report == "merc-status-context":
+        if args.json:
+            print(
+                json.dumps(
+                    render_merc_status_report_payload(summary, top=args.top, context=True),
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+        else:
+            for line in render_merc_status_context_report(summary, top=args.top):
+                print(line)
+    elif args.json:
         print(json.dumps(summary.as_dict(), indent=2, sort_keys=True))
     else:
         print_text(summary)

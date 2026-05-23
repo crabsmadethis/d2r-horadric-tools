@@ -7,6 +7,9 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from tools.d2s_corpus_scan import CorpusSummary, calc_checksum, summarize_file  # noqa: E402
+from tools.d2s_corpus_scan import render_merc_status_report  # noqa: E402
+from tools.d2s_corpus_scan import render_merc_status_context_report  # noqa: E402
+from tools.d2s_corpus_scan import render_merc_status_report_payload  # noqa: E402
 
 
 def _put_u16(data: bytearray, offset: int, value: int) -> None:
@@ -106,6 +109,70 @@ def test_corpus_scan_reports_follower_payload_and_grouped_counters(tmp_path):
     assert counters["merc_status_by_merc_item_count"] == {"11|3": 1}
     assert counters["jf_presence_by_class_id"] == {"true|7": 1}
     assert counters["jf_presence_by_follower_count"] == {"true|1": 1}
+
+
+def test_merc_status_report_renders_grouped_sections(tmp_path):
+    save = tmp_path / "merc-probe.d2s"
+    save.write_bytes(_make_save(_make_payload(), merc_item_count=0))
+
+    summary = CorpusSummary()
+    summarize_file(summary, tmp_path, save)
+
+    report = "\n".join(render_merc_status_report(summary, top=5))
+    assert "merc_status:" in report
+    assert "11: 1" in report
+    assert "merc_status_by_merc_item_count:" in report
+    assert "11|0: 1" in report
+
+
+def test_merc_status_context_report_renders_combined_sections(tmp_path):
+    save = tmp_path / "merc-context-probe.d2s"
+    save.write_bytes(_make_save(_make_payload(), merc_item_count=0))
+
+    summary = CorpusSummary()
+    summarize_file(summary, tmp_path, save)
+
+    report = "\n".join(render_merc_status_context_report(summary, top=5))
+    assert "merc_status:" in report
+    assert "11: 1" in report
+    assert "merc_status_by_progression_difficulty:" in report
+    assert "11|15|2: 1" in report
+    assert "merc_status_by_hireling_id_merc_item_count:" in report
+    assert "11|271|0: 1" in report
+
+
+def test_merc_status_report_payload_emits_aggregate_json(tmp_path):
+    save = tmp_path / "merc-json-probe.d2s"
+    save.write_bytes(_make_save(_make_payload(), merc_item_count=0))
+
+    summary = CorpusSummary()
+    summarize_file(summary, tmp_path, save)
+
+    payload = render_merc_status_report_payload(summary, top=5, context=False)
+    assert payload["report"] == "merc-status"
+    assert payload["valid_d2s"] == 1
+    assert payload["sections"]["merc_status"] == [{"value": "11", "count": 1}]
+    assert payload["sections"]["merc_status_by_merc_item_count"] == [
+        {"value": "11|0", "count": 1}
+    ]
+
+
+def test_merc_status_context_report_payload_emits_combined_sections(tmp_path):
+    save = tmp_path / "merc-json-context-probe.d2s"
+    save.write_bytes(_make_save(_make_payload(), merc_item_count=0))
+
+    summary = CorpusSummary()
+    summarize_file(summary, tmp_path, save)
+
+    payload = render_merc_status_report_payload(summary, top=5, context=True)
+    assert payload["report"] == "merc-status-context"
+    assert payload["sections"]["merc_status"] == [{"value": "11", "count": 1}]
+    assert payload["sections"]["merc_status_by_progression_difficulty"] == [
+        {"value": "11|15|2", "count": 1}
+    ]
+    assert payload["sections"]["merc_status_by_hireling_id_merc_item_count"] == [
+        {"value": "11|271|0", "count": 1}
+    ]
 
 
 def test_corpus_scan_accepts_missing_jf_with_empty_merc_and_no_follower(tmp_path):

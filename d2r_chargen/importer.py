@@ -4,8 +4,9 @@ import struct
 from datetime import datetime
 
 from d2r_chargen.scanner import (
-    bits_at, decode_item_header, navigate_item_structure,
+    bits_at, decode_huff4, decode_item_header, navigate_item_structure,
 )
+from d2r_chargen.build_lib import get_base_flags
 from d2r_chargen.decoder import decode_item_properties
 from d2r_chargen.config import (
     CLASS_DEFS, reverse_resolve_alias,
@@ -297,6 +298,9 @@ def _decode_single_item(data, pos):
         else:
             item_dict['runeword'] = f'runeword_{rw_id}'
         item_dict['base'] = tc
+        quantity = _decode_quantity(data, pos, quality)
+        if quantity:
+            item_dict['quantity'] = quantity
 
     elif quality == 7:
         u_info = UNIQUE_ITEMS.get(uid)
@@ -315,6 +319,20 @@ def _decode_single_item(data, pos):
     elif quality == 6:
         item_dict['rare'] = True
         item_dict['base'] = tc
+        first, last = _decode_rare_name_ids(data, pos, quality)
+        if first:
+            item_dict['rare_first_name'] = first
+        if last:
+            item_dict['rare_last_name'] = last
+
+    elif quality == 8:
+        item_dict['crafted'] = True
+        item_dict['base'] = tc
+        first, last = _decode_rare_name_ids(data, pos, quality)
+        if first:
+            item_dict['rare_first_name'] = first
+        if last:
+            item_dict['rare_last_name'] = last
 
     elif quality == 4:
         item_dict['magic'] = True
@@ -326,6 +344,9 @@ def _decode_single_item(data, pos):
 
     else:
         item_dict['base'] = tc
+        quantity = _decode_quantity(data, pos, quality)
+        if quantity:
+            item_dict['quantity'] = quantity
 
     if prop_start_bit is not None:
         num_terminators = 2 if is_runeword else 1
@@ -339,6 +360,112 @@ def _decode_single_item(data, pos):
             pass
 
     return item_dict
+
+
+def _decode_rare_name_ids(data, pos, quality):
+    """Decode rare/crafted 8-bit first and last name ids from an item record."""
+    if quality not in (6, 8):
+        return (0, 0)
+
+    flags32 = struct.unpack_from('<I', data, pos)[0]
+    if flags32 & (1 << 21):
+        return (0, 0)
+
+    br = pos * 8
+    br += 32  # flags
+    br += 3   # D2R ext
+    br += 3   # location
+    br += 4   # bodyloc
+    br += 4   # col
+    br += 3   # row
+    br += 1   # unknown
+    br += 3   # storage
+
+    try:
+        _tc, br = decode_huff4(data, br)
+    except Exception:
+        return (0, 0)
+
+    br += 3   # nr_in_sockets
+    br += 32  # item_id
+    br += 7   # ilvl
+    br += 4   # quality
+
+    multi_pic = bits_at(data, br, 1)
+    br += 1
+    if multi_pic:
+        br += 3
+    class_spec = bits_at(data, br, 1)
+    br += 1
+    if class_spec:
+        br += 11
+
+    return (bits_at(data, br, 8), bits_at(data, br + 8, 8))
+
+
+def _decode_quantity(data, pos, quality):
+    """Decode a normal-item 9-bit quantity from an item record, when present."""
+    if quality != 2:
+        return None
+
+    flags32 = struct.unpack_from('<I', data, pos)[0]
+    if flags32 & (1 << 21):
+        return None
+
+    br = pos * 8
+    br += 32  # flags
+    br += 3   # D2R ext
+    br += 3   # location
+    br += 4   # bodyloc
+    br += 4   # col
+    br += 3   # row
+    br += 1   # unknown
+    br += 3   # storage
+
+    try:
+        _tc, br = decode_huff4(data, br)
+    except Exception:
+        return None
+
+    base_flags = get_base_flags(_tc)
+    if not (base_flags & 1):
+        return None
+
+    br += 3   # nr_in_sockets
+    br += 32  # item_id
+    br += 7   # ilvl
+    br += 4   # quality
+
+    multi_pic = bits_at(data, br, 1)
+    br += 1
+    if multi_pic:
+        br += 3
+    class_spec = bits_at(data, br, 1)
+    br += 1
+    if class_spec:
+        br += 11
+
+    if flags32 & (1 << 24):
+        return None
+    if base_flags & 8:
+        br += 5
+    ext_body = bits_at(data, br, 1)
+    br += 1
+    if ext_body:
+        br += 96
+    if base_flags & 4:
+        br += 11
+    if base_flags & 6:
+        max_dur = bits_at(data, br, 8)
+        br += 8
+        if max_dur > 0:
+            br += 9
+
+    has_qty = bits_at(data, br, 1)
+    br += 1
+    if not has_qty:
+        return None
+    return bits_at(data, br, 9)
 
 
 def _props_to_yaml(prop_tuples):
