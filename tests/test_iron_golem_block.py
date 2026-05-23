@@ -153,6 +153,10 @@ def test_compare_runeword_golem_payload_groups_socket_filler_diffs():
 
 
 def test_compare_unique_helm_golem_payload_groups_d2r_bodyloc_rewrite():
+    pytest.importorskip(
+        "d2r_chargen.data.item_bases",
+        reason="game data not extracted (run 'd2r-mod extract')",
+    )
     from d2r_chargen.items import build_iron_golem_item
 
     before = build_iron_golem_item({
@@ -178,6 +182,10 @@ def test_compare_unique_helm_golem_payload_groups_d2r_bodyloc_rewrite():
 
 
 def test_compare_unique_axe_golem_payload_groups_d2r_canonicalization_rewrite():
+    pytest.importorskip(
+        "d2r_chargen.data.item_bases",
+        reason="game data not extracted (run 'd2r-mod extract')",
+    )
     from d2r_chargen.items import build_iron_golem_item
 
     before = build_iron_golem_item({
