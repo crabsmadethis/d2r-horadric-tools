@@ -26,6 +26,8 @@ Horadric Tools provides:
   and mod-pipeline automation.
 - Public diagnostics in `tools/` for corpus scans, follower payload inspection,
   model-row comparison, and repo hygiene checks.
+- A shareable external-corpus scan wrapper at `scripts/merc_status_external_scan.sh`
+  for the merc-status open question (aggregate-only JSON; no paths or per-file examples).
 
 Character generation currently covers equipment, runewords, charms, stats,
 skills, mercenary gear, Iron Golems, and experimental template-derived bound
