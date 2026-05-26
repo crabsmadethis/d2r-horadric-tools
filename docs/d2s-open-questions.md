@@ -80,8 +80,9 @@ For release sequencing, see `docs/d2s-version-roadmap.md`.
 ### Merc status at `0xA7..0xA8`
 
 - Current state: the field has more observed values than the writer understands; the
-  committed fixture corpus currently observes only `0` and `1` (1 committed `.d2s` under
-  `tests/fixtures/`).
+  local public-safe corpora currently observe only `0` and `1`:
+  - Committed `.d2s` fixtures (`d2r_chargen/data/template.d2s`, `tests/fixtures/*.d2s`): `1` only.
+  - Local `.live-evidence/` corpus (public-safe): `126` `.d2s` files total; `122` with `1`, `4` with `0`.
 - Next proof (public-safe): run an external-corpus aggregate grouping pass and share only
   aggregate-only JSON output:
   - `python3 tools/d2s_corpus_scan.py <roots...> --report merc-status-context --json > merc-status-report.json`
